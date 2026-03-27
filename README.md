@@ -185,7 +185,6 @@ Each opportunity under `ACCOUNTS/<team>/<Account Name>/` gets an automated intel
 | Orchestrator crashes | Check `logs/orchestrator_manual.log` for missing methods |
 | LLM not responding | Verify API key in `jarvis/config/jarvis.yaml` |
 | Files not updating | Ensure folder is under `ACCOUNTS/` with `notes.json` |
-not updating | Ensure folder is under `ACCOUNTS/` with `notes.json` or `deals/` |
 | Port 8080 in use | `lsof -i :8080` → kill conflicting process |
 | MCP not filtering | Verify `workspace_root` in `config/mcp-observer.json` |
 
