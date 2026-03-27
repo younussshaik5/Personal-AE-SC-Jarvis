@@ -1,0 +1,59 @@
+workspace_root: /path/to/your/workspace
+data_dir: /path/to/your/workspace/jarvis/data
+logs_dir: /path/to/your/workspace/jarvis/logs
+approval_required: true
+approval_threshold: 50
+evolution:
+  enabled: true
+  cycle_interval_hours: 6
+archiving:
+  enabled: true
+  daily_snapshot: true
+  retention_days: 90
+persona:
+  default: work
+  auto_switch: true
+
+# Solution Engineer Identity (persisted throughout system)
+solution_engineer:
+  name: "YOUR_NAME"
+  initials: "XY"
+  title: "Solution Engineer at Company"
+telegram:
+  enabled: true
+  bot_token: "YOUR_TELEGRAM_BOT_TOKEN_HERE"
+  allowed_user_ids: []  # Add your Telegram user ID here (e.g., [123456789]). Empty = allow all (not recommended for production).
+  channel_id: ""  # Optional: channel ID for broadcasts (e.g., "@your_channel" or -1001234567890)
+  broadcast_events: true
+  allow_conversational_chat: true
+  allow_commands: true
+  notify_on_persona_switch: true
+  notify_on_modification_approved: true
+  notify_on_pattern_discovered: false
+  notify_on_competitor_detected: true
+  notify_on_errors: true
+  rate_limit_per_minute: 10
+
+llm:
+  provider: "openai"  # (ignored if opencode_ai: true) openai, anthropic, nvidia, local, mock
+  api_key: "YOUR_API_KEY_HERE"
+  base_url: "https://api.openai.com/v1"
+  model: "stepfun-ai/step-3.5-flash"
+  temperature: 1
+  top_p: 0.9
+  max_tokens: 16384
+  context_window: 32768
+  extra_body: null
+  stream: false
+
+# Use OpenCode's AI configuration instead of local LLM config
+opencode_ai:
+  enabled: true  # Set to true to use OpenCode's configured AI provider/model
+  config_path: "~/.config/opencode/config.yaml"  # Path to OpenCode's config file
+  # Recommended: remove or comment out local llm: section above when enabled
+
+web_search:
+  enabled: true
+  engine: "duckduckgo"  # duckduckgo, google (requires API key)
+  max_results: 5
+  timeout: 10  # seconds

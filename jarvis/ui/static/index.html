@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JARVIS - AI Employee Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Rajdhani:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Boot Sequence Overlay -->
+    <div id="boot-sequence" class="boot-overlay">
+        <div class="boot-content">
+            <div class="jarvis-logo">J.A.R.V.I.S.</div>
+            <div class="boot-text">
+                <div id="boot-line-1" class="boot-line">Initializing systems...</div>
+                <div id="boot-line-2" class="boot-line">Loading modules...</div>
+                <div id="boot-line-3" class="boot-line">Connecting to OpenCode...</div>
+                <div id="boot-line-4" class="boot-line">READY</div>
+            </div>
+            <div class="loading-bar">
+                <div class="loading-progress" id="boot-progress"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Dashboard -->
+    <div id="dashboard" class="dashboard hidden">
+        <!-- Top Bar -->
+        <header class="top-bar">
+            <div class="header-left">
+                <div class="jarvis-logo-small">J.A.R.V.I.S.</div>
+                <div class="system-status" id="system-status">
+                    <span class="status-indicator online"></span>
+                    <span id="status-text">ONLINE</span>
+                </div>
+            </div>
+            <div class="header-center">
+                <div class="active-persona" id="active-persona">
+                    <span class="label">ACTIVE PERSONA:</span>
+                    <span class="value" id="persona-name">Loading...</span>
+                    <span class="persona-type" id="persona-type">—</span>
+                </div>
+                <div class="current-time" id="current-time">00:00:00 UTC</div>
+            </div>
+            <div class="header-right">
+                <button class="btn btn-primary" id="quick-action-btn">
+                    <span class="icon">⚡</span> Quick Action
+                </button>
+                <button class="btn btn-secondary" id="settings-btn">
+                    <span class="icon">⚙</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Content Grid -->
+        <div class="main-grid">
+            <!-- Left Sidebar - Persona & Quick Stats -->
+            <aside class="sidebar left-sidebar">
+                <div class="panel">
+                    <div class="panel-header">
+                        <h3>PERSONAS</h3>
+                        <button class="btn-icon" id="add-persona-btn">+</button>
+                    </div>
+                    <div class="personas-list" id="personas-list">
+                        <!-- Dynamic persona cards -->
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-header">
+                        <h3>QUICK STATS</h3>
+                    </div>
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <div class="stat-value" id="stat-files">0</div>
+                            <div class="stat-label">Files Observed</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value" id="stat-patterns">0</div>
+                            <div class="stat-label">Patterns</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value" id="stat-deals">0</div>
+                            <div class="stat-label">Active Deals</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value" id="stat-trust">0%</div>
+                            <div class="stat-label">Trust Score</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-header">
+                        <h3>APPROVALS</h3>
+                        <span class="badge" id="approval-count">0</span>
+                    </div>
+                    <div class="approvals-list" id="approvals-list">
+                        <div class="empty-state">No pending approvals</div>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Center - Main Workspace -->
+            <main class="main-content">
+                <!-- Workspace Overview -->
+                <div class="panel workspace-panel">
+                    <div class="panel-header">
+                        <h3>WORKSPACE OVERVIEW</h3>
+                        <button class="btn-small" id="scan-btn">🔍 Scan</button>
+                    </div>
+                    <div class="workspace-grid">
+                        <div class="workspace-item" id="workspace-current">
+                            <div class="workspace-icon">📁</div>
+                            <div class="workspace-info">
+                                <div class="workspace-name" id="current-workspace-name">—</div>
+                                <div class="workspace-path" id="current-workspace-path">—</div>
+                            </div>
+                            <div class="workspace-meta">
+                                <span class="tech-badge" id="tech-stack">—</span>
+                            </div>
+                        </div>
+                        <div class="workspace-stats">
+                            <div class="ws-stat">
+                                <span class="ws-stat-value" id="ws-total-files">0</span>
+                                <span class="ws-stat-label">Total Files</span>
+                            </div>
+                            <div class="ws-stat">
+                                <span class="ws-stat-value" id="ws-observed-files">0</span>
+                                <span class="ws-stat-label">Observed</span>
+                            </div>
+                            <div class="ws-stat">
+                                <span class="ws-stat-value" id="ws-recent-activity">0</span>
+                                <span class="ws-stat-label">Recent Edits</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Event Stream -->
+                <div class="panel events-panel">
+                    <div class="panel-header">
+                        <h3>LIVE EVENT STREAM</h3>
+                        <div class="event-controls">
+                            <button class="btn-icon active" id="event-filter-all">All</button>
+                            <button class="btn-icon" id="event-filter-files">Files</button>
+                            <button class="btn-icon" id="event-filter-chat">Chat</button>
+                            <button class="btn-icon" id="event-filter-system">System</button>
+                        </div>
+                    </div>
+                    <div class="events-container" id="events-container">
+                        <div class="empty-state">Waiting for events...</div>
+                    </div>
+                </div>
+
+                <!-- Deals & Tasks -->
+                <div class="panel deals-panel">
+                    <div class="panel-header">
+                        <h3>ACTIVE DEALS</h3>
+                        <button class="btn-small" id="add-deal-btn">+ New Deal</button>
+                    </div>
+                    <div class="deals-list" id="deals-list">
+                        <div class="empty-state">No active deals</div>
+                    </div>
+                </div>
+            </main>
+
+            <!-- Right Sidebar - Actions & Insights -->
+            <aside class="sidebar right-sidebar">
+                <div class="panel">
+                    <div class="panel-header">
+                        <h3>QUICK ACTIONS</h3>
+                    </div>
+                    <div class="quick-actions">
+                        <button class="action-btn" id="action-archive">
+                            <span class="action-icon">📦</span>
+                            <span class="action-label">Create Snapshot</span>
+                        </button>
+                        <button class="action-btn" id="action-evolve">
+                            <span class="action-icon">🧬</span>
+                            <span class="action-label">Trigger Evolution</span>
+                        </button>
+                        <button class="action-btn" id="action-scan">
+                            <span class="action-icon">🔍</span>
+                            <span class="action-label">Force Scan</span>
+                        </button>
+                        <button class="action-btn" id="action-backup">
+                            <span class="action-icon">💾</span>
+                            <span class="action-label">Backup Now</span>
+                        </button>
+                        <button class="action-btn" id="action-approvals">
+                            <span class="action-icon">✅</span>
+                            <span class="action-label">Review Approvals</span>
+                        </button>
+                        <button class="action-btn" id="action-logs">
+                            <span class="action-icon">📋</span>
+                            <span class="action-label">View Logs</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-header">
+                        <h3>LEARNED PATTERNS</h3>
+                    </div>
+                    <div class="patterns-list" id="patterns-list">
+                        <div class="empty-state">No patterns learned yet</div>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-header">
+                        <h3>COMPETITORS</h3>
+                    </div>
+                    <div class="competitors-list" id="competitors-list">
+                        <div class="empty-state">No competitors detected</div>
+                    </div>
+                </div>
+
+                <div class="panel system-panel">
+                    <div class="panel-header">
+                        <h3>SYSTEM</h3>
+                        <span class="status-dot" id="system-health">●</span>
+                    </div>
+                    <div class="system-info">
+                        <div class="info-row">
+                            <span class="info-label">Uptime:</span>
+                            <span class="info-value" id="uptime">0h 0m</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Messages:</span>
+                            <span class="info-value" id="msg-count">0</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Changes:</span>
+                            <span class="info-value" id="change-count">0</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Version:</span>
+                            <span class="info-value">2.0.0</span>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <div id="modal-overlay" class="modal-overlay hidden">
+        <div class="modal" id="modal-content">
+            <!-- Dynamic modal content -->
+        </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
