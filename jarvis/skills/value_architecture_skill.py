@@ -286,7 +286,7 @@ Build 3-year ROI model for {account_name}.
 Deal:
 - ARR: ${arr:,}
 - Agents: {agents}
-- Product: {deal.get('product', 'Freshdesk')}
+- Product: {deal.get('product', 'AcmeDesk')}
 
 Competitor Pricing (live):
 {comp_pricing_str}

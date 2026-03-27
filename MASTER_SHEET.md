@@ -276,10 +276,7 @@ Edit the respective skill file:
 
 | Account Name | Team | Deals | Gaps | Last Updated |
 |--------------|------|-------|------|--------------|
-| Ivalua::Freshdesk (35) Pro::New Business | PRESALES SOLUTION CONSULTANT | 1 | 7 | 2026-03-25 12:26 |
-| AKSHAYAKALPA ORGANIC | AE | - | - | 2026-03-25 12:26 |
-| TEST ACCOUNT AE | AE | - | - | 2026-03-25 12:26 |
-| deals | AE | - | - | 2026-03-25 12:26 |
+| ACME Corp | PRESALES | - | - | 2026-03-27 |
 
 *All accounts auto-updated every 60 seconds.*
 

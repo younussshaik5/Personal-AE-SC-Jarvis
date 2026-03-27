@@ -9,7 +9,7 @@ tags:
   - executive
   - c-level
   - messaging
-  - freshworks
+  - ACME
   - solution-engineering
 ---
 # SKILL: Exec Translator Module (Dynamic Edition)

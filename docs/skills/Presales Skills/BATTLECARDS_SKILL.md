@@ -9,7 +9,7 @@ tags:
   - competitive
   - battlecards
   - positioning
-  - freshworks
+  - ACME
   - solution-engineering
 ---
 # SKILL: Competitive Battlecards Module (Dynamic Edition)
@@ -94,7 +94,7 @@ Salesforce Sales Cloud, HubSpot CRM, Zoho CRM, Pipedrive, Microsoft Dynamics 365
 |----------|-------|------|----------------|
 | `battle-competitor` | Competitor | select (grouped) | Pre-populated + `[FETCH: Recent additions]` |
 | `battle-custom` | Custom Competitor | text | `[VALIDATE: Check if exists in DB first]` |
-| `battle-product` | YourCompany Product | select | freshdesk, freshservice, freshsales, freshchat, freshmarketer, freshcaller, freshworks-css, freshworks-crm, freshteam |
+| `battle-product` | YourCompany Product | select | AcmeDesk, AcmeService, freshsales, freshchat, freshmarketer, freshcaller, ACME-css, ACME-crm, freshteam |
 | `battle-context` | Deal Context | textarea | `[SUGGEST: Based on industry + deal size]` |
 | `battle-file` | Attachments | file (multi) | Competitor proposals, feature lists |
 
@@ -204,7 +204,7 @@ When adding custom competitor:
 Include header: "⚔️ Battlecard: YourCompany vs {competitor} | Generated {datetime} | Data as of {research_timestamp}"
 
 ### Slack
-Prefix: `⚔️ *Battlecard: {competitor}* | Product: {freshworks_product} | Health: {win_probability}%`
+Prefix: `⚔️ *Battlecard: {competitor}* | Product: {ACME_product} | Health: {win_probability}%`
 Include: Top 3 win themes + pricing comparison summary
 
 ### Export

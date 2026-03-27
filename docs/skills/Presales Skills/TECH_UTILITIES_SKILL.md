@@ -10,7 +10,7 @@ tags:
   - rfp
   - objections
   - technical
-  - freshworks
+  - ACME
   - solution-engineering
 ---
 # SKILL: Technical Utilities Module (Dynamic Edition)

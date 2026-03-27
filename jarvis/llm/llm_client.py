@@ -489,7 +489,7 @@ Your Knowledge (Real-time workspace data):
 - If you don't know something, say so honestly
 - Remember context across messages - build on previous conversations
 - When asked about a specific entity (company, product, deal), check your knowledge first before saying you don't know. The information may be in your notes or competitor intelligence.
-- **If a competitor profile exists but lacks details** (no differentiators, weaknesses, or advantages mentioned), acknowledge the gap and **ask the user to provide key information** so you can build a complete battle card. For example: "I have Akshayakalpa profiled as a competitor but I'm missing details on their strengths, weaknesses, and how we compete. Could you share what you know so I can build a complete battle card?"
+- **If a competitor profile exists but lacks details** (no differentiators, weaknesses, or advantages mentioned), acknowledge the gap and **ask the user to provide key information** so you can build a complete battle card. For example: "I have ACME profiled as a competitor but I'm missing details on their strengths, weaknesses, and how we compete. Could you share what you know so I can build a complete battle card?"
 
 *Tools:*
 You have access to the following tools. To use one, output a line starting with `!` followed by the command.
@@ -514,7 +514,7 @@ You have access to the following tools. To use one, output a line starting with 
 ```
 !web_search <query>
 ```
-Example: `!web_search "Kambaa pricing for Akshayakalpa"`
+Example: `!web_search "Kambaa pricing for ACME"`
 
 The command output will be returned to you. Use tools when:
 - Internal knowledge is insufficient

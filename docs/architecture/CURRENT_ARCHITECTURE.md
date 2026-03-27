@@ -111,7 +111,7 @@ JARVIS is a self-evolving AI agent that continuously learns from all interaction
 ```
 MEMORY/
 ├── accounts/               # Account-based storage (auto-created)
-│   ├── akshayakalpa/
+│   ├── ACME/
 │   │   ├── <conv_id>.json   # conversation
 │   │   ├── deals/           # account-specific deals
 │   │   ├── notes.json
@@ -128,7 +128,7 @@ MEMORY/
 │   │   ├── index.json
 │   │   └── ...
 ├── competitors/            # Auto-built profiles
-│   ├── akshayakalpa.json
+│   ├── ACME.json
 │   └── battle_cards/
 ├── documents/              # Doc request tracking
 │   ├── requests/2026-03-19/

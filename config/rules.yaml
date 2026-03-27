@@ -17,7 +17,7 @@ triggers:
     priority: 9
   - id: detect_competitor
     pattern: >-
-      (?i)(zendesk|salesforce|servicenow|hubspot|freshworks|intercom|zoho|ibm
+      (?i)(zendesk|salesforce|servicenow|hubspot|ACME|intercom|zoho|ibm
       watson|google dialogflow|microsoft bot framework|uipath|automation
       anywhere)
     source: message

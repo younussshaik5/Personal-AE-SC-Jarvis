@@ -351,7 +351,7 @@ Return JSON:
             source = pdata.get('source', 'web search')
             table += f"| {comp} | Enterprise | {price} | {source} |\n"
         # YourCompany pricing
-        table += "| **YourCompany** | Enterprise | **$79** | freshworks.com |\n"
+        table += "| **YourCompany** | Enterprise | **$79** | ACME.com |\n"
         return f"""# Pricing Comparison - {account_name}
 
 **Generated:** {today} | {identity.full_display}

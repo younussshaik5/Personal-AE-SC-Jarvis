@@ -160,7 +160,7 @@ Every 30 minutes, JARVIS reflects on recent experiences, extracts patterns, and 
   {
     "intent": "question",
     "entities": {"deals": [...], "companies": [...]},
-    "facts": ["Akshayakalpa deal size $50K"],
+    "facts": ["ACME deal size $50K"],
     "preferences": {"communication_style": "concise"},
     "knowledge_gaps": ["pricing model unclear"],
     "decisions": ["approved database migration"]
@@ -463,12 +463,12 @@ User: "Prepare demo for Acme showing integration flexibility"
 
 #### Use Case 1: Deal Status Inquiry
 ```
-User: "What's the status of the Akshayakalpa deal?"
+User: "What's the status of the ACME deal?"
 ```
 **What JARVIS Does**:
-- Searches `deals.json` for "Akshayakalpa"
+- Searches `deals.json` for "ACME"
 - Extracts from conversation history: last discussion about this deal
-- Uses LLM to synthesize: "Akshayakalpa: $50K opportunity, in negotiation phase, budget approved, technical eval complete"
+- Uses LLM to synthesize: "ACME: $50K opportunity, in negotiation phase, budget approved, technical eval complete"
 - Suggests next actions based on similar deal patterns
 
 **Files Updated**:
@@ -502,7 +502,7 @@ User: "Acme just lowered prices. How should we respond?"
 | File change learning | ✅ | Editing `.py` files → pattern recognition updates |
 | Workspace isolation | ✅ | OpenCode in other folder → ignored |
 | Conversation storage | ✅ | Every chat → `MEMORY/summaries/YYYY-MM-DD/` |
-| Insight extraction | ✅ | "Akshayakalpa deal $50K" → auto-updates `deals.json` |
+| Insight extraction | ✅ | "ACME deal $50K" → auto-updates `deals.json` |
 | Competitor profiling | ✅ | Mention competitor → profile + battle card auto-created |
 | Documentation tracking | ✅ | "Send me the proposal" → request logged, fulfilled tracked |
 | Reflection | ✅ | Every 30 min → `learnings.json` updated |

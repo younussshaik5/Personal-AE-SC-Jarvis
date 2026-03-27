@@ -10,7 +10,7 @@ tags:
   - tco
   - value
   - cfo
-  - freshworks
+  - ACME
   - solution-engineering
 ---
 # SKILL: Value Architecture Module (Dynamic Edition)
@@ -40,7 +40,7 @@ AI MUST fetch current pricing before generating output:
    - `[FETCH: Use [PRICE: $X/yr | Source: URL | Date]]`
 
 2. **YourCompany Pricing** (Current):
-   - Reference: freshworks.com/pricing (latest)
+   - Reference: ACME.com/pricing (latest)
    - Plan tiers: Growth ($18), Pro ($49), Enterprise ($79) per agent/month
    - Freddy AI: $100 per 1,000 sessions
    - `[FLAG: If pricing changed, note effective date]`

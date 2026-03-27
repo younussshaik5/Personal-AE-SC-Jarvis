@@ -41,7 +41,7 @@ triggers:
 
 # Competitor tracking (for battlecards)
   - id: detect_competitor
-    pattern: '(?i)(zendesk|salesforce|servicenow|hubspot|freshworks|intercom|zoho|ibm watson|google dialogflow|microsoft bot framework|uipath|automation anywhere)'
+    pattern: '(?i)(zendesk|salesforce|servicenow|hubspot|ACME|intercom|zoho|ibm watson|google dialogflow|microsoft bot framework|uipath|automation anywhere)'
     source: "message"
     action: "log_competitor_mention $1"
     confidence: 0.9

@@ -213,8 +213,8 @@ class DynamicResearchService:
         except:
             return {}
     
-    # ========== FRESHWORKS PRODUCT KNOWLEDGE ==========
-    async def get_freshworks_capabilities(self, product: str, feature: str = "") -> Dict[str, Any]:
+    # ========== ACME PRODUCT KNOWLEDGE ==========
+    async def get_ACME_capabilities(self, product: str, feature: str = "") -> Dict[str, Any]:
         """Get current YourCompany product capabilities and pricing."""
         cache_key = f"fw:{product.lower()}:{feature}"
         if cached := self._get_cached(cache_key):

@@ -70,7 +70,7 @@ function getDefaultRules(): RulesConfig {
       },
       {
         id: 'detect_competitor',
-        pattern: '(?i)(zendesk|salesforce|servicenow|hubspot|freshworks|intercom|zoho|ibm watson|google dialogflow|microsoft bot framework|uipath|automation anywhere)',
+        pattern: '(?i)(zendesk|salesforce|servicenow|hubspot|ACME|intercom|zoho|ibm watson|google dialogflow|microsoft bot framework|uipath|automation anywhere)',
         source: 'message',
         action: 'log_competitor_mention',
         confidence: 0.9
@@ -348,7 +348,7 @@ export function extractInsights(message: string): any {
   }
   
         // Competitor detection (list from rules)
-        const competitorRegex = /(zendesk|salesforce|servicenow|hubspot|freshworks|intercom|zoho|ibm watson|google dialogflow|microsoft bot framework|uipath|automation anywhere)/i;
+        const competitorRegex = /(zendesk|salesforce|servicenow|hubspot|ACME|intercom|zoho|ibm watson|google dialogflow|microsoft bot framework|uipath|automation anywhere)/i;
         const matches = message.match(competitorRegex);
         if (matches) insight.competitors_mentioned = matches.map((m: string) => m.toLowerCase());
   

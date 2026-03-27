@@ -9,7 +9,7 @@ tags:
   - meddpicc
   - qualification
   - enterprise
-  - freshworks
+  - ACME
   - solution-engineering
 ---
 # SKILL: Deal MEDDPICC Module (Dynamic Edition)

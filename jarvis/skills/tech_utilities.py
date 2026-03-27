@@ -274,9 +274,9 @@ class TechUtilitiesSkill:
                 data['competitors_research'][competitor] = comp_data
 
             # Get YourCompany product pricing
-            product = data['deals'][0].get('product') if data['deals'] else 'Freshdesk'
-            fw_pricing = await self.research_service.get_freshworks_capabilities(product)
-            data['freshworks_pricing'] = fw_pricing
+            product = data['deals'][0].get('product') if data['deals'] else 'AcmeDesk'
+            fw_pricing = await self.research_service.get_ACME_capabilities(product)
+            data['ACME_pricing'] = fw_pricing
 
         except Exception as e:
             self.logger.debug("Research enrichment failed", error=str(e))
@@ -441,7 +441,7 @@ Output JSON with:
         today = datetime.now().strftime("%Y-%m-%d")
         identity = get_se_identity(self.config_manager)
         research = data.get('research', {})
-        fw_pricing = data.get('freshworks_pricing', {})
+        fw_pricing = data.get('ACME_pricing', {})
 
         # Extract likely RFP questions from gaps and discovery
         rfp_questions = []
@@ -467,7 +467,7 @@ Generate RFP response guidance for {account_name}.
 
 Context:
 - Industry: {research.get('industry', 'Unknown')}
-- Product: {data['deals'][0].get('product', 'Freshdesk') if data['deals'] else 'Freshdesk'}
+- Product: {data['deals'][0].get('product', 'AcmeDesk') if data['deals'] else 'AcmeDesk'}
 - Current Tool: {data['deals'][0].get('current_systems', {}).get('ticket_system', 'Unknown') if data['deals'] else 'Unknown'}
 - Competitors: {', '.join(data['competitors'])}
 - YourCompany Pricing: {json.dumps(fw_pricing, indent=2)}

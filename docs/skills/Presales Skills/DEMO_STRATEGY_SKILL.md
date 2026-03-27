@@ -9,7 +9,7 @@ tags:
   - demo
   - strategy
   - discovery
-  - freshworks
+  - ACME
   - solution-engineering
 ---
 # SKILL: Demo Strategy Module (Dynamic Edition)

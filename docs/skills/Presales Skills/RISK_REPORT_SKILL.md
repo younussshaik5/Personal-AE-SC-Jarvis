@@ -9,7 +9,7 @@ tags:
   - risk
   - assessment
   - deal-qualification
-  - freshworks
+  - ACME
   - solution-engineering
 ---
 # SKILL: Risk Report Module (Dynamic Edition)
