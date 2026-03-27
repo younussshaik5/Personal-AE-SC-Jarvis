@@ -62,13 +62,42 @@ For every account folder you create in `ACCOUNTS/`, JARVIS will automatically ge
 - Every account gets a `DASHBOARD.html` that aggregates all the above.
 - One-click exports to **PDF**, **Word**, or **Excel** for immediate handoffs to your team.
 
+## 5. Under the Hood: The End-to-End Data Flow
+
+To fully understand JARVIS, here is the lifecycle of a single interaction:
+
+### 1. The Pulse (Polling)
+- The **MCP Observer** (in `mcp-opencode-observer/`) continuously polls the local SQLite databases of **OpenCode** (`~/.local/share/opencode/conversations.db`) and **Claude** (`~/Library/Application Support/claude/conversations_history.db`).
+- It checks for new messages or sessions every 60 seconds.
+
+### 2. The Bridge (WebSocket/Webhook)
+- When a new message is detected, the Observer prepares a JSON payload containing the conversation context.
+- This data is streamed via **WebSocket** or sent via **HTTP POST** to the **JARVIS Core** (Python).
+
+### 3. The Nerve Center (Event Bus)
+- The Python **Orchestrator** receives the incoming data and broadcasts an `mcp.new_message` event onto its internal **Event Bus**.
+- Any component "listening" for new messages (like the Discovery Skill or the Risk Skill) is instantly triggered.
+
+### 4. The Intelligence Layer (LLM Synthesis)
+- The triggered **Skills** gather the new chat message plus existing account history from `MEMORY/`.
+- They send this combined context to your configured **LLM** (e.g., GPT-4o, Claude 3.5, or NVIDIA NIM).
+- The LLM performs "synthesis"—extracting concrete business facts, technical risks, and competitive threats from the natural language chat.
+
+### 5. The Living Document (File Sync)
+- The Skill writes its specialized output (e.g., `TECHNICAL_RISK_ASSESSMENT.md`) directly into the corresponding account folder in `ACCOUNTS/`.
+- JARVIS ensures that cross-references (like discovery gaps affecting a risk score) are automatically updated.
+
+### 6. The Showcase (Account Dashboard)
+- Finally, the **Account Dashboard Skill** detects the file changes and regenerates the `DASHBOARD.html`.
+- It injects the latest markdown into a premium HTML template, ensuring you always have a CRM-ready view of your opportunity.
+
 ---
 
-## 5. Customizing Your Personas
+## 7. Customizing Your Personas
 - To modify persona definitions, edit the files in `jarvis/persona/`.
 - To add new rules for autonomous behavior, edit `mcp-opencode-observer/config/rules.yaml`.
 
-## 6. Troubleshooting "Broken" Links
+## 8. Troubleshooting "Broken" Links
 If you see path errors (e.g., `~/.local/share/opencode/...` not found), it's because the template defaults to standard OpenCode paths. 
 - **Claude Users**: Ask the AI: *"I am using ClaudeCode. Update the observer database paths to point to the Claude conversation history location on my Mac/Windows."*
 
