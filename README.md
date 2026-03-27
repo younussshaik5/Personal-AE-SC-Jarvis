@@ -17,15 +17,25 @@
 
 JARVIS is an autonomous AI employee that **continuously learns** from your OpenCode/claude code conversations and file system, automatically generating professional sales engineering documents for every opportunity—zero manual effort required.
 
-### ✨ Features
+## ✨ Key Capabilities
 
-- **Zero-Config Sync** – Works from any subfolder; automatically detects all sessions in workspace
-- **Real-Time Updates** – All documents refresh within 60 seconds of any change
-- **LLM-Enhanced Synthesis** – Uses OpenAI/Anthropic/NVIDIA to synthesize high-level insights
-- **Comprehensive Skill Suite** – Automated Risk, Discovery, MEDDPICC, ROI, Battlecards, and more
-- **Interactive Dashboards** – Master HTML view with exports (PDF, Word, Excel)
-- **Multi-Persona Awareness** – Tailors behavior for Solution Consultants, AEs, etc.
-- **Fully Interlinked** – Risk assessments and discovery docs all cross-reference each other
+JARVIS acts as your autonomous double. Whatever you chat about in **ClaudeCode** or **OpenCode**, JARVIS synthesizes it in real-time.
+
+- **🧠 Real-Time Conversation Synthesis** – Polls your chat history every 60s to extract customer interests, pain points, and technical requirements.
+- **📝 Autonomous Document Generation** – Automatically creates and updates Technical Risk Assessments, Deep Discovery docs, MEDDPICC reports, ROI models, and Demo Strategies.
+- **🎭 Multi-Persona Intelligence** – Detects if your conversation is deal-focused (AE) or technical (SC) and adjusts its output focus.
+- **📊 Interactive Dashboards** – Aggregates all insights into a premium HTML interface with one-click exports to PDF, Word, and Excel.
+
+---
+
+## ⚙️ How It Works: Under the Hood
+
+1. **Pulse (Polling)**: The **MCP Observer** (in `mcp-opencode-observer/`) continuously monitors local SQLite databases for new Claude/OpenCode messages.
+2. **Bridge**: New messages are streamed via WebSocket to the **JARVIS Core** (Python).
+3. **Event Bus**: The Python Orchestrator broadcasts events to triggered **Skills** (Risk, Discovery, etc.).
+4. **LLM Synthesis**: Skills send chat context to your **LLM** (GPT-4o, Claude 3.5, etc.) to extract concrete business facts.
+5. **File Sync**: Specialized markdown reports are written directly into your `ACCOUNTS/` folder.
+6. **Showcase**: The **Dashboard Skill** regenerates the `DASHBOARD.html` with the latest insights.
 
 ---
 
