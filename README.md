@@ -8,6 +8,11 @@
 
 ---
 
+> [!IMPORTANT]
+> **Just Forked?** Read the [FORK_GUIDE.md](FORK_GUIDE.md) for setup instructions and AI prompts to get JARVIS running in your local environment.
+
+---
+
 ## What is JARVIS?
 
 JARVIS is an autonomous AI employee that **continuously learns** from your OpenCode/claude code conversations and file system, automatically generating professional sales engineering documents for every opportunity—zero manual effort required.
