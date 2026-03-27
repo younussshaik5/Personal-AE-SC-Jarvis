@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
-import { readFileSync, existsSync, watch, statSync, readdirSync } from 'fs';
-import { join, basename } from 'path';
-import { EventEmitter } from 'events';
+import { readFileSync, existsSync, watch, statSync, readdirSync } from 'node:fs';
+import { join, basename } from 'node:path';
+import { EventEmitter } from 'node:events';
 
 export interface ConversationSession {
   id: string;

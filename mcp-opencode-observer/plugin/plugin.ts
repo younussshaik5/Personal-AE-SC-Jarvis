@@ -1,6 +1,10 @@
+// @ts-ignore
 import { Plugin } from '@opencode-ai/plugin';
+// @ts-ignore
 import { tool } from '@opencode-ai/plugin';
 import { z } from 'zod';
+import { createRequire } from 'node:module';
+const _require = createRequire(import.meta.url);
 
 // This is the actual plugin entry point for OpenCode
 // It exposes tools that access OpenCode data
@@ -27,10 +31,10 @@ export default Plugin({
         limit: z.number().min(1).max(100).default(10),
         workspace: z.string().optional()
       },
-      async execute(args, context) {
+      async execute(args: any, context: any) {
         // Query the local database
         const dbPath = process.env.OPENCODE_DB_PATH || '~/.local/share/opencode/opencode.db';
-        const db = require('better-sqlite3')(dbPath);
+        const db = _require('better-sqlite3')(dbPath);
 
         let query = 'SELECT id, title, directory, time_created FROM session';
         const params = [];
@@ -56,9 +60,9 @@ export default Plugin({
       args: {
         session_id: z.string().describe('Session ID')
       },
-      async execute(args) {
+      async execute(args: any) {
         const dbPath = process.env.OPENCODE_DB_PATH || '~/.local/share/opencode/opencode.db';
-        const db = require('better-sqlite3')(dbPath);
+        const db = _require('better-sqlite3')(dbPath);
 
         const messages = db.prepare(`
           SELECT m.id, m.time_created, json_extract(m.data, '$.role') as role,
@@ -91,9 +95,9 @@ export default Plugin({
         query: z.string(),
         limit: z.number().max(100).default(20)
       },
-      async execute(args) {
+      async execute(args: any) {
         const dbPath = process.env.OPENCODE_DB_PATH || '~/.local/share/opencode/opencode.db';
-        const db = require('better-sqlite3')(dbPath);
+        const db = _require('better-sqlite3')(dbPath);
 
         // Get recent messages to search (performance optimization)
         const recent = db.prepare(`
@@ -106,7 +110,7 @@ export default Plugin({
         db.close();
 
         const lowerQuery = args.query.toLowerCase();
-        const results = recent.filter(m => {
+        const results = recent.filter((m: any) => {
           try {
             const data = JSON.parse(m.data);
             return JSON.stringify(data).toLowerCase().includes(lowerQuery);
@@ -125,18 +129,18 @@ export default Plugin({
       args: {
         tool_id: z.string()
       },
-      async execute(args) {
-        const fs = require('fs');
-        const path = require('path');
+      async execute(args: any) {
+        const _fs = _require('fs');
+        const _path = _require('path');
         const toolOutputDir = process.env.OPENCODE_TOOL_OUTPUT_DIR ||
           '~/.local/share/opencode/tool-output';
-        const filePath = path.join(toolOutputDir, `tool_${args.tool_id}`);
+        const filePath = _path.join(toolOutputDir, `tool_${args.tool_id}`);
 
-        if (!fs.existsSync(filePath)) {
+        if (!_fs.existsSync(filePath)) {
           return `Tool output not found: ${args.tool_id}`;
         }
 
-        return fs.readFileSync(filePath, 'utf-8');
+        return _fs.readFileSync(filePath, 'utf-8');
       }
     })
   ]

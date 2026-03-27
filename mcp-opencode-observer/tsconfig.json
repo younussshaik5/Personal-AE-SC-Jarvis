@@ -4,7 +4,7 @@
     "module": "commonjs",
     "moduleResolution": "node",
     "outDir": "./dist",
-    "rootDir": "./src",
+    "rootDir": "./",
     "strict": false,
     "noImplicitAny": false,
     "esModuleInterop": true,
@@ -12,8 +12,10 @@
     "forceConsistentCasingInFileNames": true,
     "declaration": false,
     "sourceMap": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "lib": ["ES2022"],
+    "types": ["node"]
   },
-  "include": ["src/index.ts", "src/db.ts", "src/autonomy.ts"],
+  "include": ["src/**/*.ts", "plugin/**/*.ts"],
   "exclude": ["node_modules", "dist"]
 }
