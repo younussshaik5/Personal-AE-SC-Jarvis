@@ -1,15 +1,10 @@
-// @ts-ignore
-import { Plugin } from '@opencode-ai/plugin';
-// @ts-ignore
-import { tool } from '@opencode-ai/plugin';
+import { Plugin, tool } from '@opencode-ai/plugin';
 import { z } from 'zod';
-import { createRequire } from 'node:module';
-const _require = createRequire(import.meta.url);
 
 // This is the actual plugin entry point for OpenCode
 // It exposes tools that access OpenCode data
 
-export default Plugin({
+export default new Plugin({
   name: 'opencode-observer',
   version: '1.0.0',
   description: 'Query OpenCode and Claude sessions and conversations',
@@ -34,7 +29,7 @@ export default Plugin({
       async execute(args: any, context: any) {
         // Query the local database
         const dbPath = process.env.OPENCODE_DB_PATH || '~/.local/share/opencode/opencode.db';
-        const db = _require('better-sqlite3')(dbPath);
+        const db = require('better-sqlite3')(dbPath);
 
         let query = 'SELECT id, title, directory, time_created FROM session';
         const params = [];
@@ -62,7 +57,7 @@ export default Plugin({
       },
       async execute(args: any) {
         const dbPath = process.env.OPENCODE_DB_PATH || '~/.local/share/opencode/opencode.db';
-        const db = _require('better-sqlite3')(dbPath);
+        const db = require('better-sqlite3')(dbPath);
 
         const messages = db.prepare(`
           SELECT m.id, m.time_created, json_extract(m.data, '$.role') as role,
@@ -97,7 +92,7 @@ export default Plugin({
       },
       async execute(args: any) {
         const dbPath = process.env.OPENCODE_DB_PATH || '~/.local/share/opencode/opencode.db';
-        const db = _require('better-sqlite3')(dbPath);
+        const db = require('better-sqlite3')(dbPath);
 
         // Get recent messages to search (performance optimization)
         const recent = db.prepare(`
@@ -130,17 +125,17 @@ export default Plugin({
         tool_id: z.string()
       },
       async execute(args: any) {
-        const _fs = _require('fs');
-        const _path = _require('path');
+        const fs = require('fs');
+        const path = require('path');
         const toolOutputDir = process.env.OPENCODE_TOOL_OUTPUT_DIR ||
           '~/.local/share/opencode/tool-output';
-        const filePath = _path.join(toolOutputDir, `tool_${args.tool_id}`);
+        const filePath = path.join(toolOutputDir, `tool_${args.tool_id}`);
 
-        if (!_fs.existsSync(filePath)) {
+        if (!fs.existsSync(filePath)) {
           return `Tool output not found: ${args.tool_id}`;
         }
 
-        return _fs.readFileSync(filePath, 'utf-8');
+        return fs.readFileSync(filePath, 'utf-8');
       }
     })
   ]

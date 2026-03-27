@@ -1,3 +1,5 @@
+import { WebSocketServer } from 'ws';
+
 interface WebSocketClient {
   ws: any;
   subscriptions: string[];
@@ -15,8 +17,7 @@ export class LiveUpdateServer {
   }
 
   start(server: any): void {
-    const wsModule = require('ws');
-    this.wss = new wsModule.WebSocketServer({ server });
+    this.wss = new WebSocketServer({ server });
 
     this.wss.on('connection', (ws: any) => {
       const client: WebSocketClient = {

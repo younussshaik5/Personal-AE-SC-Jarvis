@@ -1,13 +1,9 @@
-// MCP Conversation Observer (OpenCode & Claude) - Standalone stdio server
-// @ts-ignore
-import { ConversationDB } from './db.js';
-// @ts-ignore
+import { ConversationDB } from './db';
 import { createServer as createHttpServer } from 'http';
-// @ts-ignore
 import { readFileSync, existsSync, unlinkSync } from 'fs';
-// @ts-ignore
 import { join } from 'path';
-import { startAutonomy, getStatus } from './autonomy.js';
+import { WebSocketServer } from 'ws';
+import { startAutonomy, getStatus } from './autonomy';
 
 // Load configuration
 const configPath = process.env.OPENCODE_OBSERVER_CONFIG || join(process.cwd(), 'config', 'mcp-observer.json');
@@ -37,7 +33,6 @@ startAutonomy(db);
 // ============ HTTP + WebSocket Server (optional monitoring) ============
 const httpServer = createHttpServer();
 const wsPort = config.observer.wsPort || 3001;
-const { WebSocketServer } = require('ws');
 const wss = new WebSocketServer({ port: wsPort });
 const wsClients = new Set<any>();
 

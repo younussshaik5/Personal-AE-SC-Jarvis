@@ -1,11 +1,7 @@
-// @ts-ignore
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, copyFileSync, unlinkSync } from 'fs';
-// @ts-ignore
 import { join, dirname, basename } from 'path';
-// @ts-ignore
 import yaml from 'js-yaml';
-// @ts-ignore
-import { ConversationDB } from './db.js';
+import { ConversationDB } from './db';
 
 // ============== Configuration ==============
 
