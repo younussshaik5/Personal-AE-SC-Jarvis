@@ -8,14 +8,38 @@
 
 ---
 
-> [!IMPORTANT]
-> **Just Forked?** Read the [FORK_GUIDE.md](FORK_GUIDE.md) for setup instructions and AI prompts to get JARVIS running in your local environment.
+## 🚀 Quick Start: Post-Fork Setup
+
+Congratulations on forking JARVIS! Follow these steps to make it work seamlessly in your local environment.
+
+### 1. Install Dependencies
+Navigate to the observer directory and install the required Node.js modules.
+```bash
+cd mcp-opencode-observer
+npm install
+```
+
+### 2. Environment Configuration
+Copy the example configurations and update them with your local paths.
+- **Main Config**: `jarvis/config/jarvis.yaml`
+- **Observer Config**: `mcp-opencode-observer/config/mcp-observer.json`
 
 ---
 
-## What is JARVIS?
+## 🤖 AI-Assisted Configuration & Repair
 
-JARVIS is an autonomous AI employee that **continuously learns** from your OpenCode/claude code conversations and file system, automatically generating professional sales engineering documents for every opportunity—zero manual effort required.
+Because this project has a complex architecture (Python and Node.js working together), if you find any "broken" files or startup errors, you can have your AI assistant (ClaudeCode or OpenCode) fix them automatically.
+
+### Recommended Prompt:
+> "I have just forked this JARVIS AI template. 
+> 1. Please first **analyze the entire project architecture** to understand how the MCP Observer and JARVIS Core interact.
+> 2. Once you understand the system, perform the following setup:
+>    - Update `mcp-opencode-observer/config/mcp-observer.json` with my local paths.
+>    - Ensure the `dbPath` correctly points to my local OpenCode/Claude database.
+>    - Run `npm install` in the observer directory.
+>    - Fix any syntax or path errors you find to make the system fully functional."
+
+---
 
 ## ✨ Key Capabilities
 
@@ -65,101 +89,22 @@ Each opportunity under `ACCOUNTS/<team>/<Account Name>/` gets an automated intel
 └── notes.json                     ← Raw facts & knowledge gaps
 ```
 
-All files feature **Owner: SE YOUR_NAME** and real-time syncing.
-
 ---
 
-## 🚀 Getting Started
+## 🔧 Advanced Configuration
 
-### Start JARVIS
-```bash
-./fireup_jarvis.sh
-```
+### Persona Management
+- To modify persona definitions, edit the files in `jarvis/persona/`.
+- To add new rules for autonomous behavior, edit `mcp-opencode-observer/config/rules.yaml`.
 
-**Components launched:**
-- **MCP Observer (Node.js)** – Monitors OpenCode and Claude conversations
-- **JARVIS Core (Python)** – The "Brain" (Orchestrator + Skills)
-- **UI Dashboard** – http://localhost:8080
-
-### Add a New Opportunity
-
-1. Create folder: `ACCOUNTS/<your-team>/<New Account>/`
-2. Add at minimum: `notes.json` with facts/gaps
-3. Optionally add: `deals/<deal>.json`
-4. JARVIS auto-creates all other files and the HTML dashboard within 60 seconds.
-
----
-
-## 📊 How It Works
-
-1. **Observers** (MCP & File System) detect changes in conversations or manual notes.
-2. **Event Bus** broadcasts updates to the **Orchestrator**.
-3. **Modular Skills** (Risk, Discovery, ROI, etc.) gather data from across the workspace.
-4. **LLM Synthesis** (NVIDIA/Stepfun) produces intelligent, cross-referenced content.
-5. **Dashboard Engine** aggregates all outputs into a premium HTML interface.
-
----
-
-## 🔧 Configuration
-
-### 1. Configure the system
-
-Copy `.env.example` to `.env` and add your API keys, or update `jarvis/config/jarvis.yaml`:
-
-```yaml
-workspace_root: /path/to/your/workspace
-solution_engineer:
-  name: YOUR_NAME
-  title: Solution Engineer at COMPANY
-
-llm:
-  provider: openai
-  api_key: YOUR_API_KEY
-  model: gpt-4o
-```
-
----
-
-## 📋 Current Accounts
-
-*Check the root `MASTER_SHEET.md` or individual `DASHBOARD.html` files for live status.*
-
----
-
-## 🛠️ Advanced Usage
-
-### Force Immediate Update
-```bash
-touch ACCOUNTS/<team>/<account>/notes.json
-```
-
-### Check System Status
-```bash
-./fireup_jarvis.sh  # Re-runs checks and restarts components if needed
-```
-
-*Note: CLI commands (`jarvis status`, etc.) are currently in active development.*
-
----
-
-## 📚 Architecture Overview
-
-- **Orchestrator** (`jarvis/core/orchestrator.py`) – Central async coordinator
-- **Skills** (`jarvis/skills/`) – Specialized document & logic generators
-- **Observers** (`jarvis/observers/`) – Real-time conversation & FS monitoring
-- **MCP Bridge** (`mcp-opencode-observer/`) – Node.js service for OpenCode integration
-- **Account Dashboard** (`jarvis/skills/account_dashboard_skill.py`) – Master aggregation layer
-- **MEMORY/ & ACCOUNTS/** – Persistent knowledge and work artifacts
-
----
-
-## 🐛 Troubleshooting
-
+### Troubleshooting
 | Issue | Solution |
 |-------|----------|
+| Path Errors | Ask AI: *"Update observer database paths to my local Claude/OpenCode history."* |
 | Orchestrator crashes | Check `logs/orchestrator_manual.log` for missing methods |
-| LLM not responding | Verify API key; system falls back to rule-based |
-| Files not updating | Ensure folder is under `ACCOUNTS/` with `notes.json` or `deals/` |
+| LLM not responding | Verify API key in `jarvis/config/jarvis.yaml` |
+| Files not updating | Ensure folder is under `ACCOUNTS/` with `notes.json` |
+not updating | Ensure folder is under `ACCOUNTS/` with `notes.json` or `deals/` |
 | Port 8080 in use | `lsof -i :8080` → kill conflicting process |
 | MCP not filtering | Verify `workspace_root` in `config/mcp-observer.json` |
 
