@@ -39,6 +39,7 @@ yarn-error.log*
 jarvis/data/archives/
 jarvis/data/history/
 jarvis/data/cache/
+data/archives/
 logs/
 *.log
 
