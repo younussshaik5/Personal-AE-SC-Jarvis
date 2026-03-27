@@ -7,53 +7,62 @@ from jarvis.utils.config import ConfigManager
 
 
 @dataclass
-class SEIdentity:
-    """Solution Engineer identity information."""
+class ProfessionalIdentity:
+    """Professional identity information (Sales or Presales)."""
     name: str
     initials: str
     title: str
+    role: str
     full_display: str
     signature: str
 
 
-def get_se_identity(config_manager: Optional[ConfigManager] = None) -> SEIdentity:
-    """Get the configured SE identity.
+def get_professional_identity(config_manager: Optional[ConfigManager] = None) -> ProfessionalIdentity:
+    """Get the configured professional identity.
     
     Args:
         config_manager: Optional ConfigManager instance. If None, creates one.
     
     Returns:
-        SEIdentity object with name, initials, title, etc.
+        ProfessionalIdentity object with name, initials, title, role, etc.
     """
     if config_manager is None:
         config_manager = ConfigManager()
         config_manager.load()
     
-    se_config = getattr(config_manager.config, 'solution_engineer', None)
-    if se_config:
-        name = getattr(se_config, 'name', 'YOUR_NAME')
-        initials = getattr(se_config, 'initials', 'SE')
-        title = getattr(se_config, 'title', 'Solution Engineer')
+    # Try the new 'identity' key first
+    identity_config = getattr(config_manager.config, 'identity', None)
+    if not identity_config:
+        # Fallback to old 'solution_engineer' for backward compatibility during transition
+        identity_config = getattr(config_manager.config, 'solution_engineer', None)
+        
+    if identity_config:
+        name = getattr(identity_config, 'name', 'YOUR_NAME')
+        initials = getattr(identity_config, 'initials', 'XY')
+        title = getattr(identity_config, 'title', 'Professional')
+        role = getattr(identity_config, 'role', 'Sales & Presales')
     else:
         # Fallback defaults
         name = 'YOUR_NAME'
-        initials = 'SE'
-        title = 'Solution Engineer'
+        initials = 'XY'
+        title = 'Professional'
+        role = 'Sales & Presales'
     
     full_display = f"{initials} {name}"
     signature = f"{initials} {name}"
     
-    return SEIdentity(
+    return ProfessionalIdentity(
         name=name,
         initials=initials,
         title=title,
+        role=role,
         full_display=full_display,
         signature=signature
     )
 
 
-def format_se_signature(date: Optional[str] = None, include_title: bool = True) -> str:
-    """Get a formatted SE signature for file headers.
+def format_identity_signature(date: Optional[str] = None, include_title: bool = True) -> str:
+    """Get a formatted professional signature for file headers.
     
     Args:
         date: Optional date string. If None, uses current date.
@@ -63,7 +72,7 @@ def format_se_signature(date: Optional[str] = None, include_title: bool = True) 
         Formatted signature string.
     """
     from datetime import datetime
-    identity = get_se_identity()
+    identity = get_professional_identity()
     date_str = date or datetime.now().strftime("%Y-%m-%d")
     
     if include_title:

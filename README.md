@@ -1,15 +1,17 @@
-# JARVIS - Autonomous AI Employee (Presales Template)
+# JARVIS - Autonomous AI Professional (Sales & Presales Template)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 
 > **Welcome to the JARVIS Open-Source Template!**  
-> This is a fully functional, self-evolving AI assistant designed specifically for Presales, Solution Engineers, and Account Executives. Fork this repository to run your own autonomous employee locally.
+> This is a fully functional, self-evolving AI assistant designed specifically for **Account Executives (AEs)**, **Sales Reps**, **Solution Engineers (SEs)**, and **Presales** professionals. Fork this repository to run your own autonomous double locally.
+
+---
 
 ## 🗺️ Project Architecture: Why, What, and How
 
-### The "Why": Solving the Presales Documentation Gap
-Presales and Solution Engineers spend 30-40% of their time on tedious administrative tasks: summarizing meeting notes, drafting discovery docs, and filling out risk assessments. **JARVIS** was built to automate this by observing your real-world conversations and turning them into professional, high-impact business artifacts.
+### The "Why": Solving the Sales & Presales Documentation Gap
+Sales professionals and Solution Engineers spend 30-40% of their time on tedious administrative tasks: summarizing meeting notes, drafting discovery docs, and filling out risk assessments. **JARVIS** was built to automate this by observing your real-world conversations and turning them into professional, high-impact business artifacts.
 
 ### The "What": High-Level System Design
 JARVIS is a multi-layered autonomous system that bridges your AI chat environments with a professional documentation suite.

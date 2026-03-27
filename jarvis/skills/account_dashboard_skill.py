@@ -8,7 +8,7 @@ from typing import Dict, Any, List, Optional
 from jarvis.utils.data_aggregator import read_all_skill_data
 from jarvis.utils.logger import JARVISLogger
 from jarvis.utils.event_bus import EventBus, Event
-from jarvis.utils.identity import get_se_identity
+from jarvis.utils.identity import get_professional_identity
 from jarvis.services.research_service import DynamicResearchService
 from jarvis.llm.llm_client import LLMManager, Message
 
@@ -628,7 +628,7 @@ class AccountDashboardSkill:
 
     def _generate_html_dashboard(self, account_name: str, data: Dict[str, Any]) -> str:
         """Generate premium single-column article-style dashboard."""
-        identity = get_se_identity(self.config_manager)
+        identity = get_professional_identity(self.config_manager)
         today = datetime.now().strftime("%Y-%m-%d %H:%M")
         parsed = self._parse_all_data(data)
         
@@ -745,7 +745,7 @@ class AccountDashboardSkill:
             html_parts.append(f'<div class="card" id="{section_id}" style="margin:0 20px 40px;"><div class="card-header"><h2 class="card-title">{title}</h2><button class="btn" onclick="exportSection(\'{section_id}\', \'pdf\')">PDF</button><button class="btn" onclick="exportSection(\'{section_id}\', \'word\')">Word</button><button class="btn" onclick="exportSection(\'{section_id}\', \'excel\')">Excel</button></div><div class="card-body article-content">{content}</div></div>')
         
         # Footer
-        html_parts.append(f'<div style="text-align:center;padding:40px 20px;color:var(--muted);font-size:12px;"><div style="font-weight:600;margin-bottom:8px;">JARVIS Intelligence Platform</div><div>Auto-generated • {len(sections_content)} intelligence modules • SE: {identity.full_display} • Last: {today}</div></div>')
+        html_parts.append(f'<div style="text-align:center;padding:40px 20px;color:var(--muted);font-size:12px;"><div style="font-weight:600;margin-bottom:8px;">JARVIS Intelligence Platform</div><div>Auto-generated • {len(sections_content)} intelligence modules • Professional: {identity.full_display} • Last: {today}</div></div>')
         
         # JavaScript
         html_parts.append('<script>')

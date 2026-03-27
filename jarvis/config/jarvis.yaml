@@ -14,25 +14,12 @@ persona:
   default: work
   auto_switch: true
 
-# Solution Engineer Identity (persisted throughout system)
-solution_engineer:
+# Professional Identity (persisted throughout system)
+identity:
   name: "YOUR_NAME"
   initials: "XY"
-  title: "Solution Engineer at Company"
-telegram:
-  enabled: true
-  bot_token: "YOUR_TELEGRAM_BOT_TOKEN_HERE"
-  allowed_user_ids: []  # Add your Telegram user ID here (e.g., [123456789]). Empty = allow all (not recommended for production).
-  channel_id: ""  # Optional: channel ID for broadcasts (e.g., "@your_channel" or -1001234567890)
-  broadcast_events: true
-  allow_conversational_chat: true
-  allow_commands: true
-  notify_on_persona_switch: true
-  notify_on_modification_approved: true
-  notify_on_pattern_discovered: false
-  notify_on_competitor_detected: true
-  notify_on_errors: true
-  rate_limit_per_minute: 10
+  title: "Professional at Company"
+  role: "Sales & Presales" # Options: Sales, Presales, Both
 
 llm:
   provider: "openai"  # (ignored if opencode_ai: true) openai, anthropic, nvidia, local, mock

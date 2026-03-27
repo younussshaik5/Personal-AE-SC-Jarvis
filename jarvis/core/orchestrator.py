@@ -18,7 +18,6 @@ from jarvis.learners.pattern_recognition import PatternRecognition
 from jarvis.mcp.context_engine import ContextEngine
 from jarvis.archive.archiver import Archiver
 from jarvis.mcp.websocket_server import WebSocketServer
-from jarvis.telegram.bot import TelegramBotBridge
 from jarvis.scanner.workspace_scanner import WorkspaceScanner
 from jarvis.learners.conversation_learner import ConversationLearner
 from jarvis.skills.conversation_summarizer import ConversationSummarizationSkill
@@ -57,7 +56,6 @@ class Orchestrator:
         'persona_manager': PersonaManager,
         'archiver': Archiver,
         'websocket_server': WebSocketServer,
-        'telegram_bot': TelegramBotBridge,
         'scanner': WorkspaceScanner,
         'conversation_learner': ConversationLearner,
         'conversation_summarizer': ConversationSummarizationSkill,
@@ -109,7 +107,7 @@ class Orchestrator:
             'meddpicc', 'tech_utilities', 'battlecards', 'value_architecture', 'risk_report', 'demo_strategy',
             'account_dashboard',
             'account_auto_init',
-            'scanner', 'archiver', 'websocket_server', 'telegram_bot'
+            'scanner', 'archiver', 'websocket_server'
         ]
 
         for name in init_order:

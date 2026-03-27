@@ -70,34 +70,25 @@ class JarvisConfig:
     auto_persona_switch: bool = True
     persona_trust_threshold: float = 0.5
 
-    # Telegram notifications
-    telegram: Dict[str, Any] = field(default_factory=lambda: {
-        "enabled": False,
-        "bot_token": "",
-        "allowed_user_ids": [],  # List of Telegram user IDs allowed to chat
-        "channel_id": "",
-        "broadcast_events": True,
-        "allow_conversational_chat": True,
-        "allow_commands": True,
-        "notify_on_persona_switch": True,
-        "notify_on_modification_approved": True,
-        "notify_on_pattern_discovered": False,
-        "notify_on_competitor_detected": True,
-        "notify_on_errors": True,
-        "rate_limit_per_minute": 10
+    # Professional Identity
+    identity: Dict[str, Any] = field(default_factory=lambda: {
+        "name": "YOUR_NAME",
+        "initials": "XY",
+        "title": "Professional at Company",
+        "role": "Sales & Presales"
     })
 
     # LLM configuration for natural conversation
     llm: Dict[str, Any] = field(default_factory=lambda: {
         "provider": "openai",  # openai, anthropic, nvidia, local, mock
-        "api_key": "",  # Your API key (or set NVIDIA_API_KEY env var)
-        "base_url": "https://integrate.api.nvidia.com/v1",  # NVIDIA endpoint
-        "model": "stepfun-ai/step-3.5-flash",  # Model identifier
+        "api_key": "YOUR_API_KEY_HERE",
+        "base_url": "https://api.openai.com/v1",
+        "model": "stepfun-ai/step-3.5-flash",
         "temperature": 1,
         "top_p": 0.9,
         "max_tokens": 16384,
         "context_window": 32768,
-        "extra_body": None,  # No extra body needed for this model
+        "extra_body": None,
         "stream": False
     })
 
