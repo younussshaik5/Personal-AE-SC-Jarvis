@@ -33,6 +33,14 @@ from jarvis.skills.risk_report_skill import DealRiskReportSkill
 from jarvis.skills.demo_strategy_skill import DemoStrategySkill
 from jarvis.skills.account_dashboard_skill import AccountDashboardSkill
 from jarvis.observers.account_initializer import AccountAutoInitializer
+from jarvis.skills.meeting_summary_skill import MeetingSummarySkill
+from jarvis.skills.meeting_prep_skill import MeetingPrepSkill
+from jarvis.skills.proposal_generator_skill import ProposalGeneratorSkill
+from jarvis.skills.followup_email_skill import FollowupEmailSkill
+from jarvis.skills.deal_stage_tracker_skill import DealStageTrackerSkill
+from jarvis.meeting.meeting_processor import MeetingProcessor
+from jarvis.playbook.automation_engine import PlaybookAutomationEngine
+from jarvis.sync.claude_sync_manager import ClaudeSyncManager
 
 
 @dataclass
@@ -71,6 +79,15 @@ class Orchestrator:
         'demo_strategy': DemoStrategySkill,
         'account_dashboard': AccountDashboardSkill,
         'account_auto_init': AccountAutoInitializer,
+        # v2: Meeting, Playbook, Sync, New Skills
+        'meeting_summary': MeetingSummarySkill,
+        'meeting_prep': MeetingPrepSkill,
+        'proposal_generator': ProposalGeneratorSkill,
+        'followup_email': FollowupEmailSkill,
+        'deal_stage_tracker': DealStageTrackerSkill,
+        'meeting_processor': MeetingProcessor,
+        'playbook_engine': PlaybookAutomationEngine,
+        'claude_sync': ClaudeSyncManager,
     }
 
     def __init__(self, config):
@@ -107,6 +124,10 @@ class Orchestrator:
             'meddpicc', 'tech_utilities', 'battlecards', 'value_architecture', 'risk_report', 'demo_strategy',
             'account_dashboard',
             'account_auto_init',
+            # v2 components
+            'meeting_summary', 'meeting_prep', 'proposal_generator',
+            'followup_email', 'deal_stage_tracker',
+            'meeting_processor', 'playbook_engine', 'claude_sync',
             'scanner', 'archiver', 'websocket_server'
         ]
 

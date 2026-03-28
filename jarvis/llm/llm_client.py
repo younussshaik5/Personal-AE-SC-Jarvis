@@ -22,6 +22,7 @@ class LLMConfig:
     base_url: Optional[str] = None
     system_prompt_override: str = ""
     extra_body: Optional[Dict[str, Any]] = None  # Provider-specific additional fields
+    task_type: str = "text"  # "text", "video", "audio"
 
 
 @dataclass
@@ -51,19 +52,25 @@ class OpenAIProvider(LLMProvider):
     def __init__(self):
         self.logger = JARVISLogger("llm.openai")
         self._client = None
+        self._last_base_url: Optional[str] = None
 
     def _get_client(self, config: LLMConfig):
+        base_url = config.base_url or "https://api.openai.com/v1"
+        # Recreate client if base_url changed (e.g., switching between NVIDIA text and video endpoints)
+        if self._client is not None and self._last_base_url != base_url:
+            self.logger.info("Base URL changed, recreating client", old=self._last_base_url, new=base_url)
+            self._client = None
+
         if self._client is None:
             try:
                 from openai import AsyncOpenAI
-                # Use base_url from config; required for NVIDIA
-                base_url = config.base_url or "https://api.openai.com/v1"
                 # Get API key from config or environment (NVIDIA_API_KEY or OPENAI_API_KEY)
                 api_key = config.api_key or os.getenv("NVIDIA_API_KEY") or os.getenv("OPENAI_API_KEY") or ""
                 if not api_key:
                     self.logger.error("No API key provided for LLM. Set api_key in config or NVIDIA_API_KEY env var.")
                     raise ValueError("Missing API key")
                 self._client = AsyncOpenAI(api_key=api_key, base_url=base_url)
+                self._last_base_url = base_url
             except ImportError as e:
                 self.logger.error("openai package not installed. Run: pip install openai")
                 raise e
@@ -169,11 +176,11 @@ class LLMManager:
         "none": MockProvider,
     }
 
-    # Fallback models (same NVIDIA key, different models)
+    # Fallback models — NVIDIA only (background tasks should never use Claude tokens)
     FALLBACK_MODELS = [
-        "step-3.5-flash",           # Primary
-        "kimi-k2-thinking",         # Fallback 1
-        "gemma-3-27b-it",           # Fallback 2
+        "nvidia/llama-3.3-nemotron-super-49b-v1",       # Primary
+        "nvidia/llama-3.1-nemotron-ultra-253b-v1",      # Fallback 1
+        "nvidia/mistral-nemo-minitron-8b-8k-instruct",  # Fallback 2
     ]
 
     def __init__(self, config_manager):
@@ -183,6 +190,8 @@ class LLMManager:
         self._config: Optional[LLMConfig] = None
         self._fallback_configs: List[LLMConfig] = []
         self._active_model_index: int = 0
+        self._video_config: Optional[LLMConfig] = None
+        self._anthropic_fallback_config: Optional[LLMConfig] = None
 
     def get_config(self) -> LLMConfig:
         """Read LLM configuration from main config."""
@@ -198,11 +207,74 @@ class LLMManager:
             context_window=llm_cfg.get('context_window', 4096),
             base_url=llm_cfg.get('base_url'),
             system_prompt_override=llm_cfg.get('system_prompt', ''),
-            extra_body=llm_cfg.get('extra_body')
+            extra_body=llm_cfg.get('extra_body'),
+            task_type=llm_cfg.get('task_type', 'text')
+        )
+
+    def get_video_config(self) -> LLMConfig:
+        """Read video LLM configuration from llm_video section in yaml config."""
+        cfg = self.config_manager.config
+        video_cfg = getattr(cfg, 'llm_video', {})
+        if not video_cfg:
+            # Sensible defaults for NVIDIA Cosmos video reasoning
+            api_key = os.getenv("NVIDIA_API_KEY") or ""
+            return LLMConfig(
+                provider="openai",
+                api_key=api_key,
+                model="nvidia/cosmos-reason2-8b",
+                temperature=0.5,
+                max_tokens=1024,
+                context_window=8192,
+                base_url="https://integrate.api.nvidia.com/v1",
+                task_type="video"
+            )
+        return LLMConfig(
+            provider=video_cfg.get('provider', 'openai'),
+            api_key=video_cfg.get('api_key', os.getenv("NVIDIA_API_KEY") or ''),
+            model=video_cfg.get('model', 'nvidia/cosmos-reason2-8b'),
+            temperature=video_cfg.get('temperature', 0.5),
+            top_p=video_cfg.get('top_p'),
+            max_tokens=video_cfg.get('max_tokens', 1024),
+            context_window=video_cfg.get('context_window', 8192),
+            base_url=video_cfg.get('base_url', 'https://integrate.api.nvidia.com/v1'),
+            system_prompt_override=video_cfg.get('system_prompt', ''),
+            extra_body=video_cfg.get('extra_body'),
+            task_type="video"
+        )
+
+    def get_anthropic_fallback_config(self) -> LLMConfig:
+        """Read Anthropic fallback configuration from llm_fallback section in yaml config."""
+        cfg = self.config_manager.config
+        fallback_cfg = getattr(cfg, 'llm_fallback', {})
+        if not fallback_cfg:
+            # Sensible defaults for Claude as final fallback
+            api_key = os.getenv("ANTHROPIC_API_KEY") or ""
+            return LLMConfig(
+                provider="anthropic",
+                api_key=api_key,
+                model="claude-sonnet-4-20250514",
+                temperature=0.7,
+                max_tokens=500,
+                context_window=200000,
+                task_type="text"
+            )
+        return LLMConfig(
+            provider=fallback_cfg.get('provider', 'anthropic'),
+            api_key=fallback_cfg.get('api_key', os.getenv("ANTHROPIC_API_KEY") or ''),
+            model=fallback_cfg.get('model', 'claude-sonnet-4-20250514'),
+            temperature=fallback_cfg.get('temperature', 0.7),
+            top_p=fallback_cfg.get('top_p'),
+            max_tokens=fallback_cfg.get('max_tokens', 500),
+            context_window=fallback_cfg.get('context_window', 200000),
+            base_url=fallback_cfg.get('base_url'),
+            system_prompt_override=fallback_cfg.get('system_prompt', ''),
+            extra_body=fallback_cfg.get('extra_body'),
+            task_type="text"
         )
 
     def _build_fallback_configs(self) -> List[LLMConfig]:
-        """Build a list of fallback LLM configs."""
+        """Build a list of fallback LLM configs — NVIDIA only, no Anthropic.
+        Background tasks should never use Claude tokens."""
         primary = self._config
         configs = [primary]
 
@@ -210,7 +282,7 @@ class LLMManager:
         api_key = primary.api_key or os.getenv("NVIDIA_API_KEY") or os.getenv("OPENAI_API_KEY") or ""
         base_url = primary.base_url or "https://integrate.api.nvidia.com/v1"
 
-        # Add fallback models if they're different from primary
+        # Add NVIDIA fallback models only (no Anthropic)
         for model in self.FALLBACK_MODELS:
             if model != primary.model:
                 fallback = LLMConfig(
@@ -223,7 +295,8 @@ class LLMManager:
                     context_window=primary.context_window,
                     base_url=base_url,
                     system_prompt_override=primary.system_prompt_override,
-                    extra_body=primary.extra_body
+                    extra_body=primary.extra_body,
+                    task_type=primary.task_type
                 )
                 configs.append(fallback)
 
@@ -242,6 +315,10 @@ class LLMManager:
                 # Build fallback configs
                 self._fallback_configs = self._build_fallback_configs()
                 self.logger.info(f"Fallback chain: {[c.model for c in self._fallback_configs]}")
+                # Load video and anthropic fallback configs
+                self._video_config = self.get_video_config()
+                self._anthropic_fallback_config = self.get_anthropic_fallback_config()
+                self.logger.info(f"Video config: {self._video_config.model}, Anthropic fallback: {self._anthropic_fallback_config.model}")
                 return True
             else:
                 self.logger.warning("LLM provider config invalid, falling back to mock", provider=self._config.provider)
@@ -253,7 +330,8 @@ class LLMManager:
             return False
 
     async def generate(self, messages: List[Message]) -> str:
-        """Generate a response using the configured LLM with fallback chain."""
+        """Generate a response using the configured LLM with fallback chain.
+        Backwards compatible — defaults to background NVIDIA only."""
         if not self._provider:
             await self.initialize()
 
@@ -291,6 +369,79 @@ class LLMManager:
 
         # All fallbacks exhausted
         self.logger.error(f"All LLM models failed, last error: {last_error}")
+        return f"[LLM Error: {last_error}]"
+
+    async def generate_with_routing(self, messages: List[Message], task_type: str = "text", source: str = "background") -> str:
+        """Generate a response with task-type routing and source-aware fallback.
+
+        Args:
+            messages: List of Message objects for the conversation.
+            task_type: "text", "video", or "audio" — determines which config/model to use.
+            source: "background" (never use Claude) or "user_request" (Claude as final fallback).
+
+        Returns:
+            Generated response string.
+        """
+        if not self._provider:
+            await self.initialize()
+
+        # --- Video task routing ---
+        if task_type == "video":
+            video_config = self._video_config or self.get_video_config()
+            openai_provider = OpenAIProvider()
+            try:
+                result = await openai_provider.generate(messages, video_config)
+                if not result.startswith("[LLM Error:"):
+                    return result
+                raise Exception(result)
+            except Exception as e:
+                self.logger.error(f"Video generation failed", model=video_config.model, error=str(e))
+                return f"[LLM Error: Video generation failed: {str(e)}]"
+
+        # --- Text (or audio) task routing ---
+        # Build the NVIDIA-only fallback chain
+        nvidia_configs = self._fallback_configs if self._fallback_configs else self._build_fallback_configs()
+
+        last_error = None
+        for i, config in enumerate(nvidia_configs):
+            try:
+                result = await self._provider.generate(messages, config)
+                if result.startswith("[LLM Error:"):
+                    raise Exception(result)
+                if i > 0:
+                    self.logger.info(f"Routed fallback successful", model=config.model, attempts=i+1, source=source)
+                    self._active_model_index = i
+                return result
+            except Exception as e:
+                last_error = e
+                error_str = str(e)
+                if "429" in error_str or "Too Many Requests" in error_str:
+                    self.logger.warning(f"Model {config.model} rate limited, trying next fallback", error=error_str)
+                    continue
+                elif "404" in error_str or "not found" in error_str.lower():
+                    self.logger.warning(f"Model {config.model} not found, trying next fallback", error=error_str)
+                    continue
+                else:
+                    self.logger.error(f"Non-retryable LLM error with {config.model}", error=error_str)
+                    break
+
+        # --- Claude as final fallback (only for user_request, never background) ---
+        if source == "user_request":
+            self.logger.warning("All NVIDIA models failed, falling back to Anthropic Claude for user request")
+            anthropic_config = self._anthropic_fallback_config or self.get_anthropic_fallback_config()
+            anthropic_provider = AnthropicProvider()
+            try:
+                result = await anthropic_provider.generate(messages, anthropic_config)
+                if not result.startswith("[LLM Error:"):
+                    self.logger.info(f"Anthropic fallback successful", model=anthropic_config.model)
+                    return result
+                raise Exception(result)
+            except Exception as e:
+                self.logger.error(f"Anthropic fallback also failed", error=str(e))
+                last_error = e
+
+        # All fallbacks exhausted
+        self.logger.error(f"All LLM models failed (source={source}), last error: {last_error}")
         return f"[LLM Error: {last_error}]"
 
 
@@ -379,10 +530,10 @@ class ContextBuilder:
                                     profiles.append(prof)
                             except:
                                 continue
-                        
+
                         # Sort by mentions_count descending
                         profiles.sort(key=lambda x: x.get('mentions_count', 0), reverse=True)
-                        
+
                         for prof in profiles[:3]:
                             name = prof.get('name', 'Unknown')
                             mentions = prof.get('mentions_count', 0)
@@ -394,7 +545,7 @@ class ContextBuilder:
                             if weak:
                                 detail_line += f"\n  • Weaknesses: {'; '.join(weak)}"
                             competitor_details.append(detail_line)
-                        
+
                         competitors_summary = f"Detailed intelligence on {len(profiles)} competitors."
             except:
                 pass

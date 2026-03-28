@@ -1,11 +1,17 @@
-# JARVIS Core Dependencies
+# JARVIS v2 Core Dependencies
 websockets>=12.0
 watchdog>=4.0.0
 pyyaml>=6.0
-aiohttp>=3.9  # for Telegram API
-python-telegram-bot>=20.0  # Telegram bot integration
-openai>=1.0  # LLM integration (OpenAI + compatible endpoints like NVIDIA)
+aiohttp>=3.9
+python-telegram-bot>=20.0
+openai>=1.0
+httpx>=0.27.0
+python-dotenv>=1.0.0
+anthropic>=0.39.0
 
 # Optional: embedding generation for pattern recognition
 sentence-transformers>=2.2
 numpy>=1.24
+
+# Optional: local whisper (if not using NVIDIA Whisper API)
+# openai-whisper>=20231117

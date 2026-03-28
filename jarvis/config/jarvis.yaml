@@ -1,8 +1,12 @@
-workspace_root: /path/to/your/workspace
-data_dir: /path/to/your/workspace/jarvis/data
-logs_dir: /path/to/your/workspace/jarvis/logs
+# JARVIS v2 - Personal AE + SC Sales Assistant
+# All paths are resolved at runtime from JARVIS_HOME env var or defaults
+
+workspace_root: ~/Documents/claude space/JARVIS
+data_dir: ~/Documents/claude space/JARVIS/data
+logs_dir: ~/Documents/claude space/JARVIS/logs
 approval_required: true
 approval_threshold: 50
+
 evolution:
   enabled: true
   cycle_interval_hours: 6
@@ -14,33 +18,59 @@ persona:
   default: work
   auto_switch: true
 
-# Professional Identity (persisted throughout system)
+# Professional Identity
 identity:
-  name: "YOUR_NAME"
-  initials: "XY"
-  title: "Professional at Company"
-  role: "Sales & Presales" # Options: Sales, Presales, Both
+  name: "Younus Shaik"
+  initials: "YS"
+  title: "Account Executive + Solution Consultant"
+  role: "Both"
+  company: "Yellow.ai"
 
+# PRIMARY LLM: NVIDIA (used for ALL background processing - 24/7)
+# Uses OpenAI-compatible endpoint at integrate.api.nvidia.com
 llm:
-  provider: "openai"  # (ignored if opencode_ai: true) openai, anthropic, nvidia, local, mock
-  api_key: "YOUR_API_KEY_HERE"
-  base_url: "https://api.openai.com/v1"
-  model: "stepfun-ai/step-3.5-flash"
-  temperature: 1
+  provider: "openai"
+  api_key: ""  # Set via NVIDIA_API_KEY env var
+  base_url: "https://integrate.api.nvidia.com/v1"
+  model: "nvidia/llama-3.3-nemotron-super-49b-v1"
+  temperature: 0.7
   top_p: 0.9
-  max_tokens: 16384
+  max_tokens: 8192
   context_window: 32768
   extra_body: null
   stream: false
 
-# Use OpenCode/Claude AI configuration instead of local LLM config
-opencode_ai:
-  enabled: true  # Set to true to use OpenCode or Claude configured AI provider/model
-  config_path: "~/.config/opencode/config.yaml"  # Path to OpenCode's config file
-  # Recommended: remove or comment out local llm: section above when enabled
+# VIDEO/IMAGE LLM: NVIDIA Cosmos Reason 2 (for meeting slide analysis)
+llm_video:
+  provider: "openai"
+  api_key: ""  # Set via NVIDIA_API_KEY env var
+  base_url: "https://integrate.api.nvidia.com/v1"
+  model: "nvidia/cosmos-reason2-8b"
+  max_tokens: 4096
 
+# FALLBACK LLM: Claude (used ONLY when user explicitly requests via Claude Desktop)
+llm_fallback:
+  provider: "anthropic"
+  api_key: ""  # Set via ANTHROPIC_API_KEY env var
+  model: "claude-sonnet-4-20250514"
+  max_tokens: 8192
+
+# Meeting processing
+meeting:
+  recordings_dir: ~/Documents/claude space/JARVIS/recordings
+  queue_dir: ~/Documents/claude space/JARVIS/data/meeting_queue
+  auto_record: false
+  frame_interval_seconds: 30
+
+# Playbook automation
+playbook:
+  stale_deal_days: 7
+  critical_stale_days: 14
+  auto_advance: false  # Require manual stage advancement for safety
+
+# Web search (for competitive intel)
 web_search:
   enabled: true
-  engine: "duckduckgo"  # duckduckgo, google (requires API key)
+  engine: "duckduckgo"
   max_results: 5
-  timeout: 10  # seconds
+  timeout: 10
