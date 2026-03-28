@@ -12,15 +12,20 @@ from typing import Any, Dict, Optional, List, Callable
 from dataclasses import dataclass, field, asdict
 
 
+def _default_jarvis_home() -> Path:
+    """Resolve JARVIS_HOME from env var, fallback to ~/JARVIS. Always portable."""
+    return Path(os.environ.get("JARVIS_HOME", str(Path.home() / "JARVIS")))
+
+
 @dataclass
 class JarvisConfig:
     """Main configuration container."""
 
-    # Core
-    workspace_root: Path = Path.cwd() / "OPENCODE SPACE"
-    data_dir: Path = Path.cwd() / "data"
-    logs_dir: Path = Path.cwd() / "logs"
-    temp_dir: Path = Path.cwd() / "tmp"
+    # Core — all paths resolve relative to JARVIS_HOME env var
+    workspace_root: Path = field(default_factory=_default_jarvis_home)
+    data_dir: Path = field(default_factory=lambda: _default_jarvis_home() / "data")
+    logs_dir: Path = field(default_factory=lambda: _default_jarvis_home() / "logs")
+    temp_dir: Path = field(default_factory=lambda: _default_jarvis_home() / "data" / "cache")
 
     # MCP / OpenCode integration
     opencode_db_path: Path = Path.home() / ".local/share/opencode/opencode.db"

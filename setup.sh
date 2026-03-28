@@ -54,8 +54,17 @@ echo "  JARVIS MCP Server built successfully"
 # Create data directories
 echo ""
 echo "[6/7] Creating data directories..."
-JARVIS_HOME="${JARVIS_HOME:-$HOME/Documents/claude space/JARVIS}"
-mkdir -p "$JARVIS_HOME"/{ACCOUNTS,MEMORY,MEMORY/patterns,data/personas,data/templates,data/meeting_queue,logs,recordings}
+JARVIS_HOME="${JARVIS_HOME:-$HOME/JARVIS}"
+mkdir -p "$JARVIS_HOME"/{ACCOUNTS,MEETINGS,MEMORY,MEMORY/patterns,data/personas,data/templates,data/meeting_queue,logs,recordings}
+# Account template folder — shows users the subfolder structure
+mkdir -p "$JARVIS_HOME/ACCOUNTS/_template"/{MEETINGS,DOCUMENTS,EMAILS,INTEL,meetings}
+[ -f "JARVIS_HOME/ACCOUNTS/_template/README.md" ] && \
+  cp "JARVIS_HOME/ACCOUNTS/_template/README.md" "$JARVIS_HOME/ACCOUNTS/_template/README.md" 2>/dev/null || true
+# Blank JARVIS_BRAIN.md if not present
+if [ ! -f "$JARVIS_HOME/JARVIS_BRAIN.md" ]; then
+  printf "# JARVIS Brain — Conversation Intelligence Log\n\n*Claude Desktop appends entries here.*\n*JARVIS routes intelligence to ACCOUNTS/ automatically.*\n\n---\n" \
+    > "$JARVIS_HOME/JARVIS_BRAIN.md"
+fi
 echo "  JARVIS_HOME: $JARVIS_HOME"
 
 # Setup .env

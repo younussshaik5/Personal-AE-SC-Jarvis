@@ -6,6 +6,23 @@ google_token.json
 credentials.json
 
 # Runtime data (lives in JARVIS_HOME, not repo)
+# JARVIS_HOME/ is the portable template — keep structure, ignore real data
+JARVIS_HOME/ACCOUNTS/*/
+!JARVIS_HOME/ACCOUNTS/_template/
+!JARVIS_HOME/ACCOUNTS/.gitkeep
+JARVIS_HOME/MEETINGS/*
+!JARVIS_HOME/MEETINGS/.gitkeep
+JARVIS_HOME/logs/*
+!JARVIS_HOME/logs/.gitkeep
+JARVIS_HOME/recordings/*
+!JARVIS_HOME/recordings/.gitkeep
+JARVIS_HOME/data/*
+!JARVIS_HOME/data/.gitkeep
+# Brain file — real content is personal, keep blank template
+JARVIS_HOME/JARVIS_BRAIN.md
+!JARVIS_HOME/.gitkeep
+
+# Legacy paths
 ACCOUNTS/
 MEMORY/
 logs/

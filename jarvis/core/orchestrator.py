@@ -41,6 +41,9 @@ from jarvis.skills.deal_stage_tracker_skill import DealStageTrackerSkill
 from jarvis.meeting.meeting_processor import MeetingProcessor
 from jarvis.playbook.automation_engine import PlaybookAutomationEngine
 from jarvis.sync.claude_sync_manager import ClaudeSyncManager
+from jarvis.brain.conversation_extractor import ConversationExtractor
+from jarvis.brain.document_processor import DocumentProcessor
+from jarvis.observers.account_watcher import AccountWatcher
 
 
 @dataclass
@@ -88,6 +91,10 @@ class Orchestrator:
         'meeting_processor': MeetingProcessor,
         'playbook_engine': PlaybookAutomationEngine,
         'claude_sync': ClaudeSyncManager,
+        # Brain — interlinking reactive layer
+        'account_watcher': AccountWatcher,
+        'conversation_extractor': ConversationExtractor,
+        'document_processor': DocumentProcessor,
     }
 
     def __init__(self, config):
@@ -127,7 +134,10 @@ class Orchestrator:
             # v2 components
             'meeting_summary', 'meeting_prep', 'proposal_generator',
             'followup_email', 'deal_stage_tracker',
+            # account_watcher must start before brain components
+            'account_watcher',
             'meeting_processor', 'playbook_engine', 'claude_sync',
+            'conversation_extractor', 'document_processor',
             'scanner', 'archiver', 'websocket_server'
         ]
 
