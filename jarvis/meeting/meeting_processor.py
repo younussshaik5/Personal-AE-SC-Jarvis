@@ -16,12 +16,15 @@ from jarvis.utils.event_bus import Event, EventBus
 from jarvis.utils.config import ConfigManager
 from jarvis.meeting.transcriber import MeetingTranscriber
 from jarvis.meeting.video_analyzer import VideoAnalyzer
+from jarvis.meeting.recording_router import RecordingRouter
 
 
 class MeetingProcessor:
     """
     Orchestrates the full meeting processing pipeline:
     audio extraction -> transcription -> video frame analysis -> output generation.
+
+    Drop any recording in MEETINGS/ — JARVIS identifies the account automatically.
     """
 
     def __init__(self, config_manager: ConfigManager, event_bus: EventBus):
@@ -39,10 +42,19 @@ class MeetingProcessor:
         self.transcriber = MeetingTranscriber(nvidia_key, nvidia_url)
         self.video_analyzer = VideoAnalyzer(nvidia_key, nvidia_url)
 
+        # Router identifies which account a recording belongs to
+        accounts_dir = Path(self.config.workspace_root) / "ACCOUNTS"
+        self.router = RecordingRouter(accounts_dir, nvidia_key, nvidia_url)
+
     async def start(self):
-        """Start the meeting processor, including queue watcher if configured."""
+        """Start the meeting processor and auto-watch the MEETINGS/ folder."""
         self._running = True
-        self.logger.info("Meeting processor started")
+        meetings_dir = Path(self.config.workspace_root) / "MEETINGS"
+        meetings_dir.mkdir(parents=True, exist_ok=True)
+        self._watch_task = asyncio.create_task(
+            self.watch_queue(str(meetings_dir))
+        )
+        self.logger.info("Meeting processor started", watching=str(meetings_dir))
 
     async def stop(self):
         """Stop the meeting processor."""
@@ -186,68 +198,101 @@ class MeetingProcessor:
         # Step 8: Return combined data
         return result
 
-    async def watch_queue(self, queue_dir: str):
+    async def watch_queue(self, meetings_dir: str):
         """
-        Watch a directory for new .json processing requests and process each one.
+        Watch the MEETINGS/ folder for new recording files.
 
-        Each JSON file should contain:
-        {
-            "recording_path": "/path/to/recording",
-            "account_name": "AccountName",
-            "meeting_title": "Meeting Title"
-        }
+        Drop ANY video/audio file here — JARVIS identifies the account automatically
+        using RecordingRouter (filename → quick transcript → full NLP → new account).
 
-        Processed files are renamed with a .done suffix.
+        Supported formats: .mp4 .mov .avi .mkv .webm .mp3 .wav .m4a
 
-        Args:
-            queue_dir: Directory to watch for .json request files.
+        Processed files are moved to MEETINGS/.processed/ so they don't re-trigger.
         """
-        queue = Path(queue_dir)
-        queue.mkdir(parents=True, exist_ok=True)
-        self.logger.info("Watching meeting queue", queue_dir=queue_dir)
+        VIDEO_EXTS = {".mp4", ".mov", ".avi", ".mkv", ".webm", ".mp3", ".wav", ".m4a"}
+
+        meetings = Path(meetings_dir)
+        meetings.mkdir(parents=True, exist_ok=True)
+        processed_dir = meetings / ".processed"
+        processed_dir.mkdir(exist_ok=True)
+
+        self.logger.info("Watching MEETINGS folder", path=str(meetings))
 
         while self._running:
             try:
-                # Scan for new .json files (not .done)
-                request_files = sorted(queue.glob("*.json"))
-                for req_file in request_files:
-                    if req_file.suffix == ".json" and not req_file.name.endswith(".done.json"):
-                        self.logger.info(
-                            "Processing queue request", file=str(req_file)
-                        )
-                        try:
-                            request = json.loads(
-                                req_file.read_text(encoding="utf-8")
-                            )
-                            await self.process_recording(
-                                recording_path=request["recording_path"],
-                                account_name=request["account_name"],
-                                meeting_title=request["meeting_title"],
-                            )
-                            # Mark as processed
-                            done_path = req_file.with_suffix(".done.json")
-                            req_file.rename(done_path)
-                        except Exception as e:
-                            self.logger.error(
-                                "Queue request failed",
-                                file=str(req_file),
-                                error=str(e),
-                            )
-                            # Write error status
-                            error_path = req_file.with_suffix(".error.json")
-                            error_path.write_text(
-                                json.dumps({"error": str(e)}),
-                                encoding="utf-8",
-                            )
-                            req_file.rename(
-                                req_file.with_name(
-                                    req_file.stem + "_failed.json"
-                                )
-                            )
-            except Exception as e:
-                self.logger.error("Queue watch error", error=str(e))
+                for recording in sorted(meetings.iterdir()):
+                    if not recording.is_file():
+                        continue
+                    if recording.suffix.lower() not in VIDEO_EXTS:
+                        continue
+                    if recording.name.startswith('.'):
+                        continue
 
-            await asyncio.sleep(5)
+                    self.logger.info("New recording detected", file=recording.name)
+
+                    try:
+                        # Auto-identify account
+                        route = await self.router.identify_account(
+                            recording_path=recording,
+                            transcriber=self.transcriber,
+                            llm_client=None,  # use LLM only as last resort
+                        )
+                        account_name = route["account"]
+                        method = route["method"]
+                        confidence = route["confidence"]
+                        created_new = route["created_new"]
+
+                        self.logger.info(
+                            "Account identified",
+                            account=account_name,
+                            method=method,
+                            confidence=confidence,
+                        )
+
+                        # Notify if low confidence or new account created
+                        if route["notify"]:
+                            self.event_bus.publish(Event(
+                                type="meeting.account.uncertain",
+                                source="meeting.processor",
+                                data={
+                                    "file": recording.name,
+                                    "account": account_name,
+                                    "confidence": confidence,
+                                    "created_new": created_new,
+                                    "message": (
+                                        f"Recording '{recording.name}' routed to "
+                                        f"{'NEW account' if created_new else 'account'} "
+                                        f"'{account_name}' (confidence: {confidence:.0%}). "
+                                        f"Please confirm or reassign."
+                                    )
+                                }
+                            ))
+
+                        # Process the recording
+                        meeting_title = recording.stem
+                        await self.process_recording(
+                            recording_path=str(recording),
+                            account_name=account_name,
+                            meeting_title=meeting_title,
+                        )
+
+                        # Move to .processed/
+                        recording.rename(processed_dir / recording.name)
+                        self.logger.info("Recording processed and archived",
+                                         file=recording.name, account=account_name)
+
+                    except Exception as e:
+                        self.logger.error("Failed to process recording",
+                                          file=recording.name, error=str(e))
+                        # Move to .processed/failed/ so it doesn't loop
+                        failed_dir = processed_dir / "failed"
+                        failed_dir.mkdir(exist_ok=True)
+                        recording.rename(failed_dir / recording.name)
+
+            except Exception as e:
+                self.logger.error("MEETINGS watcher error", error=str(e))
+
+            await asyncio.sleep(10)  # check every 10 seconds
 
     def _format_transcript_md(
         self,
