@@ -173,7 +173,8 @@ class DynamicResearchService:
             
         try:
             # Competitive weaknesses from reviews
-            weaknesses = await self._web_search(f"{competitor} vs YourCompany disadvantages")
+            company_name = self.config.get("identity", {}).get("company", "Your Company")
+            weaknesses = await self._web_search(f"{competitor} vs {company_name} disadvantages")
             result["weaknesses"] = self._extract_weaknesses(weaknesses)
         except:
             pass
@@ -213,16 +214,17 @@ class DynamicResearchService:
         except:
             return {}
     
-    # ========== ACME PRODUCT KNOWLEDGE ==========
-    async def get_ACME_capabilities(self, product: str, feature: str = "") -> Dict[str, Any]:
-        """Get current YourCompany product capabilities and pricing."""
+    # ========== COMPANY PRODUCT KNOWLEDGE ==========
+    async def get_company_capabilities(self, product: str, feature: str = "") -> Dict[str, Any]:
+        """Get current company product capabilities and pricing."""
         cache_key = f"fw:{product.lower()}:{feature}"
         if cached := self._get_cached(cache_key):
             return cached
-            
+
+        company_name = self.config.get("identity", {}).get("company", "Your Company")
         try:
-            # Search YourCompany official docs/pricing
-            query = f"YourCompany {product} {feature} pricing features 2025" if feature else f"YourCompany {product} pricing features 2025"
+            # Search company official docs/pricing
+            query = f"{company_name} {product} {feature} pricing features 2025" if feature else f"{company_name} {product} pricing features 2025"
             results = await self._web_search(query)
             capabilities = self._extract_fw_capabilities(results, product, feature)
             self._cache(cache_key, capabilities)
@@ -424,7 +426,7 @@ class DynamicResearchService:
         return {}
     
     def _extract_fw_capabilities(self, text: str, product: str, feature: str) -> Dict[str, Any]:
-        """Extract YourCompany product info."""
+        """Extract company product info."""
         return {}
     
     def _contains_risk_signal(self, texts: List[str], query: str) -> bool:

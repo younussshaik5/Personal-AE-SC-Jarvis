@@ -28,7 +28,7 @@ graph TD
 ## 1. Data Ingestion (Observers)
 
 ### MCP Observer (`mcp-opencode-observer/`)
-- **Source**: YourCompany OpenCode internal database.
+- **Source**: Yellow.ai OpenCode internal database.
 - **Mechanism**: Node.js service polls for new messages/sessions in specific workspace IDs.
 - **Output**: Publishes `CONVERSATION_UPDATED` events to the JARVIS Event Bus.
 

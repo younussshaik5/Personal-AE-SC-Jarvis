@@ -231,11 +231,11 @@ else:
 ```json
 {
   "type": "file_created",
-  "path": "/workspace/acme/src/payment.py",
+  "path": "/workspace/techcorp/src/payment.py",
   "size": 2048,
   "file_type": "python",
   "timestamp": "2025-03-18T14:32:10Z",
-  "workspace_id": "acme_web"
+  "workspace_id": "techcorp_web"
 }
 ```
 
@@ -306,7 +306,7 @@ else:
   "name": "Django Model with UUID PK",
   "template": "class {name}(models.Model):\n    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)",
   "frequency": 15,
-  "workspaces": ["acme", "beta_project"],
+  "workspaces": ["techcorp", "beta_project"],
   "confidence": 0.92
 }
 ```
@@ -322,7 +322,7 @@ else:
 **Builds Persona-Specific Preferences**:
 ```json
 {
-  "persona": "acme_team",
+  "persona": "techcorp_team",
   "style": {
     "indentation": "spaces (4)",
     "max_line_length": 88,
@@ -783,12 +783,12 @@ archive_2025_03_monthly.tar.gz
 
 #### **Category Archiver** (`category_archiver.py`)
 **Categories**:
-- By persona: `acme_team_20250318.tar.gz`
+- By persona: `techcorp_team_20250318.tar.gz`
 - By project: `ecommerce_backend_20250318.tar.gz`
 - By task: `feature_stripe_integration_20250318.tar.gz`
 - By milestone: `release_v1.2.0_20250318.tar.gz`
 
-**Use Case**: "Show me all changes for Acme Corp last month" → extract from persona archives
+**Use Case**: "Show me all changes for TechCorp Inc last month" → extract from persona archives
 
 ---
 
@@ -822,7 +822,7 @@ class Event:
 1. **File Created**:
    - Source: `observer.file_system`
    - Type: `FILE_CREATED`
-   - Data: `{"path": "/app/models.py", "size": 1024, "workspace": "acme"}`
+   - Data: `{"path": "/app/models.py", "size": 1024, "workspace": "techcorp"}`
    - Subscribers: `learner.pattern_recognition`, `updater.file_modder`, `persona.comm_logger`
 
 2. **Pattern Discovered**:
@@ -1035,7 +1035,7 @@ A **Persona** represents a distinct identity for a client, project, or team. Eac
 - Isolated history and performance metrics
 
 #### Use Cases
-1. **Multiple Clients**: Acme Corp vs Beta Inc - separate codebases, styles, preferences
+1. **Multiple Clients**: TechCorp Inc vs Beta Inc - separate codebases, styles, preferences
 2. **Internal vs External**: Different behavior for internal projects vs client work
 3. **Personal vs Professional**: Separate "learning" vs "production" personas
 4. **Sandbox vs Production**: Conservative in production, experimental in sandbox
@@ -1043,9 +1043,9 @@ A **Persona** represents a distinct identity for a client, project, or team. Eac
 #### Creating a Persona
 ```bash
 jarvis persona create \
-  --name "Acme Corp" \
+  --name "TechCorp Inc" \
   --description "E-commerce platform development" \
-  --workspace "/path/to/acme" \
+  --workspace "/path/to/techcorp" \
   --preferences '{"code_style": "black", "framework": "django"}'
 ```
 
@@ -1054,9 +1054,9 @@ Or via config:
 {
   "personas": [
     {
-      "id": "acme_corp",
-      "name": "Acme Corp Dev Team",
-      "workspaces": ["/projects/acme-*"],
+      "id": "techcorp_inc",
+      "name": "TechCorp Inc Dev Team",
+      "workspaces": ["/projects/techcorp-*"],
       "preferences": {
         "languages": ["python", "javascript"],
         "style_guide": "pep8",
@@ -1064,7 +1064,7 @@ Or via config:
         "documentation": "sphinx"
       },
       "trust_score": 0.85,
-      "stakeholders": ["dev-team@acme.com"]
+      "stakeholders": ["dev-team@techcorp.com"]
     }
   ]
 }
@@ -1119,13 +1119,13 @@ class Deal:
 When conversation contains:
 - "We need to build a new checkout by April 15"
 - "Budget is around $20k"
-- "Client is Acme Corp"
+- "Client is TechCorp Inc"
 
 → Auto-create deal:
 ```json
 {
   "title": "New Checkout System",
-  "client": "Acme Corp",
+  "client": "TechCorp Inc",
   "description": "Build a new checkout system",
   "value": 20000,
   "deadline": "2026-04-15",
@@ -1136,7 +1136,7 @@ When conversation contains:
 And send for confirmation:
 ```
 Detected potential deal: "New Checkout System"
-Client: Acme Corp
+Client: TechCorp Inc
 Deadline: April 15, 2026
 Value: $20,000
 
@@ -1314,7 +1314,7 @@ for step in plan:
 ```
 
 #### 4. Cross-Workspace Learning
-Persona "acme" has done Stripe integration:
+Persona "techcorp" has done Stripe integration:
 - Learned patterns: create customer, handle webhook, record transaction
 - Success rate: 95%
 
@@ -1667,7 +1667,7 @@ Performance:
   - Cost today: $1.47 (API calls: 3,247)
 
 Personas:
-  - acme_corp (trust: 0.87): 12 active tasks
+  - techcorp_inc (trust: 0.87): 12 active tasks
   - beta_inc (trust: 0.72): 5 active tasks
 ```
 
@@ -1740,14 +1740,14 @@ Authorization: Bearer <token>
 **GET /personas** - List personas
 ```json
 [
-  {"id": "acme", "name": "Acme Corp", "workspaces": 2},
+  {"id": "techcorp", "name": "TechCorp Inc", "workspaces": 2},
   {"id": "beta", "name": "Beta Inc", "workspaces": 1}
 ]
 ```
 
 **POST /personas/{id}/switch** - Switch active persona
 ```bash
-curl -X POST http://localhost:8000/personas/acme/switch
+curl -X POST http://localhost:8000/personas/techcorp/switch
 ```
 
 **GET /metrics** - Performance metrics
@@ -1966,8 +1966,8 @@ jarvis workspace add /path/to/project
 
 # Personas
 jarvis persona list
-jarvis persona create --name "Acme" --workspace /acme
-jarvis persona switch acme   # Manual switch
+jarvis persona create --name "TechCorp" --workspace /techcorp
+jarvis persona switch techcorp   # Manual switch
 jarvis persona show <id>
 
 # Deals

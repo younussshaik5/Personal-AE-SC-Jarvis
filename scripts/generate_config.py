@@ -33,7 +33,7 @@ identity:
   initials: "YS"
   title: "Account Executive + Solution Consultant"
   role: "Sales & Presales"
-  company: "Yellow.ai"
+  company: "Your Company"
 
 # Primary LLM - NVIDIA (used for ALL background processing)
 llm:

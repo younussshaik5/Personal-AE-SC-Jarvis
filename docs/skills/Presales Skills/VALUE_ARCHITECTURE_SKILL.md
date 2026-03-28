@@ -1,8 +1,8 @@
 ---
 name: value-architecture
-description: CFO-ready ROI/TCO business case builder with dynamic competitive pricing, headcount avoidance modeling, and YourCompany-specific value drivers
+description: CFO-ready ROI/TCO business case builder with dynamic competitive pricing, headcount avoidance modeling, and Yellow.ai-specific value drivers
 version: 2.0
-author: YourCompany SE Team
+author: Yellow.ai SE Team
 last_updated: 2026-03-11
 tags:
   - presales
@@ -10,20 +10,20 @@ tags:
   - tco
   - value
   - cfo
-  - ACME
+  - yellow-ai
   - solution-engineering
 ---
 # SKILL: Value Architecture Module (Dynamic Edition)
 
 **Module ID:** `valueArchitecture` | **File:** `src/modules/valueArchitecture.js`  
-**Audience:** YourCompany Solution Engineering (Presales)  
-**YourCompany Context:** Investor Day 2025, "Cost of Complexity" Theme
+**Audience:** Yellow.ai Solution Engineering (Presales)  
+**Yellow.ai Context:** Investor Day 2025, "Cost of Complexity" Theme
 
 ---
 
 ## Overview
 
-CFO-ready business case builder with dynamic competitive pricing intelligence and adaptive ROI modeling. Fetches real-time pricing and benchmarks rather than relying on static databases. Emphasizes YourCompany' "Cost of Complexity" value proposition.
+CFO-ready business case builder with dynamic competitive pricing intelligence and adaptive ROI modeling. Fetches real-time pricing and benchmarks rather than relying on static databases. Emphasizes Yellow.ai' "Cost of Complexity" value proposition.
 
 ---
 
@@ -35,12 +35,12 @@ AI MUST fetch current pricing before generating output:
 
 1. **Competitor Pricing** (Live Fetch):
    - Search `"{competitor} pricing {current_year}"`
-   - Search `"{competitor} vs YourCompany pricing"`
+   - Search `"{competitor} vs Yellow.ai pricing"`
    - Check G2/Capterra for recent pricing reviews
    - `[FETCH: Use [PRICE: $X/yr | Source: URL | Date]]`
 
-2. **YourCompany Pricing** (Current):
-   - Reference: ACME.com/pricing (latest)
+2. **Yellow.ai Pricing** (Current):
+   - Reference: yellow.ai/pricing (latest)
    - Plan tiers: Growth ($18), Pro ($49), Enterprise ($79) per agent/month
    - Freddy AI: $100 per 1,000 sessions
    - `[FLAG: If pricing changed, note effective date]`
@@ -75,7 +75,7 @@ Instead of static table, use:
 | `roi-current-tools` | Current Tools & Annual Costs | textarea | `[AUTO-FILL: From cost database + research]` |
 | `roi-labor-rate` | Average Labor Burden Rate ($/hr) | number | `[SUGGEST: Based on industry/region]` |
 | `roi-manual-ftes` | Manual Reporting FTEs | number | `[CALCULATE: Suggest based on agent count]` |
-| `roi-plan` | Proposed YourCompany Plan | select | growth ($18), pro ($49), enterprise ($79) |
+| `roi-plan` | Proposed Yellow.ai Plan | select | growth ($18), pro ($49), enterprise ($79) |
 | `roi-context` | Additional Context | textarea | `[FETCH: Company financials, churn data]` |
 | `roi-file` | Attachments | file (multi) | Current contracts, usage reports |
 
@@ -88,7 +88,7 @@ Instead of static table, use:
 ```
 1. Research competitor pricing (see above)
 2. Fetch industry-specific ROI benchmarks
-3. Calculate YourCompany cost: agents × plan_price × 12
+3. Calculate Yellow.ai cost: agents × plan_price × 12
 4. Identify headcount avoidance opportunities from context
 5. Research company financial health for budget context
 6. Apply "Cost of Complexity" framework (20% waste reduction)
@@ -112,9 +112,9 @@ Instead of static table, use:
    - `[FETCH: Industry benchmark comparison]`
    - `[FLAG: Any pricing discrepancies found in research]`
 
-3. **Proposed YourCompany Solution** (Current Pricing)
+3. **Proposed Yellow.ai Solution** (Current Pricing)
    - Cost breakdown: Agent costs + Implementation + Training + Freddy AI
-   - Pricing source: [YourCompany.com, accessed {date}]
+   - Pricing source: [Yellow.ai.com, accessed {date}]
    - "Uncomplicated" value: Faster time-to-value, lower admin overhead
    - `[NOTE: Any promotional pricing or bundles available]`
 
@@ -127,7 +127,7 @@ Instead of static table, use:
 
 5. **Labor Savings Calculation** (Activity-Based)
    - Current hours per activity: [Estimated or input]
-   - Proposed hours with YourCompany: [Based on product benchmarks]
+   - Proposed hours with Yellow.ai: [Based on product benchmarks]
    - Savings: [Current - Proposed]
    - `[INCLUDE: Confidence level per activity]`
 
@@ -201,7 +201,7 @@ Include: "Pricing current as of {date} | Recommend refresh before customer prese
 2. **Adaptive Models**: ROI structure adapts to deal size/type
 3. **Benchmark Intelligence**: Industry comparisons where available
 4. **Confidence Indicators**: Every number has uncertainty rating
-5. **YourCompany Specific**: Pre-loaded with "Cost of Complexity" value drivers
+5. **Yellow.ai Specific**: Pre-loaded with "Cost of Complexity" value drivers
 6. **Freddy AI ROI**: 80% deflection rate for headcount avoidance
 
 ---
@@ -215,12 +215,12 @@ Include: "Pricing current as of {date} | Recommend refresh before customer prese
 
 ---
 
-## YourCompany Value Drivers (2025)
+## Yellow.ai Value Drivers (2025)
 
 ### "Cost of Complexity" Framework:
 - 20% of software spend is wasted on unnecessary complexity
 - 7% of annual revenue lost to inefficiency
-- YourCompany eliminates complexity = immediate savings
+- Yellow.ai eliminates complexity = immediate savings
 
 ### Key Differentiators:
 - **Unified Platform**: One solution vs. multiple tools

@@ -238,7 +238,7 @@ Multiple learners receive same event:
 **ContextEngine**:
 - Receives task: "Add authentication"
 - Queries learned patterns: "We've seen 'django_authentication' 5 times before"
-- Checks persona preferences: "Acme uses Django REST + JWT"
+- Checks persona preferences: "TechCorp uses Django REST + JWT"
 - Retrieves similar past tasks from history
 - Builds **rich context** with semantic search (not just keywords)
 
@@ -450,7 +450,7 @@ def get_active_persona(current_path: Path) -> Persona:
 
 **Persona Isolation**:
 ```
-Acme Corp Persona:
+TechCorp Inc Persona:
   - Knows Django, React, PostgreSQL
   - Uses Black, pytest, Sphinx
   - Trust score: 0.87 (high autonomy)
@@ -464,7 +464,7 @@ Beta Inc Persona:
   - Patterns learned: 89
   - Deals: 1 active
 
-Switching: cd /acme → Acme persona active
+Switching: cd /techcorp → TechCorp persona active
           cd /beta → Beta persona active
 ```
 
@@ -483,10 +483,10 @@ Switching: cd /acme → Acme persona active
 **Deal Lifecycle**:
 ```
 1. Creation (manual or auto from conversation)
-   User: "We need to build checkout for Acme by Friday"
-   → JARVIS parses: feature=checkout, client=Acme, deadline=Friday
+   User: "We need to build checkout for TechCorp by Friday"
+   → JARVIS parses: feature=checkout, client=TechCorp, deadline=Friday
    → Creates deal: "Checkout Feature", deadline=2025-03-21
-   → Adds to Acme persona
+   → Adds to TechCorp persona
 
 2. Execution
    JARVIS works on tasks related to deal
@@ -625,8 +625,8 @@ Meta-Learner analyzes:
 ```
 Fireup detects workspace is Django
 → Loads: django_skills, testing_skills, security_skills
-→ Persona: Acme Corp (trust 0.87)
-→ MCP context warm: "Acme uses JWT before"
+→ Persona: TechCorp Inc (trust 0.87)
+→ MCP context warm: "TechCorp uses JWT before"
 ```
 
 **Step 1: User Request**
@@ -719,7 +719,7 @@ Observers see:
 → PatternRecognition: "jwt_auth_setup" pattern (new)
   Store in data/patterns/jwt_auth_001.json
 
-→ PreferenceExtractor: "Acme prefers simplejwt over core JWT"
+→ PreferenceExtractor: "TechCorp prefers simplejwt over core JWT"
   Update persona.preferences.auth_method = "simplejwt"
 
 → PerformanceAnalyzer: "Task completion: 18m vs avg 2.3h → 92% faster"

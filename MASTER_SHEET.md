@@ -2,7 +2,7 @@
 
 **Version:** 2.0.0  
 **Workspace:** `/path/to/your/workspace`  
-**Solution Engineer:** YOUR_NAME (YourCompany)  
+**Solution Engineer:** YOUR_NAME (Yellow.ai)  
 **Last Updated:** 2026-03-25
 
 ---
@@ -276,7 +276,7 @@ Edit the respective skill file:
 
 | Account Name | Team | Deals | Gaps | Last Updated |
 |--------------|------|-------|------|--------------|
-| ACME Corp | PRESALES | - | - | 2026-03-27 |
+| Yellow.ai Corp | PRESALES | - | - | 2026-03-27 |
 
 *All accounts auto-updated every 60 seconds.*
 
@@ -284,7 +284,7 @@ Edit the respective skill file:
 
 ## License & Ownership
 
-**Created for:** YourCompany SE Team  
+**Created for:** Yellow.ai SE Team  
 **Primary User:** YOUR_NAME (Solution Engineer)  
 **All generated documents:** Property of the workspace owner  
 **System:** Open-source under MIT (modify as needed)

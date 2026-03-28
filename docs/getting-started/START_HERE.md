@@ -175,4 +175,4 @@ The `persona/` directory contains role-specific configurations. The system tailo
 
 ---
 
-**Built by SE YOUR_NAME** | Designed for YourCompany Solution Engineers
+**Built by SE YOUR_NAME** | Designed for Yellow.ai Solution Engineers

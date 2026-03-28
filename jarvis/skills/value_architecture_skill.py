@@ -286,21 +286,21 @@ Build 3-year ROI model for {account_name}.
 Deal:
 - ARR: ${arr:,}
 - Agents: {agents}
-- Product: {deal.get('product', 'AcmeDesk')}
+- Product: {deal.get('product', self.config_manager.config.get("identity", {}).get("company", "Your Company"))}
 
 Competitor Pricing (live):
 {comp_pricing_str}
 
 Industry benchmarks: {json.dumps(data.get('industry_benchmarks', {}), indent=2)}
 
-YourCompany pricing:
+Company pricing:
 - Growth: $18/agent/mo
 - Pro: $49/agent/mo
 - Enterprise: $79/agent/mo
-- Freddy AI: $100 per 1,000 sessions
+- AI Add-on: $100 per 1,000 sessions
 
 Calculate:
-1. Year 1-3 YourCompany cost (assume appropriate agent count and plan)
+1. Year 1-3 platform cost (assume appropriate agent count and plan)
 2. Current tool cost (use competitor pricing if known)
 3. Headcount avoidance savings (assume 1 FTE per 50 agents with AI)
 4. Cost of Complexity reduction (20% of current spend)
@@ -318,7 +318,7 @@ Return JSON:
   }},
   "assumptions": ["...", "..."],
   "cost_breakdown": [
-    {{"category": "YourCompany license", "y1": 0, "y2": 0, "y3": 0}},
+    {{"category": "Platform license", "y1": 0, "y2": 0, "y3": 0}},
     {{"category": "Implementation", "y1": 0, "y2": 0, "y3": 0}}
   ],
   "sensitivity": "If headcount reduction is lower by 50%, ROI drops X%"
@@ -350,9 +350,9 @@ Return JSON:
                 "roi_percent": 150,
                 "payback_months": 8
             },
-            "assumptions": ["1 FTE per 50 agents avoided", "20% Cost of Complexity reduction", "No discount on YourCompany"],
+            "assumptions": ["1 FTE per 50 agents avoided", "20% Cost of Complexity reduction", "No discount on platform license"],
             "cost_breakdown": [
-                {"category": "YourCompany license", "y1": annual_fw, "y2": annual_fw, "y3": annual_fw},
+                {"category": "Platform license", "y1": annual_fw, "y2": annual_fw, "y3": annual_fw},
                 {"category": "Implementation", "y1": 25000, "y2": 5000, "y3": 0}
             ],
             "sensitivity": "If headcount reduction is lower by 50%, ROI drops ~40%"
@@ -424,7 +424,7 @@ Return JSON:
 
 ## 3-Year Total Cost of Ownership
 
-| Cost Component | YourCompany | {comps[0]} | {comps[1] if len(comps)>1 else 'Other'} |
+| Cost Component | Our Platform | {comps[0]} | {comps[1] if len(comps)>1 else 'Other'} |
 |----------------|------------|-----------|-----------|
 | License (per agent/mo) | $49 (Pro) | $X | $Y |
 | Annual license cost (50 agents) | $29,400 | $X | $Y |

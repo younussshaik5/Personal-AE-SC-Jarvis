@@ -43,7 +43,7 @@ jarvis start            # Runs as a background daemon
 jarvis status           # Shows health
 jarvis scan now         # Force a workspace scan
 jarvis persona list     # List existing personas
-jarvis persona create --name "Acme Corp"
+jarvis persona create --name "TechCorp Inc"
 ```
 
 You can also embed JARVIS as a library:

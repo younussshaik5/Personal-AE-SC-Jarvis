@@ -535,7 +535,7 @@ class DemoStrategySkill:
         for comp in competitors[:3]:
             points += f"""### vs {comp}
 
-- **Integration:** YourCompany unified vs {comp} point solutions
+- **Integration:** Our unified platform vs {comp} point solutions
 - **AI:** Freddy embedded vs {comp} add-on or none
 - **Deployment:** Weeks vs months
 - **TCO:** 30% lower 3-year cost
@@ -610,7 +610,7 @@ class DemoStrategySkill:
 
 **Trap-setting:** "Some vendors you're probably evaluating take a different approach..."
 
-| Area | YourCompany | Competitor |
+| Area | Our Platform | Competitor |
 |------|-----------|------------|
 | AI | Built-in | Add-on or none |
 | Deployment | Weeks | Months |

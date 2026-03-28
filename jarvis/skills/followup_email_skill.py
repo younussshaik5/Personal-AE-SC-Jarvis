@@ -81,7 +81,7 @@ Requirements:
 - Include clear next steps with proposed dates
 - Keep it concise (under 200 words)
 - Include a subject line
-- Sign off as the Yellow.ai representative
+- Sign off as the company representative
 
 Format:
 Subject: [subject line]
@@ -89,15 +89,15 @@ Subject: [subject line]
 [email body]
 
 Best regards,
-Younus Shaik
+{self.config.config.get("identity", {}).get("name", "Your Name")}
 Account Executive & Solution Consultant
-Yellow.ai"""
+{self.config.config.get("identity", {}).get("company", "Your Company")}"""
 
         email_text = ""
         if self._llm_manager:
             from jarvis.llm.llm_client import Message
             messages = [
-                Message(role="system", content="You are JARVIS, drafting professional sales follow-up emails for Yellow.ai."),
+                Message(role="system", content=f"You are JARVIS, drafting professional sales follow-up emails for {self.config.config.get('identity', {}).get('company', 'Your Company')}."),
                 Message(role="user", content=prompt)
             ]
             email_text = await self._llm_manager.generate_with_routing(

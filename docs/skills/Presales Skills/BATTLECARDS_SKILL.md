@@ -1,28 +1,28 @@
 ---
 name: battlecards
-description: Real-time competitive intelligence system with live pricing, G2 sentiment analysis, and trap-setting discovery questions for YourCompany SEs
+description: Real-time competitive intelligence system with live pricing, G2 sentiment analysis, and trap-setting discovery questions for Yellow.ai SEs
 version: 2.0
-author: YourCompany SE Team
+author: Yellow.ai SE Team
 last_updated: 2026-03-11
 tags:
   - presales
   - competitive
   - battlecards
   - positioning
-  - ACME
+  - yellow-ai
   - solution-engineering
 ---
 # SKILL: Competitive Battlecards Module (Dynamic Edition)
 
 **Module ID:** `battlecards` | **File:** `src/modules/battlecards.js`  
-**Audience:** YourCompany Solution Engineering (Presales)  
-**YourCompany Context:** Investor Day 2025, "Why We Win" Framework
+**Audience:** Yellow.ai Solution Engineering (Presales)  
+**Yellow.ai Context:** Investor Day 2025, "Why We Win" Framework
 
 ---
 
 ## Overview
 
-AI-powered competitive intelligence system that generates real-time battlecards with live pricing, G2 sentiment, and trap-setting questions. Continuously updated rather than relying on static competitor databases. Built for YourCompany SEs competing against Zendesk, Salesforce, ServiceNow.
+AI-powered competitive intelligence system that generates real-time battlecards with live pricing, G2 sentiment, and trap-setting questions. Continuously updated rather than relying on static competitor databases. Built for Yellow.ai SEs competing against Zendesk, Salesforce, ServiceNow.
 
 ---
 
@@ -34,7 +34,7 @@ For ANY competitor selected, AI MUST perform:
 
 1. **Pricing Intelligence**:
    - Search `"{competitor} pricing {current_year}"`
-   - Search `"{competitor} vs YourCompany pricing comparison"`
+   - Search `"{competitor} vs Yellow.ai pricing comparison"`
    - Check G2/Capterra pricing reviews (last 6 months)
    - `[FETCH: Current list/contract prices if available]`
 
@@ -46,14 +46,14 @@ For ANY competitor selected, AI MUST perform:
 
 3. **Sentiment Analysis** (Live):
    - Search G2 reviews `"{competitor} cons disadvantages"`
-   - Search Reddit `"{competitor} vs YourCompany"`
+   - Search Reddit `"{competitor} vs Yellow.ai"`
    - Search `"{competitor} outage"` OR `"{competitor} downtime"`
    - `[CALCULATE: Recent sentiment trend: Improving/Stable/Declining]`
 
-4. **YourCompany Positioning**:
-   - Reference YourCompany Investor Day 2025 messaging: "Uncomplicated, AI-native, Unified Experience"
+4. **Yellow.ai Positioning**:
+   - Reference Yellow.ai Investor Day 2025 messaging: "Uncomplicated, AI-native, Unified Experience"
    - Map to specific competitor weaknesses
-   - `[INCLUDE: Latest YourCompany wins against this competitor if available]`
+   - `[INCLUDE: Latest Yellow.ai wins against this competitor if available]`
 
 ---
 
@@ -94,7 +94,7 @@ Salesforce Sales Cloud, HubSpot CRM, Zoho CRM, Pipedrive, Microsoft Dynamics 365
 |----------|-------|------|----------------|
 | `battle-competitor` | Competitor | select (grouped) | Pre-populated + `[FETCH: Recent additions]` |
 | `battle-custom` | Custom Competitor | text | `[VALIDATE: Check if exists in DB first]` |
-| `battle-product` | YourCompany Product | select | AcmeDesk, AcmeService, freshsales, freshchat, freshmarketer, freshcaller, ACME-css, ACME-crm, freshteam |
+| `battle-product` | Yellow.ai Product | select | Yellow.ai Chat, Yellow.ai Voice, Yellow.ai Email, Yellow.ai Agent Assist, Yellow.ai Insights, Yellow.ai Integrate |
 | `battle-context` | Deal Context | textarea | `[SUGGEST: Based on industry + deal size]` |
 | `battle-file` | Attachments | file (multi) | Competitor proposals, feature lists |
 
@@ -107,7 +107,7 @@ Salesforce Sales Cloud, HubSpot CRM, Zoho CRM, Pipedrive, Microsoft Dynamics 365
 ```
 1. Identify selected competitor
 2. Fetch real-time pricing and reviews (see protocol above)
-3. Research latest YourCompany positioning vs this competitor
+3. Research latest Yellow.ai positioning vs this competitor
 4. Check for uploaded competitor documents (RFPs, proposals)
 5. Generate battlecard with [DATA FRESHNESS: {timestamp}] markers
 ```
@@ -115,7 +115,7 @@ Salesforce Sales Cloud, HubSpot CRM, Zoho CRM, Pipedrive, Microsoft Dynamics 365
 ### Dynamic Output Sections:
 
 1. **Executive Summary** (Context-Aware)
-   - Overall competitive position: YourCompany vs {competitor}
+   - Overall competitive position: Yellow.ai vs {competitor}
    - Key differentiators (prioritized by deal context)
    - Recommended strategy: Attack/Defend/Neutralize
    - Win probability: [Based on similar deals in CRM]
@@ -124,7 +124,7 @@ Salesforce Sales Cloud, HubSpot CRM, Zoho CRM, Pipedrive, Microsoft Dynamics 365
 
 2. **Pricing Comparison** (Live Data)
    - Tier-by-tier comparison table:
-     | Plan | YourCompany Price | {Competitor} Price | Savings % | Feature Parity | Notes |
+     | Plan | Yellow.ai Price | {Competitor} Price | Savings % | Feature Parity | Notes |
    - Pricing analysis: Hidden costs, implementation fees, AI add-ons
    - `[SOURCE: URLs for all pricing data]`
    - `[FLAG: Any pricing changes detected in last 90 days]`
@@ -138,10 +138,10 @@ Salesforce Sales Cloud, HubSpot CRM, Zoho CRM, Pipedrive, Microsoft Dynamics 365
 
 4. **Technical Comparison** (Feature-Current)
    - Feature category matrix: [Based on latest product docs]
-   - YourCompany advantages: [With implementation complexity]
+   - Yellow.ai advantages: [With implementation complexity]
    - {Competitor} weaknesses: [Specific, with evidence from reviews/news]
    - {Competitor} strengths: [With counter-positioning]
-   - `[FLAG: Features in YourCompany roadmap that close gaps]`
+   - `[FLAG: Features in Yellow.ai roadmap that close gaps]`
 
 5. **Trap-Setting Discovery Questions** (Dynamic)
    - Generated based on identified competitor weaknesses
@@ -150,13 +150,13 @@ Salesforce Sales Cloud, HubSpot CRM, Zoho CRM, Pipedrive, Microsoft Dynamics 365
    - `[INCLUDE: Specific to {industry} if context provided]`
 
 6. **Competitive Positioning** (Strategic)
-   - Dimension table: YourCompany position vs competitor
+   - Dimension table: Yellow.ai position vs competitor
    - Our advantages: [Mapped to customer pain hypotheses]
    - Proof points: [Case studies, ROI data]
-   - `[REFERENCE: YourCompany Investor Day 2025 themes if relevant]`
+   - `[REFERENCE: Yellow.ai Investor Day 2025 themes if relevant]`
 
 7. **Win Themes & Messaging** (Adaptive)
-   - Theme table: YourCompany message, competitor counter, our response, evidence
+   - Theme table: Yellow.ai message, competitor counter, our response, evidence
    - Messaging by persona: CIO, CFO, CEO, COO
    - `[ADAPT: Based on deal context and known stakeholders]`
 
@@ -168,12 +168,12 @@ Salesforce Sales Cloud, HubSpot CRM, Zoho CRM, Pipedrive, Microsoft Dynamics 365
 
 9. **Implementation Comparison** (Reality-Based)
    - Aspect comparison: Time-to-value, complexity, resources needed
-   - Timeline impact: YourCompany vs competitor
+   - Timeline impact: Yellow.ai vs competitor
    - Risk factors: [From implementation reviews]
    - `[SOURCE: G2 implementation reviews, case studies]`
 
 10. **Integration Ecosystem** (Current)
-    - Integration category table: YourCompany vs competitor
+    - Integration category table: Yellow.ai vs competitor
     - Key integrations: [Based on customer's likely stack]
     - API capabilities: [Current version]
     - `[NOTE: Any recent integration additions]`
@@ -201,10 +201,10 @@ When adding custom competitor:
 ## Output Actions
 
 ### Copy
-Include header: "⚔️ Battlecard: YourCompany vs {competitor} | Generated {datetime} | Data as of {research_timestamp}"
+Include header: "⚔️ Battlecard: Yellow.ai vs {competitor} | Generated {datetime} | Data as of {research_timestamp}"
 
 ### Slack
-Prefix: `⚔️ *Battlecard: {competitor}* | Product: {ACME_product} | Health: {win_probability}%`
+Prefix: `⚔️ *Battlecard: {competitor}* | Product: {yellowai_product} | Health: {win_probability}%`
 Include: Top 3 win themes + pricing comparison summary
 
 ### Export
@@ -220,7 +220,7 @@ Include: Top 3 win themes + pricing comparison summary
 2. **Sentiment Tracking**: "Zendesk G2 score dropped 0.2 in last quarter"
 3. **Context Adaptation**: Different positioning for SMB vs Enterprise
 4. **Trap Questions**: Generated from actual competitor weaknesses, not generic
-5. **YourCompany Alignment**: References latest corporate messaging (Investor Day 2025: AI-native, uncomplicated)
+5. **Yellow.ai Alignment**: References latest corporate messaging (Investor Day 2025: AI-native, uncomplicated)
 
 ---
 
@@ -234,7 +234,7 @@ Include: Top 3 win themes + pricing comparison summary
 
 ---
 
-## YourCompany "Why We Win" Framework
+## Yellow.ai "Why We Win" Framework
 
 ### Key Differentiators:
 1. **Unified Experience**: One platform vs. fragmented tools

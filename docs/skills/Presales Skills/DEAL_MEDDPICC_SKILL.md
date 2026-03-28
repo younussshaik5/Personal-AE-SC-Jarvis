@@ -2,27 +2,27 @@
 name: deal-meddpicc
 description: Comprehensive MEDDPICC qualification with real-time stakeholder research, dynamic scoring, and deal-specific risk assessment for enterprise deals
 version: 2.0
-author: YourCompany SE Team
+author: Yellow.ai SE Team
 last_updated: 2026-03-11
 tags:
   - presales
   - meddpicc
   - qualification
   - enterprise
-  - ACME
+  - yellow-ai
   - solution-engineering
 ---
 # SKILL: Deal MEDDPICC Module (Dynamic Edition)
 
 **Module ID:** `dealMeddpicc` | **File:** `src/modules/dealMeddpicc.js`  
-**Audience:** YourCompany Solution Engineering (Presales)  
-**YourCompany Context:** Enterprise Deal Qualification, Field Sales Motion
+**Audience:** Yellow.ai Solution Engineering (Presales)  
+**Yellow.ai Context:** Enterprise Deal Qualification, Field Sales Motion
 
 ---
 
 ## Overview
 
-AI-powered MEDDPICC qualification with real-time stakeholder research, dynamic scoring, and deal-specific risk assessment. Optimized for YourCompany enterprise deals with mid-market and enterprise customers (250+ employees).
+AI-powered MEDDPICC qualification with real-time stakeholder research, dynamic scoring, and deal-specific risk assessment. Optimized for Yellow.ai enterprise deals with mid-market and enterprise customers (250+ employees).
 
 ---
 
@@ -70,7 +70,7 @@ Before generating analysis, AI MUST research:
 
 ### Fetch from CRM:
 
-1. Check `YourCompanyService.isConnected()`
+1. Check `Yellow.aiService.isConnected()`
 2. Get deals with enrichment:
    - Deal fields: name, amount, stage, probability, expected_close
    - **NEW**: Auto-research fetched deals for external context
@@ -218,7 +218,7 @@ Before generating analysis, AI MUST research:
 ## Dependencies
 
 - `GeminiService` — AI generation
-- `YourCompanyService` — CRM integration
+- `Yellow.aiService` — CRM integration
 - `WebSearchService` — Company/stakeholder research (NEW)
 - `LinkedInService` — Professional network intel (NEW)
 - `slackService.js` — Sharing
@@ -243,7 +243,7 @@ Before generating analysis, AI MUST research:
 - 🟡 Yellow (4-6): Partial or unverified
 - 🔴 Red (1-3): No information
 
-### YourCompany Context:
+### Yellow.ai Context:
 - **Mid-Market**: 250-5,000 employees
 - **Enterprise**: 5,000+ employees
 - **Target**: 60%+ of ARR from mid-market & enterprise

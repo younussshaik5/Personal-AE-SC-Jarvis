@@ -160,7 +160,7 @@ Every 30 minutes, JARVIS reflects on recent experiences, extracts patterns, and 
   {
     "intent": "question",
     "entities": {"deals": [...], "companies": [...]},
-    "facts": ["ACME deal size $50K"],
+    "facts": ["TechCorp deal size $50K"],
     "preferences": {"communication_style": "concise"},
     "knowledge_gaps": ["pricing model unclear"],
     "decisions": ["approved database migration"]
@@ -263,9 +263,9 @@ MEMORY/
 │   │   ├── index.json               # {"date": "2026-03-19", "conversations": [...]}
 │   │   └── ...
 ├── competitors/                     # Auto-built profiles
-│   ├── acme_inc.json
+│   ├── techcorp_inc.json
 │   └── battle_cards/
-│       └── acme_inc_battle_card.json
+│       └── techcorp_inc_battle_card.json
 ├── documents/                      # Doc request tracking
 │   ├── requests/2026-03-19/
 │   │   └── doc_proposal_12345.json
@@ -308,7 +308,7 @@ MEMORY/
 
 **Step 1: Message Received**
 ```
-User (Telegram): "How do we compete against Acme Inc?"
+User (Telegram): "How do we compete against TechCorp Inc?"
 ```
 
 **Step 2: Telegram Bot Processes**
@@ -316,15 +316,15 @@ User (Telegram): "How do we compete against Acme Inc?"
 - Builds context:
   ```
   System: "You are JARVIS... Current Role: Solution Consultant...
-          Competitor Intelligence: Acme Inc mentioned 3 times..."
+          Competitor Intelligence: TechCorp Inc mentioned 3 times..."
   History: [previous 10 messages]
-  User: "How do we compete against Acme Inc?"
+  User: "How do we compete against TechCorp Inc?"
   ```
 - Calls LLM (NVIDIA Step-3.5-Flash)
 - Receives response:
   ```
   "We compete on integration flexibility and total cost of ownership. 
-  Acme has limited API access and higher licensing fees. 
+  TechCorp has limited API access and higher licensing fees. 
   Our deployment is 50% faster. Need a battle card?"
   ```
 
@@ -338,7 +338,7 @@ User (Telegram): "How do we compete against Acme Inc?"
     "data": {
       "user_id": 7354158438,
       "response": "We compete on integration flexibility...",
-      "original_message": "How do we compete against Acme Inc?"
+      "original_message": "How do we compete against TechCorp Inc?"
     }
   }
   ```
@@ -350,12 +350,12 @@ User (Telegram): "How do we compete against Acme Inc?"
   ```json
   {
     "entities": {
-      "competitors": [{"name": "Acme Inc"}]
+      "competitors": [{"name": "TechCorp Inc"}]
     },
     "intent": "competitive_comparison",
-    "facts": ["Acme has limited API access", "Acme higher licensing fees", "Our deployment 50% faster"],
+    "facts": ["TechCorp has limited API access", "TechCorp higher licensing fees", "Our deployment 50% faster"],
     "knowledge_gaps": [],
-    "summary": "User asked about competing against Acme Inc, response highlighted integration flexibility and TCO advantages."
+    "summary": "User asked about competing against TechCorp Inc, response highlighted integration flexibility and TCO advantages."
   }
   ```
 - Updates `index.json` for today
@@ -363,11 +363,11 @@ User (Telegram): "How do we compete against Acme Inc?"
 
 **Step 5: Competitive Intelligence Skill Updates**
 - Receives insights with `entities.competitors`
-- Loads/creates `MEMORY/competitors/acme_inc.json`
+- Loads/creates `MEMORY/competitors/techcorp_inc.json`
 - Updates:
   ```json
   {
-    "name": "Acme Inc",
+    "name": "TechCorp Inc",
     "mentions_count": 4,  // incremented
     "differentiators": ["integration flexibility", "faster deployment", "lower TCO"],  // appended
     "last_updated": "2026-03-19T07:15:00"
@@ -376,13 +376,13 @@ User (Telegram): "How do we compete against Acme Inc?"
 - Generates battle card:
   ```json
   {
-    "competitor": "Acme Inc",
+    "competitor": "TechCorp Inc",
     "our_advantage_summary": "integration flexibility\nfaster deployment\nlower TCO",
     "their_weaknesses": ["limited API access", "higher licensing fees"],
     "winning_strategy": ["emphasize integration flexibility", "highlight TCO"]
   }
   ```
-- Stores in `MEMORY/competitors/battle_cards/acme_inc_battle_card.json`
+- Stores in `MEMORY/competitors/battle_cards/techcorp_inc_battle_card.json`
 
 **Step 6: Conversation Learner Processes**
 - Receives both `telegram.message` and `telegram.response`
@@ -410,7 +410,7 @@ User (Telegram): "How do we compete against Acme Inc?"
 - Next system prompt rebuild includes: "Users frequently ask about competitors. Have battle cards ready."
 
 **Step 9: Next Time**
-When user asks "What's our advantage vs Acme?", JARVIS:
+When user asks "What's our advantage vs TechCorp?", JARVIS:
 - Has battle card ready in context
 - Can reference specific stored differentiators
 - Response is faster, more comprehensive
@@ -444,18 +444,18 @@ User: "How would we integrate our CRM with their API?"
 
 #### Use Case 2: Demo Preparation
 ```
-User: "Prepare demo for Acme showing integration flexibility"
+User: "Prepare demo for TechCorp showing integration flexibility"
 ```
 **What JARVIS Does**:
-- Retrieves Acme battle card from `competitors/`
+- Retrieves TechCorp battle card from `competitors/`
 - Finds relevant integration patterns from `patterns/`
-- Checks which features Acme's competitors lack
+- Checks which features TechCorp's competitors lack
 - Generates demo script highlighting differentiators
-- Saves to `MEMORY/documents/generated/` with link to Acme profile
+- Saves to `MEMORY/documents/generated/` with link to TechCorp profile
 
 **Files Updated**:
-- `documents/generated/demo_acme_YYYY-MM-DD.md`
-- `documents/index.json` entry with link to Acme competitor file
+- `documents/generated/demo_techcorp_YYYY-MM-DD.md`
+- `documents/index.json` entry with link to TechCorp competitor file
 
 ### Account Executive Persona
 
@@ -463,12 +463,12 @@ User: "Prepare demo for Acme showing integration flexibility"
 
 #### Use Case 1: Deal Status Inquiry
 ```
-User: "What's the status of the ACME deal?"
+User: "What's the status of the TechCorp deal?"
 ```
 **What JARVIS Does**:
-- Searches `deals.json` for "ACME"
+- Searches `deals.json` for "TechCorp"
 - Extracts from conversation history: last discussion about this deal
-- Uses LLM to synthesize: "ACME: $50K opportunity, in negotiation phase, budget approved, technical eval complete"
+- Uses LLM to synthesize: "TechCorp: $50K opportunity, in negotiation phase, budget approved, technical eval complete"
 - Suggests next actions based on similar deal patterns
 
 **Files Updated**:
@@ -477,12 +477,12 @@ User: "What's the status of the ACME deal?"
 
 #### Use Case 2: Competitor Threat
 ```
-User: "Acme just lowered prices. How should we respond?"
+User: "TechCorp just lowered prices. How should we respond?"
 ```
 **What JARVIS Does**:
-- Loads Acme profile from `competitors/acme_inc.json`
+- Loads TechCorp profile from `competitors/techcorp_inc.json`
 - Reviews battle card tactics
-- Analyzes note: "Acme's weakness: limited support"
+- Analyzes note: "TechCorp's weakness: limited support"
 - Suggests: "Don't match price. Emphasize support SLA and integration cost savings"
 - Logs strategy in decision log
 
@@ -502,7 +502,7 @@ User: "Acme just lowered prices. How should we respond?"
 | File change learning | ✅ | Editing `.py` files → pattern recognition updates |
 | Workspace isolation | ✅ | OpenCode in other folder → ignored |
 | Conversation storage | ✅ | Every chat → `MEMORY/summaries/YYYY-MM-DD/` |
-| Insight extraction | ✅ | "ACME deal $50K" → auto-updates `deals.json` |
+| Insight extraction | ✅ | "TechCorp deal $50K" → auto-updates `deals.json` |
 | Competitor profiling | ✅ | Mention competitor → profile + battle card auto-created |
 | Documentation tracking | ✅ | "Send me the proposal" → request logged, fulfilled tracked |
 | Reflection | ✅ | Every 30 min → `learnings.json` updated |
@@ -590,10 +590,10 @@ nc -z localhost 8081 && echo "WS OK"
 
 ### Test Self-Evolution
 
-1. Send a Telegram message: "We have a deal with Acme for $100K"
+1. Send a Telegram message: "We have a deal with TechCorp for $100K"
 2. Wait 5 seconds
-3. Check `jarvis/data/personas/deals.json` - should have Acme deal added
-4. Check `MEMORY/competitors/acme_inc.json` - should exist or be updated
+3. Check `jarvis/data/personas/deals.json` - should have TechCorp deal added
+4. Check `MEMORY/competitors/techcorp_inc.json` - should exist or be updated
 5. Check `MEMORY/summaries/$(date +%Y-%m-%d)/` - should have conversation file
 6. Check `notes.json` - should have new fact recorded
 
@@ -649,7 +649,7 @@ nc -z localhost 8081 && echo "WS OK"
 - Highlights deals needing attention
 
 **Behind the Scenes**:
-- May trigger deal updates if user says "Acme deal moved to closing"
+- May trigger deal updates if user says "TechCorp deal moved to closing"
 - Extracts status changes via LLM
 - Updates `deals.json` accordingly
 
@@ -671,7 +671,7 @@ nc -z localhost 8081 && echo "WS OK"
 - LLM interprets statistical patterns for user
 
 ### 5. Automatic Documentation
-**User**: "Can you send me the integration doc for Acme?"
+**User**: "Can you send me the integration doc for TechCorp?"
 
 **JARVIS**:
 - Checks `documents/requests/` for similar past requests
@@ -679,12 +679,12 @@ nc -z localhost 8081 && echo "WS OK"
 - If none exists:
   - Asks clarifying questions: "What specific integration details do you need?"
   - Uses LLM to generate doc based on:
-    - Acme competitor profile
+    - TechCorp competitor profile
     - Known integration patterns from `patterns/`
     - Past similar docs
   - Saves to `documents/generated/`
   - Marks request as fulfilled
-  - Links doc to Acme competitor file
+  - Links doc to TechCorp competitor file
 
 ---
 
@@ -759,11 +759,11 @@ patterns_summary = f"Learned {patterns_count} patterns from {files_observed} fil
 recent_patterns = ["- API error handling (12 times)", "- Config reload (5 times)"]
 
 competitors_summary = "Detected 3 competitors with 15 total mentions."
-competitor_details = ["- Acme Inc: 8 mentions", "- Globex: 5 mentions", "- Waynes: 2 mentions"]
+competitor_details = ["- TechCorp Inc: 8 mentions", "- Globex: 5 mentions", "- Waynes: 2 mentions"]
 
 deals_summary = "Managing 4 active deals with total value $245,000"
 deals_info = [
-  "- Acme Integration ($100K)",
+  "- TechCorp Integration ($100K)",
   "- Globex Migration ($80K)",
   "- Waynes Cloud ($50K)",
   "- Soylent AI ($15K)"
@@ -936,7 +936,7 @@ self.max_buffer_size = 500  # default 1000
 
 ## Future Roadmap (Ideas)
 
-1. **Proactive Suggestions**: "You haven't followed up with Acme in 3 days"
+1. **Proactive Suggestions**: "You haven't followed up with TechCorp in 3 days"
 2. **Automated Battle Card Updates**: Pull competitor news from web
 3. **Deal Forecasting**: Predict close probability based on patterns
 4. **Full CLI Implementation**: Replace placeholder with `jarvis status`, `jarvis persona`, etc.
@@ -972,7 +972,7 @@ The system is **running now** with 14 components. All you need to do is chat nat
 | `tail -f logs/orchestrator_manual.log` | Watch orchestrator logs |
 | `tail -f logs/telegram_bot.jsonl` | Watch Telegram bot messages |
 | `ls MEMORY/summaries/` | See conversation archives by date |
-| `cat MEMORY/competitors/acme_inc.json` | View competitor profile |
+| `cat MEMORY/competitors/techcorp_inc.json` | View competitor profile |
 | `grep "pattern.discovered" logs/` | See pattern learning events |
 | `ps aux \| grep orchestrator` | Check if running |
 | `kill <PID>` | Stop orchestrator (or use Ctrl+C if foreground) |

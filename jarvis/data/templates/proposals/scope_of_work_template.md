@@ -1,9 +1,9 @@
 # Scope of Work Template
 
-## Statement of Work: {{company_name}} x Yellow.ai
+## Statement of Work: {{company_name}} x {{seller_company}}
 
 **Prepared for**: {{company_name}}
-**Prepared by**: Younus Shaik, Yellow.ai
+**Prepared by**: {{seller_name}}, {{seller_company}}
 **Date**: {{date}}
 **Version**: {{version}}
 
@@ -74,7 +74,7 @@
 
 ## 6. Roles & Responsibilities
 
-### Yellow.ai Team
+### {{seller_company}} Team
 {{yellowai_responsibilities}}
 
 ### {{company_name}} Team
@@ -120,5 +120,5 @@ Changes to scope require written agreement from both parties and may impact time
 
 | Role | Name | Signature | Date |
 |------|------|-----------|------|
-| Yellow.ai AE | Younus Shaik | | |
+| {{seller_company}} AE | {{seller_name}} | | |
 | {{company_name}} | {{customer_signatory}} | | |

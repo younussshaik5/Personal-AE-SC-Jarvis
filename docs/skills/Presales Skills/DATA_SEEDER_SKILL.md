@@ -1,28 +1,28 @@
 ---
 name: data-seeder
-description: AI-powered demo data generator with dynamic schema fetching, industry-realistic scenarios, and intelligent validation for YourCompany instances
+description: AI-powered demo data generator with dynamic schema fetching, industry-realistic scenarios, and intelligent validation for Yellow.ai instances
 version: 2.0
-author: YourCompany SE Team
+author: Yellow.ai SE Team
 last_updated: 2026-03-11
 tags:
   - presales
   - demo-data
   - seeding
   - validation
-  - ACME
+  - yellow-ai
   - solution-engineering
 ---
 # SKILL: Data Seeder Module (Dynamic Edition)
 
 **Module ID:** `dataSeeder` | **File:** `src/modules/dataSeeder.js`  
-**Audience:** YourCompany Solution Engineering (Presales)  
-**YourCompany Context:** Demo Instance Population, Trial Setup
+**Audience:** Yellow.ai Solution Engineering (Presales)  
+**Yellow.ai Context:** Demo Instance Population, Trial Setup
 
 ---
 
 ## Overview
 
-AI-powered demo data generator with dynamic schema fetching, adaptive validation, and intelligent data storytelling. Creates industry-realistic data that matches actual YourCompany instance configurations.
+AI-powered demo data generator with dynamic schema fetching, adaptive validation, and intelligent data storytelling. Creates industry-realistic data that matches actual Yellow.ai instance configurations.
 
 ---
 
@@ -33,9 +33,9 @@ AI-powered demo data generator with dynamic schema fetching, adaptive validation
 Before generating data, AI attempts to fetch actual schema:
 
 1. **From Connected Instance**:
-   - Call `YourCompanyService.getTicketFields()`
-   - Call `YourCompanyService.getContactFields()`
-   - Call `YourCompanyService.getCompanyFields()`
+   - Call `Yellow.aiService.getTicketFields()`
+   - Call `Yellow.aiService.getContactFields()`
+   - Call `Yellow.aiService.getCompanyFields()`
    - `[FETCH: Custom fields, required fields, field types]`
 
 2. **Schema Adaptation**:
@@ -44,7 +44,7 @@ Before generating data, AI attempts to fetch actual schema:
    - `[VALIDATE: Data types match schema]`
 
 3. **Fallback Schema**:
-   - If no connection: Use standard YourCompany schema
+   - If no connection: Use standard Yellow.ai schema
    - `[FLAG: "Using default schema - connect instance for custom fields"]`
 
 ---
@@ -203,7 +203,7 @@ pushToInstance() {
 
   // Push with field name mapping
   for record in mapped_data:
-    YourCompanyService.create{type}(record, schema_mapping)
+    Yellow.aiService.create{type}(record, schema_mapping)
 }
 ```
 
@@ -240,7 +240,7 @@ pushToInstance() {
 ## Dependencies
 
 - `GeminiService` — AI generation
-- `YourCompanyService` — Schema fetch + data push
+- `Yellow.aiService` — Schema fetch + data push
 - `WebSearchService` — Industry trends (NEW)
 - `window.App.readFile(file)` — Schema templates
 

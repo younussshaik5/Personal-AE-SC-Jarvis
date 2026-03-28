@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Yellow.ai sales playbook stage definitions.
+Sales playbook stage definitions.
 Defines deal stages, auto-triggers, actions, and exit criteria for the
 full sales cycle from new account through close.
 """

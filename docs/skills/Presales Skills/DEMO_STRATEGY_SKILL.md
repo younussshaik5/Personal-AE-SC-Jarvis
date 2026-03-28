@@ -1,28 +1,28 @@
 ---
 name: demo-strategy
-description: AI-powered demo intelligence with real-time company research, dynamic scripting, and YourCompany-specific positioning for presales Solution Engineers
+description: AI-powered demo intelligence with real-time company research, dynamic scripting, and Yellow.ai-specific positioning for presales Solution Engineers
 version: 2.0
-author: YourCompany SE Team
+author: Yellow.ai SE Team
 last_updated: 2026-03-11
 tags:
   - presales
   - demo
   - strategy
   - discovery
-  - ACME
+  - yellow-ai
   - solution-engineering
 ---
 # SKILL: Demo Strategy Module (Dynamic Edition)
 
 **Module ID:** `demoStrategy` | **File:** `src/modules/demoStrategy.js`  
-**Audience:** YourCompany Solution Engineering (Presales)  
-**YourCompany Context:** Investor Day 2025, Refresh Event Nov 2025
+**Audience:** Yellow.ai Solution Engineering (Presales)  
+**Yellow.ai Context:** Investor Day 2025, Refresh Event Nov 2025
 
 ---
 
 ## Overview
 
-AI-powered demo intelligence system that dynamically researches, strategizes, and scripts YourCompany product demonstrations. Fetches real-time data rather than relying on static databases. Optimized for YourCompany SEs preparing for $500K+ deals.
+AI-powered demo intelligence system that dynamically researches, strategizes, and scripts Yellow.ai product demonstrations. Fetches real-time data rather than relying on static databases. Optimized for Yellow.ai SEs preparing for $500K+ deals.
 
 ---
 
@@ -77,7 +77,7 @@ IF not found: Use [PLACEHOLDER: Research needed] + explain what to research manu
 2. **Financial Health & Strategic Priorities**
    - Pull from latest earnings/10-K with [Source: SEC/Date]
    - Identify 3-5 stated strategic initiatives relevant to CX/IT
-   - Map to YourCompany value drivers (Cost of Complexity, AI-native)
+   - Map to Yellow.ai value drivers (Cost of Complexity, AI-native)
 
 3. **Leadership & Decision Makers**
    - Dynamic table: Search LinkedIn + company site
@@ -93,7 +93,7 @@ IF not found: Use [PLACEHOLDER: Research needed] + explain what to research manu
 5. **Pain Hypotheses (Dynamic Generation)**
    - Based on industry + company size + inferred tech stack
    - Generate 8-12 specific pain hypotheses
-   - Each with: Hypothesis, Evidence, Business Impact Estimate, YourCompany Solution, Confidence
+   - Each with: Hypothesis, Evidence, Business Impact Estimate, Yellow.ai Solution, Confidence
    - Prioritize by likely business impact
 
 6. **Discovery Call Game Plan**
@@ -112,9 +112,9 @@ IF not found: Use [PLACEHOLDER: Research needed] + explain what to research manu
 ```
 REQUIRED PRE-PROCESSING:
 1. Identify customer's current tools from discovery data
-2. Search "{current_tool} vs YourCompany {product}" for latest comparisons
-3. Check YourCompany release notes for newest features (Freddy AI, etc.)
-4. Look up {industry} specific demo scenarios from YourCompany resources
+2. Search "{current_tool} vs Yellow.ai {product}" for latest comparisons
+3. Check Yellow.ai release notes for newest features (Freddy AI, etc.)
+4. Look up {industry} specific demo scenarios from Yellow.ai resources
 
 Use findings to customize:
 - Win themes ("Uncomplicated, AI-native, Unified")
@@ -129,7 +129,7 @@ Use findings to customize:
    - Objective: Adapt based on deal stage and audience
    - Win Theme: Dynamic based on industry + competitive intel
    - Key Messages: Prioritized by customer pain hypotheses
-   - YourCompany Positioning: "Enterprise-grade without enterprise complexity"
+   - Yellow.ai Positioning: "Enterprise-grade without enterprise complexity"
 
 2. **Demo Narrative Arc** (Adaptive timing)
    - Hook: Personalized to company news/priorities
@@ -138,7 +138,7 @@ Use findings to customize:
    - Close: CTA matched to decision process
 
 3. **Environment Setup — Dynamic Admin Paths**
-   - Pull latest admin UI paths from YourCompany docs
+   - Pull latest admin UI paths from Yellow.ai docs
    - Include conditional logic: "If customer has {X}, configure {Y}"
    - Add `[VERIFY PATH]` for recently changed features
 
@@ -150,7 +150,7 @@ Use findings to customize:
 
 5. **Risk & Gotchas** (Deal-specific)
    - Analyze inputs for hidden risks
-   - Cross-reference with YourCompany common deal risks (SSO, API limits, migrations)
+   - Cross-reference with Yellow.ai common deal risks (SSO, API limits, migrations)
    - Include: Risk, Likelihood (High/Med/Low), Impact, Mitigation, Contingency
 
 6. **Demo Flow Script** (Adaptive)
@@ -172,11 +172,11 @@ Use findings to customize:
 IF slide deck attached:
   1. Extract content from each slide
   2. Research customer context from discovery notes
-  3. Search for relevant YourCompany customer stories in same industry
+  3. Search for relevant Yellow.ai customer stories in same industry
   4. Generate contextual talk tracks, not generic descriptions
 
 IF no deck (feature list only):
-  1. Search YourCompany docs for latest feature capabilities (Freddy AI, etc.)
+  1. Search Yellow.ai docs for latest feature capabilities (Freddy AI, etc.)
   2. Map features to customer pain points from context
   3. Generate optimal slide structure + script
 ```
@@ -222,14 +222,14 @@ IF no deck (feature list only):
 - `WebSearchService` — Real-time research (NEW)
 - `LinkedInService` — Professional network intel (NEW)
 - `G2Service` — Review sentiment API (NEW)
-- `YourCompanyDocsService` — Latest product docs (NEW)
+- `Yellow.aiDocsService` — Latest product docs (NEW)
 - `slackService.js` — Sharing
 - `window.App.readFile(file)` — Attachments
 - `localStorage` — Template persistence
 
 ---
 
-## YourCompany-Specific Context
+## Yellow.ai-Specific Context
 
 ### Current Positioning (Investor Day 2025):
 - **Theme**: "Uncomplicated, AI-native, Unified Experience"

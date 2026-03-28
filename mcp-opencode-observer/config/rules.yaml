@@ -6,8 +6,8 @@ max_approvals_before_autonomous: 50
 
 # Persona detection triggers
 triggers:
-  - id: persona_acme_ai
-    pattern: '(?i)acme\.ai|conversational ai|bot studio|agent assist'
+  - id: persona_yellow_ai
+    pattern: '(?i)yellow\.ai|conversational ai|bot studio|agent assist'
     source: "message"
     action: "switch_persona account_executive"
     confidence: 0.8
@@ -41,7 +41,7 @@ triggers:
 
 # Competitor tracking (for battlecards)
   - id: detect_competitor
-    pattern: '(?i)(zendesk|salesforce|servicenow|hubspot|ACME|intercom|zoho|ibm watson|google dialogflow|microsoft bot framework|uipath|automation anywhere)'
+    pattern: '(?i)(zendesk|salesforce|servicenow|hubspot|yellow.ai|intercom|zoho|ibm watson|google dialogflow|microsoft bot framework|uipath|automation anywhere)'
     source: "message"
     action: "log_competitor_mention $1"
     confidence: 0.9

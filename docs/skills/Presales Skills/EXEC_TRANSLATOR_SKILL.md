@@ -1,28 +1,28 @@
 ---
 name: exec-translator
-description: Executive value translator with real-time executive research, dynamic persona adaptation, and C-level strategic messaging for YourCompany solutions
+description: Executive value translator with real-time executive research, dynamic persona adaptation, and C-level strategic messaging for Yellow.ai solutions
 version: 2.0
-author: YourCompany SE Team
+author: Yellow.ai SE Team
 last_updated: 2026-03-11
 tags:
   - presales
   - executive
   - c-level
   - messaging
-  - ACME
+  - yellow-ai
   - solution-engineering
 ---
 # SKILL: Exec Translator Module (Dynamic Edition)
 
 **Module ID:** `execTranslator` | **File:** `src/modules/execTranslator.js`  
-**Audience:** YourCompany Solution Engineering (Presales)  
-**YourCompany Context:** Investor Day 2025, C-Suite Value Messaging
+**Audience:** Yellow.ai Solution Engineering (Presales)  
+**Yellow.ai Context:** Investor Day 2025, C-Suite Value Messaging
 
 ---
 
 ## Overview
 
-AI-powered executive value translator with real-time executive research, dynamic persona adaptation, and context-aware messaging. Translates technical YourCompany features into C-level strategic value based on current executive priorities.
+AI-powered executive value translator with real-time executive research, dynamic persona adaptation, and context-aware messaging. Translates technical Yellow.ai features into C-level strategic value based on current executive priorities.
 
 ---
 
@@ -47,7 +47,7 @@ For EACH target persona, AI MUST research:
 3. **Industry & Role Context**:
    - Search `"{industry} {persona} challenges 2025"` (e.g., "healthcare CIO challenges")
    - Search `"{persona} priorities"` + `"{current_year}"` (e.g., "CFO priorities 2025")
-   - `[MAP: YourCompany capabilities to these priorities]`
+   - `[MAP: Yellow.ai capabilities to these priorities]`
 
 4. **Competitive Pressure**:
    - Search `"{company} vs competitors"` + `"customer experience"`
@@ -60,7 +60,7 @@ For EACH target persona, AI MUST research:
 
 | Field ID | Label | Type | Dynamic Helper |
 |----------|-------|------|----------------|
-| `exec-feature` | Technical Feature | text | `[SUGGEST: From YourCompany product list]` |
+| `exec-feature` | Technical Feature | text | `[SUGGEST: From Yellow.ai product list]` |
 | `exec-personas` | Target Persona | chip-group | CIO, CFO, CEO, COO, ALL |
 | `exec-industry` | Industry Context | text | `[AUTO-FILL: From deal context]` |
 | `exec-context` | Deal Context | textarea | `[LOAD: From MEDDPICC module]` |
@@ -115,7 +115,7 @@ Instead of static framing, use research-enriched personas:
 1. Identify target personas
 2. For each persona: Perform external research (see protocol)
 3. Map technical feature to persona's current priorities
-4. Fetch YourCompany customer stories in same industry
+4. Fetch Yellow.ai customer stories in same industry
 5. Generate personalized value proposition
 ```
 
@@ -141,7 +141,7 @@ Instead of static framing, use research-enriched personas:
 
    **Dynamic:**
    - Categories match researched priorities
-   - Evidence includes YourCompany customer stories in same industry
+   - Evidence includes Yellow.ai customer stories in same industry
    - KPIs match executive's known metrics
 
 3. **Detailed Benefit Framings** (Vocabulary-Matched)
@@ -257,20 +257,20 @@ Instead of static framing, use research-enriched personas:
 
 ### CIO (Chief Information Officer):
 - **Focus**: IT governance, system consolidation, risk, compliance, TCO, technical debt
-- **YourCompany Value**: Unified platform reduces complexity, Freddy AI automates support
+- **Yellow.ai Value**: Unified platform reduces complexity, Freddy AI automates support
 - **Key Message**: "Enterprise-grade without enterprise complexity"
 
 ### CFO (Chief Financial Officer):
 - **Focus**: Cost reduction, headcount avoidance, predictable spend, ROI, NPV, cash flow
-- **YourCompany Value**: 20% cost of complexity savings, headcount avoidance with Freddy AI
+- **Yellow.ai Value**: 20% cost of complexity savings, headcount avoidance with Freddy AI
 - **Key Message**: "Cost of Complexity" framework - eliminate waste
 
 ### CEO (Chief Executive Officer):
 - **Focus**: Competitive advantage, revenue protection, customer experience, board metrics
-- **YourCompany Value**: "Uncomplicated" customer experience, faster time-to-value
+- **Yellow.ai Value**: "Uncomplicated" customer experience, faster time-to-value
 - **Key Message**: "Customer obsession" enabled by unified platform
 
 ### COO (Chief Operating Officer):
 - **Focus**: Operational efficiency, process standardization, scalability, productivity
-- **YourCompany Value**: Vertical AI agents, workflow automation, 80% deflection
+- **Yellow.ai Value**: Vertical AI agents, workflow automation, 80% deflection
 - **Key Message**: "Operational excellence through AI-native platform"

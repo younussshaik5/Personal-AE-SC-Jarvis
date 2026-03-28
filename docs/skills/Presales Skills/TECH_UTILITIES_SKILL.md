@@ -1,8 +1,8 @@
 ---
 name: tech-utilities
-description: Technical utilities suite with Email Assist, RFP Helper, and Objection Crusher - all with real-time research and current YourCompany product knowledge
+description: Technical utilities suite with Email Assist, RFP Helper, and Objection Crusher - all with real-time research and current Yellow.ai product knowledge
 version: 2.0
-author: YourCompany SE Team
+author: Yellow.ai SE Team
 last_updated: 2026-03-11
 tags:
   - presales
@@ -10,14 +10,14 @@ tags:
   - rfp
   - objections
   - technical
-  - ACME
+  - yellow-ai
   - solution-engineering
 ---
 # SKILL: Technical Utilities Module (Dynamic Edition)
 
 **Module ID:** `techUtilities` | **File:** `src/modules/techUtilities.js`  
-**Audience:** YourCompany Solution Engineering (Presales)  
-**YourCompany Context:** Technical Communications, RFPs, Objection Handling
+**Audience:** Yellow.ai Solution Engineering (Presales)  
+**Yellow.ai Context:** Technical Communications, RFPs, Objection Handling
 
 ---
 
@@ -68,14 +68,14 @@ Before generating email:
    - `[FETCH: Stage, recent activities from CRM]`
    - `[IDENTIFY: Outstanding issues to address]`
 
-3. **YourCompany Updates**:
+3. **Yellow.ai Updates**:
    - `[FETCH: Recent product updates relevant to email topic]`
    - `[INCLUDE: New features released since last contact]`
 
 ### AI Generation (Research-Enhanced)
 
 **System Persona:**
-"YourCompany Solution Engineer writing personalized, timely technical emails"
+"Yellow.ai Solution Engineer writing personalized, timely technical emails"
 
 **Required Sections:**
 
@@ -143,7 +143,7 @@ Process RFPs with real-time technical research and current product capabilities.
   retryQueue: [],
   // NEW: Research cache
   researchCache: {}, // {question_hash: research_results}
-  productVersion: null // YourCompany version for accuracy
+  productVersion: null // Yellow.ai version for accuracy
 }
 ```
 
@@ -197,21 +197,21 @@ async processSingleRow(i) {
 
 **Research Capability Method:**
 
-- Search YourCompany docs for feature
-- Search `"YourCompany {feature} {current_year}"`
+- Search Yellow.ai docs for feature
+- Search `"Yellow.ai {feature} {current_year}"`
 - Check release notes for recency
 - `[RETURN: Current capability + source + version]`
 
 **Fallback Chain:**
 
 1. Primary model with research context
-2. If "NOT FOUND": Search broader web for YourCompany capability
+2. If "NOT FOUND": Search broader web for Yellow.ai capability
 3. If still not found: "Contact Product Team for Roadmap Status"
 
 ### Final Architecture Generation (Current)
 
 **Input:** All Q&A with research sources
-**Model:** Current YourCompany architecture expert
+**Model:** Current Yellow.ai architecture expert
 **Output:**
 
 - Comprehensive architecture using current product names
@@ -253,15 +253,15 @@ Before generating response:
 2. **Competitive Research**:
    - If competitor mentioned: Search `"{competitor} {claim}"`
    - `[VERIFY: Is the claim accurate?]`
-   - `[FETCH: YourCompany counter-evidence]`
+   - `[FETCH: Yellow.ai counter-evidence]`
 
 3. **Proof Point Research**:
-   - Search `"YourCompany {objection_type} case study"`
+   - Search `"Yellow.ai {objection_type} case study"`
    - `[FETCH: Recent customer wins, ROI data]`
    - `[FETCH: G2 comparisons for this specific objection]`
 
 4. **Current Positioning**:
-   - `[FETCH: Latest YourCompany messaging on this topic]`
+   - `[FETCH: Latest Yellow.ai messaging on this topic]`
    - `[INCLUDE: Investor Day 2025 themes if relevant]`
 
 ### EPC Framework (Research-Enhanced)
@@ -309,11 +309,11 @@ Before generating response:
 
 5. **Objection-Specific Strategy**
    - Tactic based on deal stage and research
-   - Key messages: `[Using current YourCompany positioning]`
+   - Key messages: `[Using current Yellow.ai positioning]`
 
 6. **Competitive Intelligence** (Live)
    - Competitor claim: `[As stated in objection]`
-   - YourCompany counter: `[With current evidence]`
+   - Yellow.ai counter: `[With current evidence]`
    - `[TABLE: Side-by-side with sources]`
 
 7. **Follow-up Actions**
@@ -326,7 +326,7 @@ Before generating response:
 
 - `GeminiService` — AI generation
 - `WebSearchService` — Real-time research (NEW)
-- `YourCompanyDocsService` — Current product docs (NEW)
+- `Yellow.aiDocsService` — Current product docs (NEW)
 - `G2Service` — Review data (NEW)
 - `ExcelHandler` — File processing
 - `XLSX` — Export
@@ -343,7 +343,7 @@ Before generating response:
 
 ---
 
-## YourCompany Objection Handling Reference
+## Yellow.ai Objection Handling Reference
 
 ### Common Objections:
 

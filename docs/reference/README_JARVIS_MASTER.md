@@ -138,7 +138,7 @@ EventBus: EVENT: FILE_CREATED {path: models.py, type: python}
     ↓ broadcasts to all subscribers
 Component B (Learner): "Learning pattern from this file..."
 Component C (Fireup): "Should I reload skills? Check..."
-Component D (Persona): "Logging activity for Acme persona..."
+Component D (Persona): "Logging activity for TechCorp persona..."
 Component E (Archive): "Maybe backup this..."
 
 No component calls another directly!
@@ -156,7 +156,7 @@ You: "Add authentication"
 
 MCP thinks:
 1. ContextEngine:
-   "This is Acme persona (Django project)
+   "This is TechCorp persona (Django project)
     They've used JWT 3 times before
     Current files: api/views.py, no auth yet
     → Need Django REST + SimpleJWT"
@@ -205,7 +205,7 @@ file = models.py           → HIGH → manual approval ⚠️
 file = core/orchestrator.py → CRITICAL → 2-person approval 🔒
 
 Trust Score Impact:
-Trust 0.87 (Acme) → medium risk AUTO-APPROVED
+Trust 0.87 (TechCorp) → medium risk AUTO-APPROVED
 Trust 0.50 (New) → medium risk NEEDS_REVIEW
 
 Result: JARVIS can act boldly but safely.
@@ -216,10 +216,10 @@ Result: JARVIS can act boldly but safely.
 ### 5. Persona System - Multi-Client Intelligence
 
 ```
-persona/acme.json:
+persona/techcorp.json:
 {
-  "name": "Acme Corp",
-  "workspaces": ["/acme-backend", "/acme-frontend"],
+  "name": "TechCorp Inc",
+  "workspaces": ["/techcorp-backend", "/techcorp-frontend"],
   "preferences": {
     "backend": "django",
     "testing": "pytest",
@@ -241,7 +241,7 @@ persona/beta.json:
 }
 
 Auto-switching:
-cd /acme-backend → Acme persona active (Django + pytest)
+cd /techcorp-backend → TechCorp persona active (Django + pytest)
 cd /beta-project → Beta persona active (FastAPI + unittest)
 
 JARVIS adapts to each client's style automatically.
@@ -261,7 +261,7 @@ PatternRecognition:
 
 PreferenceExtractor:
   Checks git blame → author uses Black
-  Updates Acme persona: formatter=black
+  Updates TechCorp persona: formatter=black
 
 PerformanceAnalyzer:
   Task took 18m (avg 2.3h) → record: faster than usual
@@ -325,7 +325,7 @@ This safety enables autonomy: JARVIS can act boldly knowing everything is revers
 
 ### Example: "Add payment integration"
 
-**You**: (cd into acme-backend)
+**You**: (cd into techcorp-backend)
 ```
 $ jarvis execute "Add Stripe payment to checkout"
 ```
@@ -333,9 +333,9 @@ $ jarvis execute "Add Stripe payment to checkout"
 **What Happens**:
 
 1. **Fireup** (already running):
-   - Active persona: Acme (Django, trust 0.87)
+   - Active persona: TechCorp (Django, trust 0.87)
    - Loaded skills: django_skills, react_skills, testing_skills
-   - Context: "Acme has 3 Stripe integrations before"
+   - Context: "TechCorp has 3 Stripe integrations before"
 
 2. **MCP receives task**:
    - ContextEngine: searches patterns → "stripe_integration" seen 3×
@@ -383,7 +383,7 @@ $ jarvis execute "Add Stripe payment to checkout"
 6. **Learning**:
    - PatternRecognition: "stripe_integration_workflow" → store
    - Performance: 9.2m completion (avg 2.3h) → success!
-   - Preference: "Acme uses Stripe webhooks" → reinforce
+   - Preference: "TechCorp uses Stripe webhooks" → reinforce
    - Trend: "Stripe API v2025-03-01 available" → flag
 
 7. **Deal tracking** (if linked):

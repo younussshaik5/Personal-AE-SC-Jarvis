@@ -61,7 +61,7 @@ FileSystemObserver: "New file created: models.py"
     ↓ EventBus dispatches to all subscribers
 PatternRecognition: receives FILE_CREATED → "This is a Django model!"
 MCP: receives FILE_CREATED → "New model, might need API endpoint"
-Persona: receives FILE_CREATED → "Log activity for Acme persona"
+Persona: receives FILE_CREATED → "Log activity for TechCorp persona"
 ```
 
 ### Why It's Critical
@@ -83,7 +83,7 @@ Structured JSON logging for all components.
 logger = get_logger(__name__)
 logger.info("File modified", 
     file="models.py",
-    persona="acme",
+    persona="techcorp",
     correlation_id="req_123"
 )
 # Output: {"timestamp":"...", "level":"INFO", "logger":"...", 
@@ -894,7 +894,7 @@ class PersonaManager:
         self.update_trust_score(persona)
 ```
 
-**Automatic**: `cd /acme-project` → Acme persona active. `cd /beta-project` → Beta persona active.
+**Automatic**: `cd /techcorp-project` → TechCorp persona active. `cd /beta-project` → Beta persona active.
 
 ### Trust Score Management
 ```python
@@ -1145,7 +1145,7 @@ class Deal:
 class DealTracker:
     async def update_from_git_commit(self, commit: Commit):
         # Parse commit message for deal references
-        # "feat(checkout): complete Stripe for Acme deal #123"
+        # "feat(checkout): complete Stripe for TechCorp deal #123"
         match = re.search(r"deal\s+#(\d+)", commit.message, re.I)
         if match:
             deal_id = match.group(1)
@@ -1238,14 +1238,14 @@ class WorkspaceScanner:
 
 ## COMPLETE DATA FLOW EXAMPLE
 
-### Scenario: "Add Stripe payment to Acme's Django checkout"
+### Scenario: "Add Stripe payment to TechCorp's Django checkout"
 
 **0. Startup** (already happened)
 ```
-Fireup: Scans /acme-backend
+Fireup: Scans /techcorp-backend
   → Detects: Django, React, PostgreSQL
   → Loads: django_skills, react_skills, postgres_skills, testing_skills
-  → Active persona: Acme (trust 0.87)
+  → Active persona: TechCorp (trust 0.87)
   → Ready and waiting
 ```
 
@@ -1260,7 +1260,7 @@ CLI: jarvis execute "Add Stripe payment to checkout"
 MCP receives TASK_REQUESTED
   ↓
 ContextEngine.build():
-  - Who: Acme persona (Django, prefers pytest, used Stripe 3x before)
+  - Who: TechCorp persona (Django, prefers pytest, used Stripe 3x before)
   - What: "payment", "checkout" → semantic search finds stripe_webhook.py, payment_model.py
   - Where: checkout/views.py, payment/models.py
   → Rich context ready
@@ -1370,7 +1370,7 @@ PatternRecognition:
   Publish PATTERN_DISCOVERED
 
 PreferenceExtractor:
-  "Acme uses Stripe webhooks with signature verification"
+  "TechCorp uses Stripe webhooks with signature verification"
   Update persona.preferences.payment_webhook_validation = "stripe_signature"
   Publish PREFERENCE_UPDATED
 
@@ -1391,7 +1391,7 @@ MetaLearner:
 
 **7. Deal Tracking** (if linked)
 ```
-Deal: "E-commerce Platform Revamp" (Acme)
+Deal: "E-commerce Platform Revamp" (TechCorp)
   → tasks_completed: 124 → 125
   → progress: 62% → 62.1%
   → time_spent: 421.0h → 421.3h

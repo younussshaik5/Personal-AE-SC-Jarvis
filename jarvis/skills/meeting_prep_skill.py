@@ -48,7 +48,7 @@ class MeetingPrepSkill:
         if self._llm_manager:
             from jarvis.llm.llm_client import Message
             messages = [
-                Message(role="system", content="You are JARVIS, an AI sales assistant for Yellow.ai. Generate concise, actionable meeting prep briefs."),
+                Message(role="system", content=f"You are JARVIS, an AI sales assistant for {self.config.config.get('identity', {}).get('company', 'Your Company')}. Generate concise, actionable meeting prep briefs."),
                 Message(role="user", content=prompt)
             ]
             brief_text = await self._llm_manager.generate_with_routing(
@@ -132,4 +132,4 @@ Generate a brief with these sections:
 8. **Preparation Checklist** (what to have ready before the call)
 
 If this is a first meeting, focus heavily on discovery questions and ICP qualification.
-Be specific to Yellow.ai's enterprise conversational AI platform."""
+Be specific to the company's enterprise platform capabilities."""

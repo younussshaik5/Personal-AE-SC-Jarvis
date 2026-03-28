@@ -32,7 +32,7 @@ Edit `jarvis/config/jarvis.yaml`:
 workspace_root: /path/to/your/workspace
 solution_engineer:
   name: YOUR_NAME
-  title: Solution Engineer at YourCompany
+  title: Solution Engineer at Yellow.ai
 
 llm:
   provider: openai

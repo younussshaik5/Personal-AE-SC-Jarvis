@@ -60,7 +60,7 @@ Edit `jarvis/config/jarvis.yaml`:
 workspace_root: /path/to/your/workspace
 solution_engineer:
   name: YOUR_NAME
-  title: Solution Engineer at YourCompany
+  title: Solution Engineer at Yellow.ai
 
 llm:
   provider: openai
@@ -110,4 +110,4 @@ The `jarvis` CLI entry point (`jarvis/cli/main.py`) is currently a **placeholder
 
 ---
 
-**Owner:** SE YOUR_NAME | YourCompany
+**Owner:** SE YOUR_NAME | Yellow.ai

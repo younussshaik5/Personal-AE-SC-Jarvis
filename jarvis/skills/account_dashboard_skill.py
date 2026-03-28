@@ -993,7 +993,7 @@ class AccountDashboardSkill:
                 <td><strong>{comp}</strong></td>
                 <td><span class="win-rate {win_rate_class}">{win_rate_text}</span></td>
                 <td>Displacing</td>
-                <td>YourCompany advantage in unified platform</td>
+                <td>Our advantage in unified platform</td>
             </tr>
             '''
         

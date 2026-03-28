@@ -273,10 +273,11 @@ class TechUtilitiesSkill:
                 data['competitors_research'] = data.get('competitors_research', {})
                 data['competitors_research'][competitor] = comp_data
 
-            # Get YourCompany product pricing
-            product = data['deals'][0].get('product') if data['deals'] else 'AcmeDesk'
-            fw_pricing = await self.research_service.get_ACME_capabilities(product)
-            data['ACME_pricing'] = fw_pricing
+            # Get company product pricing
+            company_name = self.config_manager.config.get("identity", {}).get("company", "Your Company")
+            product = data['deals'][0].get('product') if data['deals'] else company_name
+            company_pricing = await self.research_service.get_company_capabilities(product)
+            data['company_pricing'] = company_pricing
 
         except Exception as e:
             self.logger.debug("Research enrichment failed", error=str(e))
@@ -317,7 +318,7 @@ Risk Assessment Summary:
         if self.llm:
             try:
                 response = await self.llm.generate([
-                    Message(role="system", content=f"""You are {identity.full_display}, a Solution Engineer at YourCompany.
+                    Message(role="system", content=f"""You are {identity.full_display}, a Solution Engineer at {self.config_manager.config.get("identity", {}).get("company", "Your Company")}.
 Generate email templates for technical communication. Include real-time research context.
 
 Output JSON with:
@@ -352,13 +353,13 @@ Output JSON with:
         return {
             "email_types": {
                 "follow_up": {
-                    "subject": f"Following up on {company} YourCompany discussion",
-                    "body": f"Hi [Name],\\n\\nFollowing up on our recent conversation about YourCompany for {company}.\\n\\nKey points we discussed:\\n- [Use case 1]\\n- [Use case 2]\\n\\nLet me know next steps.\\n\\nBest,\nSE",
+                    "subject": f"Following up on {company} discussion",
+                    "body": f"Hi [Name],\\n\\nFollowing up on our recent conversation about solutions for {company}.\\n\\nKey points we discussed:\\n- [Use case 1]\\n- [Use case 2]\\n\\nLet me know next steps.\\n\\nBest,\nSE",
                     "personalization_notes": "Add specific use cases from discovery"
                 },
                 "proposal": {
-                    "subject": f"Proposal: YourCompany Solution for {company}",
-                    "body": f"Dear [Executive],\\n\\nAttached is our proposal for implementing YourCompany at {company}.\\n\\nHighlights:\\n- [Benefit 1]\\n- [Benefit 2]\\n\\nWe look forward to discussing further.\\n\\nRegards,\nSE",
+                    "subject": f"Proposal: Solution for {company}",
+                    "body": f"Dear [Executive],\\n\\nAttached is our proposal for {company}.\\n\\nHighlights:\\n- [Benefit 1]\\n- [Benefit 2]\\n\\nWe look forward to discussing further.\\n\\nRegards,\nSE",
                     "attachments": ["Proposal.pdf", "ROI_Calculator.xlsx"]
                 }
             },
@@ -441,7 +442,8 @@ Output JSON with:
         today = datetime.now().strftime("%Y-%m-%d")
         identity = get_se_identity(self.config_manager)
         research = data.get('research', {})
-        fw_pricing = data.get('ACME_pricing', {})
+        company_name = self.config_manager.config.get("identity", {}).get("company", "Your Company")
+        company_pricing = data.get('company_pricing', {})
 
         # Extract likely RFP questions from gaps and discovery
         rfp_questions = []
@@ -467,10 +469,10 @@ Generate RFP response guidance for {account_name}.
 
 Context:
 - Industry: {research.get('industry', 'Unknown')}
-- Product: {data['deals'][0].get('product', 'AcmeDesk') if data['deals'] else 'AcmeDesk'}
+- Product: {data['deals'][0].get('product', company_name) if data['deals'] else company_name}
 - Current Tool: {data['deals'][0].get('current_systems', {}).get('ticket_system', 'Unknown') if data['deals'] else 'Unknown'}
 - Competitors: {', '.join(data['competitors'])}
-- YourCompany Pricing: {json.dumps(fw_pricing, indent=2)}
+- Company Pricing: {json.dumps(company_pricing, indent=2)}
 
 Questions to address:
 {chr(10).join(rfp_questions)}
@@ -516,7 +518,7 @@ Output JSON:
             "responses": [
                 {
                     "question": "What is your uptime SLA?",
-                    "answer": "YourCompany provides 99.99% uptime SLA for enterprise customers.",
+                    "answer": "We provide 99.99% uptime SLA for enterprise customers.",
                     "evidence": "SLA included in enterprise contract",
                     "differentiation": "Few competitors guarantee 99.99%; ours is backed by financial penalties",
                     "compliance": ["SOC2"],
@@ -579,7 +581,7 @@ Output JSON:
         objections = data['notes'].get('knowledge_gaps', [])[:5]
         if not objections:
             objections = [
-                "YourCompany is more expensive than Zendesk",
+                "Our solution is more expensive than Zendesk",
                 "We're already using Salesforce Service Cloud",
                 "We need enterprise-grade security",
                 "What about AI capabilities compared to competitors?",
@@ -641,9 +643,9 @@ Output JSON:
         return {
             "objections": [
                 {
-                    "objection": "YourCompany is more expensive",
+                    "objection": "Our solution is more expensive",
                     "empathy": "I understand cost is a concern",
-                    "response": "YourCompany TCO is 20% lower over 3 years due to unified architecture and reduced admin overhead",
+                    "response": "Our TCO is 20% lower over 3 years due to unified architecture and reduced admin overhead",
                     "evidence": ["Cost of Complexity whitepaper", "G2 TCO comparisons"],
                     "competitive_counter": "Zendesk appears cheaper but requires additional AI and integration modules",
                     "proof_point": "Customer X saved 30% in year 2",

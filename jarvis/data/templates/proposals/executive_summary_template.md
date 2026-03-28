@@ -1,6 +1,6 @@
 # Executive Summary Template
 
-## {{company_name}} x Yellow.ai
+## {{company_name}} x {{seller_company}}
 
 ### The Challenge
 
@@ -12,7 +12,7 @@ This is resulting in {{business_impact}} — approximately {{quantified_impact}}
 
 ### The Solution
 
-Yellow.ai proposes a {{solution_type}} powered by our enterprise conversational AI platform:
+{{seller_company}} proposes a {{solution_type}} powered by our enterprise conversational AI platform:
 
 {{solution_components}}
 
@@ -25,7 +25,7 @@ Yellow.ai proposes a {{solution_type}} powered by our enterprise conversational 
 
 ### Expected Outcomes
 
-| Metric | Current | With Yellow.ai | Improvement |
+| Metric | Current | With {{seller_company}} | Improvement |
 |--------|---------|---------------|-------------|
 {{metrics_table}}
 

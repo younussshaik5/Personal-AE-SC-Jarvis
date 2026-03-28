@@ -254,7 +254,7 @@ Competitors: {', '.join(comps)}
 Research data:
 {json.dumps(comp_research, indent=2) if comp_research else 'No live research available'}
 
-YourCompany positioning: "Uncomplicated, AI-native, Unified" (Investor Day 2025)
+Our positioning: "Uncomplicated, AI-native, Unified"
 
 Return JSON:
 {{
@@ -350,8 +350,9 @@ Return JSON:
             price = pdata.get('price', 'Unknown')
             source = pdata.get('source', 'web search')
             table += f"| {comp} | Enterprise | {price} | {source} |\n"
-        # YourCompany pricing
-        table += "| **YourCompany** | Enterprise | **$79** | ACME.com |\n"
+        # Our pricing
+        company_name = self.config_manager.config.get("identity", {}).get("company", "Your Company")
+        table += f"| **{company_name}** | Enterprise | **$79** | Official |\n"
         return f"""# Pricing Comparison - {account_name}
 
 **Generated:** {today} | {identity.full_display}
@@ -364,8 +365,8 @@ Return JSON:
 
 ## Cost of Complexity Analysis
 
-- YourCompany unified platform eliminates multi-tool sprawl
-- 20% of software spend wasted on complexity (YourCompany 2025 thesis)
+- Unified platform eliminates multi-tool sprawl
+- 20% of software spend wasted on complexity
 - Total 3-year TCO typically 30% lower vs best-of-breed stack
 
 ---

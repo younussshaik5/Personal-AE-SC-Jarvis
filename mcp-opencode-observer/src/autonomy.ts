@@ -53,8 +53,8 @@ function getDefaultRules(): RulesConfig {
     max_approvals_before_autonomous: 50,
     triggers: [
       {
-        id: 'persona_acme_ai',
-        pattern: '(?i)acme\\.ai|conversational ai|bot studio|agent assist',
+        id: 'persona_yellow_ai',
+        pattern: '(?i)yellow\\.ai|conversational ai|bot studio|agent assist',
         source: 'message',
         action: 'switch_persona account_executive',
         confidence: 0.8,
@@ -70,7 +70,7 @@ function getDefaultRules(): RulesConfig {
       },
       {
         id: 'detect_competitor',
-        pattern: '(?i)(zendesk|salesforce|servicenow|hubspot|ACME|intercom|zoho|ibm watson|google dialogflow|microsoft bot framework|uipath|automation anywhere)',
+        pattern: '(?i)(zendesk|salesforce|servicenow|hubspot|yellow\\.ai|intercom|zoho|ibm watson|google dialogflow|microsoft bot framework|uipath|automation anywhere)',
         source: 'message',
         action: 'log_competitor_mention',
         confidence: 0.9
@@ -328,7 +328,7 @@ export function extractInsights(message: string): any {
     summary: message.slice(0, 50)
   };
   
-  if (/acme\.ai|conversational ai|bot studio|agent assist/.test(lower)) insight.persona_cue = 'account_executive';
+  if (/yellow\.ai|conversational ai|bot studio|agent assist/.test(lower)) insight.persona_cue = 'account_executive';
   if (/demo|architecture|integration|technical|presales|solution consultant/.test(lower)) insight.persona_cue = 'solution_consultant';
   if (/love|like|excited|new.*ai|openai|claude|gpt|llm|anthropic/.test(lower)) insight.interests.push('ai_enthusiast');
   if (/(no )?bs|bullshit|zero tolerance|ruthless/.test(lower)) insight.dislikes.push('inefficiency');
@@ -348,7 +348,7 @@ export function extractInsights(message: string): any {
   }
   
         // Competitor detection (list from rules)
-        const competitorRegex = /(zendesk|salesforce|servicenow|hubspot|ACME|intercom|zoho|ibm watson|google dialogflow|microsoft bot framework|uipath|automation anywhere)/i;
+        const competitorRegex = /(zendesk|salesforce|servicenow|hubspot|yellow\\.ai|intercom|zoho|ibm watson|google dialogflow|microsoft bot framework|uipath|automation anywhere)/i;
         const matches = message.match(competitorRegex);
         if (matches) insight.competitors_mentioned = matches.map((m: string) => m.toLowerCase());
   

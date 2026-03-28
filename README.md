@@ -194,7 +194,7 @@ Each opportunity under `ACCOUNTS/<team>/<Account Name>/` gets an automated intel
 
 ## 📄 License
 
-MIT – Created for YourCompany SE Team by YOUR_NAME.
+MIT – Created for Yellow.ai SE Team by YOUR_NAME.
 
 ---
 

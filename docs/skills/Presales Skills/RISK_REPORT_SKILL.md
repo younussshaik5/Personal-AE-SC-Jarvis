@@ -1,28 +1,28 @@
 ---
 name: risk-report
-description: Dynamic deal risk assessment with real-time market intelligence, stakeholder research, and YourCompany-specific risk patterns for Solution Engineers
+description: Dynamic deal risk assessment with real-time market intelligence, stakeholder research, and Yellow.ai-specific risk patterns for Solution Engineers
 version: 2.0
-author: YourCompany SE Team
+author: Yellow.ai SE Team
 last_updated: 2026-03-11
 tags:
   - presales
   - risk
   - assessment
   - deal-qualification
-  - ACME
+  - yellow-ai
   - solution-engineering
 ---
 # SKILL: Risk Report Module (Dynamic Edition)
 
 **Module ID:** `riskReport` | **File:** `src/modules/riskReport.js`  
-**Audience:** YourCompany Solution Engineering (Presales)  
-**YourCompany Context:** Investor Day 2025, Common Deal Risks
+**Audience:** Yellow.ai Solution Engineering (Presales)  
+**Yellow.ai Context:** Investor Day 2025, Common Deal Risks
 
 ---
 
 ## Overview
 
-AI-powered deal risk assessment with real-time market intelligence. Combines pattern detection with dynamic external research for comprehensive technical risk evaluation. Optimized for YourCompany enterprise deals.
+AI-powered deal risk assessment with real-time market intelligence. Combines pattern detection with dynamic external research for comprehensive technical risk evaluation. Optimized for Yellow.ai enterprise deals.
 
 ---
 
@@ -48,8 +48,8 @@ When generating report, AI MUST perform these searches:
    - `"{competitor} price cut"` 
    - `"{competitor} new feature {use_case}"`
 
-5. **YourCompany Specific**: 
-   - Check YourCompany status page for service issues in customer's region
+5. **Yellow.ai Specific**: 
+   - Check Yellow.ai status page for service issues in customer's region
 
 ### Dynamic Risk Categories (Adaptive)
 
@@ -57,7 +57,7 @@ Instead of static 10 patterns, use these dynamic detection areas:
 
 **Technical Risks (Auto-detect + Research):**
 - `[FETCH: SSO/Security requirements]` → Search "{company} cybersecurity requirements"
-- `[FETCH: Data migration complexity]` → Search "{current_tool} to YourCompany migration"
+- `[FETCH: Data migration complexity]` → Search "{current_tool} to Yellow.ai migration"
 - `[FETCH: Integration requirements]` → Search "{company} tech stack integrations"
 - `[FETCH: Compliance needs]` → Search "{industry} compliance requirements HIPAA SOC2"
 
@@ -68,7 +68,7 @@ Instead of static 10 patterns, use these dynamic detection areas:
 
 **Competitive Risks (Live Intel):**
 - `[FETCH: Competitor activity]` → Search "{competitor} {product} pricing"
-- `[FETCH: Market positioning]` → G2 comparison "YourCompany vs {competitor} {industry}"
+- `[FETCH: Market positioning]` → G2 comparison "Yellow.ai vs {competitor} {industry}"
 
 ---
 
@@ -95,7 +95,7 @@ Instead of static 10 patterns, use these dynamic detection areas:
 ```
 1. Analyze all input text for risk signals
 2. Perform web searches for external risk context (see above)
-3. Cross-reference with YourCompany common deal risks database
+3. Cross-reference with Yellow.ai common deal risks database
 4. Check similar past deals in CRM for pattern matching
 5. Generate risk severity based on: Probability × Impact × Timeliness
 ```
@@ -111,7 +111,7 @@ Instead of fixed "no tables" rule, use format best suited to risk type:
 
 2. **Technical Use Cases & Solutions**
    - Dynamic list based on `risk-usecases` + industry research
-   - Each: Use Case → YourCompany Solution → Implementation Risk → Mitigation
+   - Each: Use Case → Yellow.ai Solution → Implementation Risk → Mitigation
 
 3. **SE Activity Log** (Auto-enhanced)
    - Quantify: "(3) Discovery calls, (2) Demos, (1) POC session"
@@ -130,7 +130,7 @@ Instead of fixed "no tables" rule, use format best suited to risk type:
    - **Confirmed Gaps**: From `risk-gaps` input
    - **Inferred Gaps**: From pattern detection + research
    - **External Risks**: From real-time research [Source: URL]
-   - Each: Gap, Evidence, Business Impact, YourCompany Capability, Workaround, Confidence
+   - Each: Gap, Evidence, Business Impact, Yellow.ai Capability, Workaround, Confidence
 
 7. **Partner & Ecosystem Risks**
    - Current partner status + any external research on partner performance
@@ -149,7 +149,7 @@ Instead of static regex, use AI + web search combo:
 
 1. **Text Analysis**: AI identifies risk signals in input text
 2. **Web Corroboration**: Search validates/inflates risk signals
-3. **Severity Scoring**: Based on YourCompany historical deal data
+3. **Severity Scoring**: Based on Yellow.ai historical deal data
 
 **Example Dynamic Detection:**
 - Input mentions "legacy system" → Search "{legacy_system} end of life" → If found, elevate to HIGH severity
@@ -180,7 +180,7 @@ Include: Top 3 risks + links to research sources
 
 1. **Real-Time Risk Validation**: External news/search corroborates internal gut feel
 2. **Adaptive Format**: Tables or prose based on content complexity
-3. **YourCompany Context**: Risks scored against YourCompany-specific patterns (SSO, API, migration)
+3. **Yellow.ai Context**: Risks scored against Yellow.ai-specific patterns (SSO, API, migration)
 4. **Proactive Suggestions**: "Consider researching X based on Y signal"
 5. **Trend Awareness**: "Similar deals with this risk profile had Z% win rate"
 
@@ -197,7 +197,7 @@ Include: Top 3 risks + links to research sources
 
 ---
 
-## YourCompany-Specific Risk Patterns
+## Yellow.ai-Specific Risk Patterns
 
 ### Common Technical Risks:
 - **SSO/SAML**: Complex configurations, multiple IdPs

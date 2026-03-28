@@ -163,7 +163,7 @@ GET /api/personas
 → [ { id: "work", name: "Work", type: "solution_consultant" }, ... ]
 
 GET /api/deals
-→ [ { title: "Bot Studio PoC", client: "Acme", budget: 50000, ... } ]
+→ [ { title: "Bot Studio PoC", client: "TechCorp", budget: 50000, ... } ]
 
 GET /api/patterns
 → { "solution_consultant": { "code_patterns": {...}, ... } }
