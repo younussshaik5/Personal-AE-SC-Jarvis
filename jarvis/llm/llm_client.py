@@ -178,20 +178,26 @@ class LLMManager:
 
     # Text-task fallback chain — NVIDIA only (background tasks never use Claude)
     FALLBACK_MODELS = [
-        "nvidia/llama-3.3-nemotron-super-49b-v1",       # Primary
-        "nvidia/llama-3.1-nemotron-ultra-253b-v1",      # Fallback 1
-        "nvidia/mistral-nemo-minitron-8b-8k-instruct",  # Fallback 2 (fast)
+        "stepfun-ai/step-3-5-flash",                    # Primary (text + reasoning)
+        "nvidia/mistral-nemo-minitron-8b-8k-instruct",  # Fallback (fast, lightweight)
     ]
 
     # Default model config per task type (used when llm_models not in yaml)
     DEFAULT_MODELS = {
-        "text":         ("nvidia/llama-3.3-nemotron-super-49b-v1", 0.7, 8192, 32768),
-        "long_context": ("nvidia/nemotron-3-super-120b", 0.3, 32768, 1048576),
+        # Discovery prep, next steps emails, general text — Step 3.5 Flash
+        "text":         ("stepfun-ai/step-3-5-flash", 0.7, 8192, 131072),
+        # Long RFPs, value architecture — Nemotron 3 Super 120B (1M token native context)
+        "long_context": ("nvidia/nemotron-3-super-120b-a12b", 0.3, 32768, 1048576),
+        # Video/slide analysis
         "video":        ("nvidia/cosmos-reason2-8b", 0.3, 4096, 8192),
+        # Audio transcription
         "audio":        ("nvidia/whisper-large-v3-turbo", 0.0, 4096, 16000),
+        # Code / technical config extraction
         "code":         ("nvidia/qwen2.5-coder-32b-instruct", 0.2, 8192, 32768),
+        # Quick template fill, classification — Minitron 8B first, Step 3.5 Flash validates
         "quick":        ("nvidia/mistral-nemo-minitron-8b-8k-instruct", 0.5, 2048, 8192),
-        "reasoning":    ("nvidia/llama-3.1-nemotron-ultra-253b-v1", 0.4, 8192, 128000),
+        # Battlecard, demo strategy, cross-deal reasoning — Step 3.5 Flash
+        "reasoning":    ("stepfun-ai/step-3-5-flash", 0.4, 8192, 131072),
     }
 
     NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1"
@@ -424,7 +430,7 @@ class LLMManager:
                 "audio"        — Whisper large-v3-turbo (transcription)
                 "code"         — Qwen2.5 Coder 32B (technical/code analysis)
                 "quick"        — Minitron 8B (fast classification/tagging)
-                "reasoning"    — Nemotron Ultra 253B (deep deal strategy)
+                "reasoning"    — Step 3.5 Flash (deep deal strategy, battlecard, demo)
             source: "background" (never use Claude) or "user_request" (Claude as final fallback).
 
         Returns:

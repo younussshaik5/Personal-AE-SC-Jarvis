@@ -88,17 +88,18 @@ identity:
 # All run concurrently via the async worker pool (3 parallel workers)
 # All use the same NVIDIA API endpoint and key
 llm_models:
-  # General text reasoning — primary workhorse for most tasks
+  # General text reasoning — Step 3.5 Flash (196B/11B active MoE, 256K context)
+  # Used for: discovery prep, next steps email drafts, general text tasks
   text:
-    model: "nvidia/llama-3.3-nemotron-super-49b-v1"
+    model: "stepfun-ai/step-3-5-flash"
     temperature: 0.7
     max_tokens: 8192
-    context_window: 32768
+    context_window: 131072
 
-  # Long-context — Nemotron 3 Super 120B (1M token window)
-  # Used for: full account dossiers, large RFPs, long transcripts, cross-deal analysis
+  # Long-context — Nemotron 3 Super 120B (1M token native window, GTC March 2026)
+  # Used for: full account dossiers, large RFPs, long transcripts, value architecture
   long_context:
-    model: "nvidia/nemotron-3-super-120b"
+    model: "nvidia/nemotron-3-super-120b-a12b"
     temperature: 0.3
     max_tokens: 32768
     context_window: 1048576
@@ -110,9 +111,9 @@ llm_models:
     max_tokens: 4096
     context_window: 8192
 
-  # Audio transcription — Whisper large v3
+  # Audio transcription — Parakeet CTC 1.1B via NVIDIA ASR endpoint
   audio:
-    model: "nvidia/whisper-large-v3-turbo"
+    model: "nvidia/parakeet-ctc-1.1b-asr"
     temperature: 0.0
     max_tokens: 4096
 
@@ -152,7 +153,24 @@ llm_fallback:
 meeting:
   recording_dir: "{jarvis_home}/recordings"
   frame_interval_seconds: 30
-  max_recording_minutes: 120
+  max_recording_minutes: 240
+  # Concurrency — 1 recording at a time to avoid OOM on large files
+  max_concurrent_recordings: 1
+  # Transcription model override (must match NVIDIA ASR endpoint)
+  transcription_model: "nvidia/parakeet-ctc-1.1b-asr"
+  # Audio chunking — files >25 MB are split into chunks
+  chunk_duration_seconds: 600
+  chunk_overlap_seconds: 30
+  # Parallel API calls for chunk transcription and frame analysis
+  max_parallel_api_calls: 5
+  # Dynamic ffmpeg timeout: seconds per GB of input file
+  ffmpeg_timeout_per_gb: 600
+  # Auto-cleanup: delete processed recordings older than N days
+  processed_retention_days: 7
+  # Fast path: 1 frame every 2 minutes for quick analysis
+  fast_path_frame_interval: 120
+  # Deep path: 1 frame every 30 seconds for full analysis
+  deep_path_frame_interval: 30
 
 # Playbook automation
 playbook:

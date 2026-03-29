@@ -199,6 +199,7 @@ class Orchestrator:
             pool.register("fill_risk_report",        kb.handle_fill_risk_report)
             pool.register("fill_next_steps",         kb.handle_fill_next_steps)
             pool.register("fill_value_architecture", kb.handle_fill_value_architecture)
+            pool.register("fill_rfp",                kb.handle_fill_rfp)
         if hg:
             pool.register("html_refresh",            hg.handle_html_refresh)
 

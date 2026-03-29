@@ -83,9 +83,13 @@ class KnowledgeBuilder:
         self.event_bus.subscribe("file.created",             self._on_file_event)
         self.event_bus.subscribe("file.modified",            self._on_file_event)
         # Presales section events — cascade refreshes
-        self.event_bus.subscribe("account.sections.created", self._on_sections_created)
-        self.event_bus.subscribe("discovery.updated",        self._on_discovery_updated)
-        self.event_bus.subscribe("meddpicc.updated",         self._on_meddpicc_updated_presales)
+        self.event_bus.subscribe("account.sections.created",   self._on_sections_created)
+        self.event_bus.subscribe("discovery.updated",          self._on_discovery_updated)
+        self.event_bus.subscribe("meddpicc.updated",           self._on_meddpicc_updated_presales)
+        # RFP source file ready → queue fill_rfp task
+        self.event_bus.subscribe("rfp.source.ready",           self._on_rfp_source_ready)
+        # Presales file dropped → cascade specific section refreshes
+        self.event_bus.subscribe("presales.cascade.requested", self._on_presales_cascade)
 
         # On startup: queue gap-fill for every existing account (LOW priority)
         await self._queue_all_account_gaps()
@@ -182,6 +186,35 @@ class KnowledgeBuilder:
                 priority=TaskPriority.MEDIUM,
                 dedup_key=f"{task_type}:{account}:meddpicc_cascade",
             )
+
+    async def _on_rfp_source_ready(self, event: Event):
+        """RFP source file extracted by DocumentProcessor → queue fill_rfp task."""
+        account = event.data.get("account", "")
+        path = event.data.get("path", "")
+        if not account:
+            return
+        await self._queue.enqueue(
+            "fill_rfp",
+            payload={"account": account, "path": path},
+            account=account,
+            priority=TaskPriority.HIGH,
+            dedup_key=f"fill_rfp:{account}:{path}",
+        )
+        self.logger.info("RFP fill task queued", account=account)
+
+    async def _on_presales_cascade(self, event: Event):
+        """File dropped into a presales section → cascade-refresh relevant downstream sections."""
+        account = event.data.get("account", "")
+        task_name = event.data.get("task", "")
+        if not account or not task_name:
+            return
+        await self._queue.enqueue(
+            task_name,
+            payload={"account": account},
+            account=account,
+            priority=TaskPriority.MEDIUM,
+            dedup_key=f"{task_name}:{account}:presales_cascade",
+        )
 
     async def _on_file_event(self, event: Event):
         """File changed in claude_space → queue workspace extraction."""
@@ -793,25 +826,56 @@ Web risk signals: (layoffs, budget freeze, M&A etc)
 Product gaps: (any requirements we can't meet)"""
 
         try:
-            filled = await llm.generate_with_routing(
+            # Stage 1: Minitron 8B generates the report (fast, structured template fill)
+            draft = await llm.generate_with_routing(
                 messages=[{"role": "user", "content": prompt}],
                 task_type="quick", source="background"
             )
-            if filled:
-                now = datetime.now()
-                # Append entry to existing risk_report.md (never overwrite)
-                existing = kb._read_text(risk_dir / "risk_report.md") or ""
-                entry = (f"\n\n---\n\n## {now.strftime('%Y-%m-%d')} — Weekly Update\n\n"
-                         f"**Owner:** SE\n\n{filled}")
-                (risk_dir / "risk_report.md").write_text(
-                    existing.rstrip() + entry, encoding="utf-8"
-                )
-                kb.logger.info("Risk report updated", account=account)
-                kb.event_bus.publish(Event(
-                    type="risk.report.updated",
-                    source="brain.knowledge_builder",
-                    data={"account": account}
-                ))
+            if not draft or draft.startswith("[LLM Error:"):
+                kb.logger.warning("Risk report quick draft failed, skipping", account=account)
+                return
+
+            # Stage 2: Step 3.5 Flash validates and improves (only if quality differs)
+            validation_prompt = f"""You are reviewing a risk report draft for account: {account}.
+
+DRAFT:
+{draft}
+
+Review the draft and:
+1. Fix any factual inconsistencies or missing information based on the data provided
+2. Improve clarity and completeness where needed
+3. If the draft is already accurate and complete, respond with exactly: APPROVED
+
+If you make improvements, return only the improved report — no preamble.
+If approved, return exactly: APPROVED"""
+
+            validated = await llm.generate_with_routing(
+                messages=[{"role": "user", "content": validation_prompt}],
+                task_type="reasoning", source="background"
+            )
+
+            # Use validated version if Step 3.5 Flash improved it; else keep draft
+            if validated and not validated.startswith("[LLM Error:") and validated.strip() != "APPROVED":
+                final_report = validated.strip()
+                kb.logger.info("Risk report improved by validation stage", account=account)
+            else:
+                final_report = draft
+                kb.logger.info("Risk report draft approved unchanged", account=account)
+
+            now = datetime.now()
+            # Append entry to existing risk_report.md (never overwrite)
+            existing = kb._read_text(risk_dir / "risk_report.md") or ""
+            entry = (f"\n\n---\n\n## {now.strftime('%Y-%m-%d')} — Weekly Update\n\n"
+                     f"**Owner:** SE\n\n{final_report}")
+            (risk_dir / "risk_report.md").write_text(
+                existing.rstrip() + entry, encoding="utf-8"
+            )
+            kb.logger.info("Risk report updated", account=account)
+            kb.event_bus.publish(Event(
+                type="risk.report.updated",
+                source="brain.knowledge_builder",
+                data={"account": account}
+            ))
         except Exception as e:
             kb.logger.error("fill_risk_report failed", account=account, error=str(e))
 
@@ -1004,6 +1068,169 @@ Generate two sections:
                 ))
         except Exception as e:
             kb.logger.error("fill_value_architecture failed", account=account, error=str(e))
+
+    @staticmethod
+    async def handle_fill_rfp(task, services: Dict[str, Any]):
+        """Fill an RFP: reads original source file, generates a new filled copy using Nemotron 120B.
+
+        Input:  Original RFP file (PDF/DOCX/TXT) in ACCOUNTS/{account}/RFP/
+        Output: {original_name}_filled.md  — new copy with responses filled in
+                rfp_analysis.md            — requirements map + evaluation breakdown
+                rfp_responses.md           — structured Q&A responses
+        """
+        kb: "KnowledgeBuilder" = services["knowledge_builder"]
+        account = task.payload.get("account", "")
+        if not account:
+            return
+        account_dir = kb._accounts_dir / account
+        if not account_dir.exists():
+            return
+        rfp_dir = account_dir / "RFP"
+        if not rfp_dir.exists():
+            return
+
+        # Find the source RFP file from the task payload, or find the latest one in the folder
+        source_path_str = task.payload.get("path", "")
+        if source_path_str:
+            source_file = Path(source_path_str)
+        else:
+            # Find the most recent non-generated RFP file
+            candidates = [
+                f for f in rfp_dir.iterdir()
+                if f.is_file()
+                and f.suffix.lower() in {".pdf", ".docx", ".doc", ".txt", ".md"}
+                and "_filled" not in f.stem
+                and f.name not in {"rfp_analysis.md", "rfp_responses.md", "README.md"}
+            ]
+            if not candidates:
+                kb.logger.warning("No source RFP file found", account=account)
+                return
+            source_file = max(candidates, key=lambda f: f.stat().st_mtime)
+
+        if not source_file.exists():
+            kb.logger.warning("RFP source file missing", path=str(source_file))
+            return
+
+        # Read the source RFP text (already extracted by DocumentProcessor)
+        rfp_text = kb._read_text(source_file) or ""
+        if not rfp_text and source_file.suffix.lower() == ".md":
+            rfp_text = source_file.read_text(encoding="utf-8", errors="ignore")
+
+        if not rfp_text or len(rfp_text.strip()) < 100:
+            kb.logger.warning("RFP source text too short to process", account=account)
+            return
+
+        llm = kb._get_llm_client()
+        if not llm:
+            return
+
+        context = kb._build_account_context(account_dir)
+        intel = kb._read_intel_files(account_dir)
+        discovery_notes = kb._read_text(account_dir / "DISCOVERY" / "final_discovery.md")
+        battlecard_data = kb._read_text(account_dir / "BATTLECARD" / "battlecard.md")
+        web_research = await kb._fetch_web_research(account)
+
+        now = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+        # --- Step 1: Analyze RFP — extract structure and requirements ---
+        analysis_prompt = f"""You are a Solution Consultant analyzing an RFP for {account}.
+
+RFP Content:
+{rfp_text}
+
+Extract and structure the following:
+1. All requirements (mandatory and optional), numbered
+2. Evaluation criteria and scoring weights (if stated)
+3. Submission deadline and key dates
+4. Budget range (if stated)
+5. Likely competitors being evaluated
+6. Key decision makers mentioned
+7. Top 5 win themes we must address
+8. MEDDPICC signals: decision process, paper process, metrics mentioned
+
+Return as structured markdown with clear section headers."""
+
+        # RFPs can be large — use Nemotron 120B (1M token window)
+        analysis = await llm.generate_with_routing(
+            messages=[{"role": "user", "content": analysis_prompt}],
+            task_type="long_context", source="background"
+        )
+
+        if not analysis or analysis.startswith("[LLM Error:"):
+            kb.logger.error("RFP analysis generation failed", account=account)
+            return
+
+        (rfp_dir / "rfp_analysis.md").write_text(
+            f"# RFP Analysis — {account}\n*Auto-generated by JARVIS — {now}*\n"
+            f"**Source file:** {source_file.name}\n\n---\n\n{analysis}",
+            encoding="utf-8"
+        )
+        kb.logger.info("RFP analysis written", account=account)
+
+        # --- Step 2: Generate responses for each requirement ---
+        responses_prompt = f"""You are an Account Executive + Solution Consultant responding to an RFP for {account}.
+
+RFP ANALYSIS (requirements and evaluation criteria):
+{analysis[:4000]}
+
+OUR CONTEXT:
+- Company intel: {intel[:1000] if intel else 'See discovery notes'}
+- Discovery notes: {discovery_notes[:800] if discovery_notes and 'Generating' not in discovery_notes else 'None yet'}
+- Competitive positioning: {battlecard_data[:800] if battlecard_data and 'Generating' not in battlecard_data else 'None yet'}
+- Web research: {str(web_research)[:400]}
+
+Generate a complete response document for this RFP. For each requirement:
+1. Confirm compliance (Fully Compliant / Partially Compliant / Requires Customization)
+2. Provide a specific response (2-4 sentences)
+3. Reference relevant capabilities or proof points
+
+Format as a professional RFP response document. Be specific, confident, and concrete."""
+
+        filled_content = await llm.generate_with_routing(
+            messages=[{"role": "user", "content": responses_prompt}],
+            task_type="long_context", source="background"
+        )
+
+        if not filled_content or filled_content.startswith("[LLM Error:"):
+            kb.logger.error("RFP response generation failed", account=account)
+            return
+
+        # Write rfp_responses.md (structured Q&A)
+        (rfp_dir / "rfp_responses.md").write_text(
+            f"# RFP Responses — {account}\n*Auto-generated by JARVIS — {now}*\n"
+            f"**Source file:** {source_file.name}\n\n---\n\n{filled_content}",
+            encoding="utf-8"
+        )
+
+        # Write the filled copy — same logical structure as original, with responses inline
+        filled_copy_name = f"{source_file.stem}_filled.md"
+        filled_copy_path = rfp_dir / filled_copy_name
+        filled_copy_path.write_text(
+            f"# {source_file.stem} — Filled Copy\n"
+            f"**Account:** {account}  \n"
+            f"**Generated:** {now}  \n"
+            f"**Source:** {source_file.name}  \n\n"
+            f"---\n\n"
+            f"## Original RFP\n\n{rfp_text[:8000]}\n\n"
+            f"---\n\n"
+            f"## Our Responses\n\n{filled_content}",
+            encoding="utf-8"
+        )
+
+        kb.logger.info("RFP filled copy written", account=account, file=filled_copy_name)
+        kb.event_bus.publish(Event(
+            type="rfp.processed",
+            source="brain.knowledge_builder",
+            data={"account": account, "filled_copy": str(filled_copy_path)}
+        ))
+        # Also trigger battlecard refresh — RFP reveals competitors and decision criteria
+        await kb._queue.enqueue(
+            "fill_battlecard",
+            payload={"account": account},
+            account=account,
+            priority=TaskPriority.MEDIUM,
+            dedup_key=f"fill_battlecard:{account}:rfp_cascade",
+        )
 
     # ------------------------------------------------------------------
     # Helpers

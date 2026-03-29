@@ -28,8 +28,8 @@ class MeetingSummarySkill:
         self._llm_manager = llm_manager
 
     async def _on_meeting_ended(self, event: Event):
-        account = event.data.get("account", "")
-        title = event.data.get("title", "Meeting")
+        account = event.data.get("account_name", event.data.get("account", ""))
+        title = event.data.get("meeting_title", event.data.get("title", "Meeting"))
         transcript_path = event.data.get("transcript_path", "")
         slides_path = event.data.get("slides_path", "")
 

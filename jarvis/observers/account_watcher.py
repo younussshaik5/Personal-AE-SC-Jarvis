@@ -34,9 +34,23 @@ DOC_EXTS    = {".pdf", ".docx", ".doc", ".txt", ".md", ".pptx", ".xlsx"}
 IGNORE_NAMES = {
     "README.md", ".DS_Store", "activities.jsonl",
     "conversation_log.md", "actions.md",
+    # Auto-generated files — never re-process these
+    "discovery_prep.md", "final_discovery.md",
+    "battlecard.md", "battlecard_data.json",
+    "demo_strategy.md", "demo_script.md",
+    "risk_report.md", "next_steps.md", "email_drafts.json",
+    "roi_model.md", "tco_analysis.md", "value_data.json",
+    "rfp_analysis.md", "rfp_responses.md",
 }
 IGNORE_DIRS = {".git", "__pycache__", "node_modules", ".processed",
                "failed", "dist", "logs", "data", "INTEL"}
+
+# Presales sections that can receive user-dropped files
+# Files dropped here are extracted and fed to relevant downstream sections
+PRESALES_SECTIONS = {
+    "DISCOVERY", "RFP", "BATTLECARD", "DEMO_STRATEGY",
+    "RISK_REPORT", "NEXT_STEPS", "VALUE_ARCHITECTURE"
+}
 
 
 class AccountWatcher:
@@ -178,6 +192,39 @@ class AccountWatcher:
                 source="account_watcher",
                 data={"path": str(path), "account": account_name,
                       "filename": path.name}
+            ))
+            return
+
+        # ── RFP/ — user drops an RFP file ────────────────────────────
+        # Only triggers on actual source RFPs (PDFs, DOCX, TXT) — not on
+        # JARVIS-generated analysis/response files (those are in IGNORE_NAMES)
+        if (sub == "RFP"
+                and not is_dir
+                and evt_type == "file.created"
+                and path.suffix.lower() in DOC_EXTS
+                and path.name not in IGNORE_NAMES
+                and "_filled" not in path.stem):
+            self.event_bus.publish(Event(
+                type="rfp.file.added",
+                source="account_watcher",
+                data={"path": str(path), "account": account_name,
+                      "filename": path.name}
+            ))
+            return
+
+        # ── Any other presales section — user drops a file ───────────
+        # Extract useful data from it and cascade to relevant sections
+        if (sub in PRESALES_SECTIONS
+                and sub != "RFP"  # RFP handled above
+                and not is_dir
+                and evt_type == "file.created"
+                and (path.suffix.lower() in DOC_EXTS | VIDEO_EXTS)
+                and path.name not in IGNORE_NAMES):
+            self.event_bus.publish(Event(
+                type="presales.file.added",
+                source="account_watcher",
+                data={"path": str(path), "account": account_name,
+                      "section": sub, "filename": path.name}
             ))
             return
 

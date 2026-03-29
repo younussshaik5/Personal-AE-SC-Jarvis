@@ -146,7 +146,11 @@ class RecordingRouter:
             import asyncio
             import tempfile
 
-            clip_path = Path(tempfile.mktemp(suffix=".wav"))
+            import tempfile as _tempfile
+            fd, clip_tmp = _tempfile.mkstemp(suffix=".wav")
+            import os
+            os.close(fd)
+            clip_path = Path(clip_tmp)
             proc = await asyncio.create_subprocess_exec(
                 "ffmpeg", "-i", str(recording_path),
                 "-t", "180",           # first 3 minutes
@@ -162,9 +166,9 @@ class RecordingRouter:
             await proc.communicate()
 
             if clip_path.exists():
-                result = await transcriber.transcribe(str(clip_path))
+                result = await transcriber.transcribe_audio(str(clip_path))
                 clip_path.unlink(missing_ok=True)
-                return result.get("text", "") if isinstance(result, dict) else str(result)
+                return result if isinstance(result, str) else str(result)
         except Exception as e:
             self.logger.warning("Quick transcript failed", error=str(e))
         return None
@@ -176,8 +180,8 @@ class RecordingRouter:
     async def _full_transcript(self, recording_path: Path, transcriber) -> Optional[str]:
         """Full transcription of the recording."""
         try:
-            result = await transcriber.transcribe(str(recording_path))
-            return result.get("text", "") if isinstance(result, dict) else str(result)
+            result = await transcriber.transcribe_audio(str(recording_path))
+            return result if isinstance(result, str) else str(result)
         except Exception as e:
             self.logger.warning("Full transcript failed", error=str(e))
         return None

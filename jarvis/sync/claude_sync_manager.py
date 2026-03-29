@@ -43,8 +43,8 @@ class ClaudeSyncManager:
         self.event_bus.subscribe("deal.stale", self._on_deal_stale)
 
     async def _on_meeting_summary(self, event: Event):
-        account = event.data.get("account", "Unknown")
-        title = event.data.get("title", "Meeting")
+        account = event.data.get("account_name", event.data.get("account", "Unknown"))
+        title = event.data.get("meeting_title", event.data.get("title", "Meeting"))
         self.add_notification(
             title=f"Meeting Summary Ready: {title}",
             body=f"Meeting summary for {account} has been processed and is ready for review.",
@@ -54,7 +54,7 @@ class ClaudeSyncManager:
         )
 
     async def _on_meeting_ended(self, event: Event):
-        account = event.data.get("account", "Unknown")
+        account = event.data.get("account_name", event.data.get("account", "Unknown"))
         self.add_notification(
             title=f"Meeting Recorded: {account}",
             body=f"Meeting recording for {account} is being processed.",

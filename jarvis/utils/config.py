@@ -79,6 +79,22 @@ class JarvisConfig:
     embedding_cache_size: int = 1000
     max_memory_mb: int = 1024
 
+    # Meeting processing
+    meeting: Dict[str, Any] = field(default_factory=lambda: {
+        "recording_dir": "",
+        "frame_interval_seconds": 30,
+        "max_recording_minutes": 240,
+        "max_concurrent_recordings": 1,
+        "transcription_model": "nvidia/parakeet-ctc-1.1b-asr",
+        "chunk_duration_seconds": 600,
+        "chunk_overlap_seconds": 30,
+        "max_parallel_api_calls": 5,
+        "ffmpeg_timeout_per_gb": 600,
+        "processed_retention_days": 7,
+        "fast_path_frame_interval": 120,
+        "deep_path_frame_interval": 30,
+    })
+
     # Persona
     default_persona: str = "work"
     auto_persona_switch: bool = True

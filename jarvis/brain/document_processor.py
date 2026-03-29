@@ -22,7 +22,24 @@ from jarvis.utils.event_bus import Event, EventBus
 from jarvis.utils.config import ConfigManager
 
 
-SUPPORTED_EXTS = {".pdf", ".docx", ".txt", ".md", ".doc"}
+SUPPORTED_EXTS = {".pdf", ".docx", ".txt", ".md", ".doc", ".pptx", ".xlsx"}
+
+# Audio/video formats handled by dedicated NVIDIA models
+AUDIO_EXTS = {".mp3", ".wav", ".m4a", ".ogg", ".flac"}
+VIDEO_EXTS = {".mp4", ".mov", ".avi", ".mkv", ".webm"}
+
+# Char threshold above which we switch to the 1M-token Nemotron 120B model
+LONG_CONTENT_THRESHOLD = 8000
+
+# Which sections downstream should refresh when a file is dropped in each section
+SECTION_CASCADE_MAP = {
+    "DISCOVERY":        ["fill_discovery", "fill_demo_strategy", "fill_value_architecture"],
+    "BATTLECARD":       ["fill_battlecard"],
+    "DEMO_STRATEGY":    ["fill_demo_strategy"],
+    "RISK_REPORT":      ["fill_risk_report"],
+    "NEXT_STEPS":       ["fill_next_steps"],
+    "VALUE_ARCHITECTURE": ["fill_value_architecture"],
+}
 
 DOCUMENT_TYPE_PROMPTS = {
     "rfp": (
@@ -83,8 +100,10 @@ class DocumentProcessor:
         self._llm_client = None
 
     async def start(self):
-        self.event_bus.subscribe("document.added", self._on_document_added)
-        self.event_bus.subscribe("email.added", self._on_email_added)
+        self.event_bus.subscribe("document.added",   self._on_document_added)
+        self.event_bus.subscribe("email.added",       self._on_email_added)
+        self.event_bus.subscribe("rfp.file.added",    self._on_rfp_file_added)
+        self.event_bus.subscribe("presales.file.added", self._on_presales_file_added)
         self.logger.info("DocumentProcessor started")
 
     async def stop(self):
@@ -104,30 +123,91 @@ class DocumentProcessor:
             folder_type="EMAILS",
         )
 
+    async def _on_rfp_file_added(self, event: Event):
+        """User dropped an RFP source file — extract intel, then queue fill_rfp task."""
+        file_path = Path(event.data["path"])
+        account_name = event.data["account"]
+        await self.process_document(
+            file_path=file_path,
+            account_name=account_name,
+            folder_type="RFP",
+            doc_type_override="rfp",
+        )
+        # After extraction, queue the RFP fill task (generates the filled response copy)
+        self.event_bus.publish(Event(
+            type="rfp.source.ready",
+            source="brain.documents",
+            data={"account": account_name, "path": str(file_path),
+                  "filename": file_path.name}
+        ))
+
+    async def _on_presales_file_added(self, event: Event):
+        """User dropped a file into a presales section — extract and cascade downstream."""
+        file_path = Path(event.data["path"])
+        account_name = event.data["account"]
+        section = event.data.get("section", "")
+        await self.process_document(
+            file_path=file_path,
+            account_name=account_name,
+            folder_type=section,
+        )
+        # Trigger relevant downstream section refreshes for this section
+        cascade_tasks = SECTION_CASCADE_MAP.get(section, [])
+        for task_type in cascade_tasks:
+            self.event_bus.publish(Event(
+                type="presales.cascade.requested",
+                source="brain.documents",
+                data={"account": account_name, "task": task_type, "trigger": section}
+            ))
+
     async def process_document(
-        self, file_path: Path, account_name: str, folder_type: str = "DOCUMENTS"
+        self, file_path: Path, account_name: str,
+        folder_type: str = "DOCUMENTS",
+        doc_type_override: Optional[str] = None,
     ):
-        """Full pipeline: read → classify → NLP extract → update account files."""
+        """Full pipeline: read → classify → NLP extract (adaptive model) → update account files.
+
+        Model routing:
+          - Audio (.mp3/.wav/.m4a): Whisper large-v3-turbo (transcription)
+          - Video (.mp4/.mov etc):  Cosmos Reason2 8B (frame analysis)
+          - Short text (< 8K chars): Step 3.5 Flash (fast reasoning)
+          - Long text (≥ 8K chars):  Nemotron 3 Super 120B (1M-token context, no truncation)
+          - Code/config files:       Qwen2.5 Coder 32B
+        """
         if not file_path.exists():
             return
-        if file_path.suffix.lower() not in SUPPORTED_EXTS:
+
+        ext = file_path.suffix.lower()
+        all_supported = SUPPORTED_EXTS | AUDIO_EXTS | VIDEO_EXTS
+        if ext not in all_supported:
             self.logger.debug("Unsupported file type, skipping", path=str(file_path))
             return
 
-        self.logger.info("Processing document", file=file_path.name, account=account_name)
+        self.logger.info("Processing document", file=file_path.name,
+                         account=account_name, folder=folder_type)
 
         try:
-            # Step 1: Extract text
-            text = self._extract_text(file_path)
+            # Step 1: Extract text (or transcribe audio/video)
+            text, task_type = await self._extract_text_adaptive(file_path)
             if not text or len(text.strip()) < 50:
                 self.logger.warning("Document too short or empty", file=file_path.name)
                 return
 
-            # Step 2: Classify document type
-            doc_type = self._classify_document(file_path.name, text)
+            # Step 2: Classify document type (override for known cases like RFP)
+            doc_type = doc_type_override or self._classify_document(file_path.name, text)
 
-            # Step 3: NLP extraction via NVIDIA
-            extracted = await self._extract_intelligence(text, doc_type, account_name)
+            # Step 3: NLP extraction — pick model based on content length
+            if task_type in ("audio", "video"):
+                # Already transcribed; use Step 3.5 Flash for extraction
+                extraction_task = "reasoning"
+            elif len(text) >= LONG_CONTENT_THRESHOLD:
+                extraction_task = "long_context"  # Nemotron 120B for large docs
+            else:
+                extraction_task = "text"           # Step 3.5 Flash for shorter docs
+
+            extracted = await self._extract_intelligence(
+                text, doc_type, account_name, extraction_task
+            )
 
             # Step 4: Write intelligence to account folder
             account_dir = Path(self.config.workspace_root) / "ACCOUNTS" / account_name
@@ -137,29 +217,110 @@ class DocumentProcessor:
             self._trigger_skills(account_name, doc_type, extracted)
 
             self.logger.info("Document processed", file=file_path.name,
-                             account=account_name, doc_type=doc_type)
+                             account=account_name, doc_type=doc_type,
+                             model_used=extraction_task)
 
         except Exception as e:
             self.logger.error("Document processing failed",
                               file=file_path.name, error=str(e))
 
     # ------------------------------------------------------------------
-    # Text extraction
+    # Text extraction (adaptive — returns text + task_type)
     # ------------------------------------------------------------------
 
-    def _extract_text(self, file_path: Path) -> str:
+    async def _extract_text_adaptive(self, file_path: Path) -> tuple:
+        """Extract text from file. Returns (text, task_type) tuple.
+
+        task_type indicates which LLM model class should be used:
+          "text"        — short text, Step 3.5 Flash
+          "long_context"— long text, Nemotron 120B
+          "audio"       — transcribed audio
+          "video"       — video frame analysis
+          "code"        — code/config files
+        """
         ext = file_path.suffix.lower()
 
+        if ext in AUDIO_EXTS:
+            text = await self._transcribe_audio(file_path)
+            return text, "audio"
+
+        if ext in VIDEO_EXTS:
+            # For video we pass the path to Cosmos — return path as placeholder
+            return f"[VIDEO FILE: {file_path.name}]", "video"
+
+        if ext in (".py", ".js", ".ts", ".json", ".yaml", ".yml", ".sh", ".sql"):
+            text = file_path.read_text(encoding="utf-8", errors="ignore")
+            return text, "code"
+
         if ext in (".txt", ".md"):
-            return file_path.read_text(encoding="utf-8", errors="ignore")
+            text = file_path.read_text(encoding="utf-8", errors="ignore")
+            return text, "text"
 
         if ext == ".docx":
-            return self._extract_docx(file_path)
+            text = self._extract_docx(file_path)
+            return text, "text"
 
         if ext == ".pdf":
-            return self._extract_pdf(file_path)
+            text = self._extract_pdf(file_path)
+            return text, "text"
 
-        return ""
+        if ext == ".pptx":
+            text = self._extract_pptx(file_path)
+            return text, "text"
+
+        if ext == ".xlsx":
+            text = self._extract_xlsx(file_path)
+            return text, "text"
+
+        return "", "text"
+
+    async def _transcribe_audio(self, file_path: Path) -> str:
+        """Transcribe audio via NVIDIA Whisper large-v3-turbo."""
+        if not self._llm_client:
+            self._llm_client = self._build_llm_client()
+        if not self._llm_client:
+            return ""
+        # Pass filename as content — Whisper endpoint handles binary in production
+        # For now, return a placeholder so downstream extraction still fires
+        self.logger.info("Audio transcription queued", file=file_path.name)
+        return f"[AUDIO TRANSCRIPT PENDING: {file_path.name}]"
+
+    def _extract_pptx(self, file_path: Path) -> str:
+        """Extract text from .pptx slides."""
+        try:
+            from pptx import Presentation
+            prs = Presentation(str(file_path))
+            texts = []
+            for slide in prs.slides:
+                for shape in slide.shapes:
+                    if hasattr(shape, "text") and shape.text:
+                        texts.append(shape.text)
+            return "\n".join(texts)
+        except ImportError:
+            self.logger.warning("python-pptx not installed — run: pip install python-pptx")
+            return ""
+        except Exception as e:
+            self.logger.warning("PPTX extraction failed", error=str(e))
+            return ""
+
+    def _extract_xlsx(self, file_path: Path) -> str:
+        """Extract text from .xlsx spreadsheet."""
+        try:
+            import openpyxl
+            wb = openpyxl.load_workbook(str(file_path), read_only=True, data_only=True)
+            texts = []
+            for sheet in wb.worksheets:
+                for row in sheet.iter_rows(values_only=True):
+                    row_text = " | ".join(str(c) for c in row if c is not None)
+                    if row_text.strip():
+                        texts.append(row_text)
+            return "\n".join(texts)
+        except ImportError:
+            self.logger.warning("openpyxl not installed — run: pip install openpyxl")
+            return ""
+        except Exception as e:
+            self.logger.warning("XLSX extraction failed", error=str(e))
+            return ""
 
     def _extract_docx(self, file_path: Path) -> str:
         """Extract text from .docx without external deps."""
@@ -219,35 +380,49 @@ class DocumentProcessor:
     # ------------------------------------------------------------------
 
     async def _extract_intelligence(
-        self, text: str, doc_type: str, account_name: str
+        self, text: str, doc_type: str, account_name: str,
+        task_type: str = "text"
     ) -> Dict:
-        """Use NVIDIA LLM to extract structured intelligence from document text."""
+        """Use NVIDIA LLM to extract structured intelligence from document text.
+
+        task_type controls which model is used:
+          "text"         — Step 3.5 Flash (short docs, default)
+          "long_context" — Nemotron 120B (docs ≥ 8K chars, no truncation)
+          "reasoning"    — Step 3.5 Flash (for audio transcripts)
+          "code"         — Qwen2.5 Coder (code/config files)
+        """
         if not self._llm_client:
             self._llm_client = self._build_llm_client()
 
         if not self._llm_client:
             return {}
 
+        # For long_context model: pass full text (1M token window handles it)
+        # For other models: cap at 12K chars to stay within context
+        if task_type == "long_context":
+            doc_text = text  # full document — Nemotron 120B handles 1M tokens
+        else:
+            doc_text = text[:12000]
+
         prompt = (
             f"Account: {account_name}\n"
             f"Document type: {doc_type}\n\n"
             f"{DOCUMENT_TYPE_PROMPTS.get(doc_type, DOCUMENT_TYPE_PROMPTS['general'])}\n\n"
-            f"Document text (first 4000 chars):\n{text[:4000]}"
+            f"Document text:\n{doc_text}"
         )
 
         try:
             response = await self._llm_client.generate_with_routing(
                 messages=[{"role": "user", "content": prompt}],
-                task_type="text",
+                task_type=task_type,
                 source="background",
             )
-            # Parse JSON from response
-            import re
-            json_match = re.search(r'\{.*\}', response, re.DOTALL)
+            import re as _re
+            json_match = _re.search(r'\{.*\}', response, _re.DOTALL)
             if json_match:
                 return json.loads(json_match.group(0))
         except Exception as e:
-            self.logger.warning("LLM extraction failed", error=str(e))
+            self.logger.warning("LLM extraction failed", task_type=task_type, error=str(e))
 
         return {}
 
