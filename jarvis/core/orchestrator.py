@@ -46,6 +46,9 @@ from jarvis.brain.document_processor import DocumentProcessor
 from jarvis.brain.self_learner import SelfLearner
 from jarvis.brain.knowledge_builder import KnowledgeBuilder
 from jarvis.observers.account_watcher import AccountWatcher
+from jarvis.skills.html_generator_skill import HTMLGeneratorSkill
+from jarvis.queue.task_queue import TaskQueue
+from jarvis.queue.worker_pool import WorkerPool
 
 
 @dataclass
@@ -99,6 +102,7 @@ class Orchestrator:
         'document_processor': DocumentProcessor,
         'self_learner': SelfLearner,
         'knowledge_builder': KnowledgeBuilder,
+        'html_generator': HTMLGeneratorSkill,
     }
 
     def __init__(self, config):
@@ -142,7 +146,7 @@ class Orchestrator:
             'account_watcher',
             'meeting_processor', 'playbook_engine', 'claude_sync',
             'conversation_extractor', 'document_processor',
-            'self_learner', 'knowledge_builder',
+            'self_learner', 'knowledge_builder', 'html_generator',
             'scanner', 'archiver', 'websocket_server'
         ]
 
@@ -150,6 +154,9 @@ class Orchestrator:
             if name in self.COMPONENT_CLASSES:
                 await self._init_component(name)
                 await asyncio.sleep(0.5)  # Stagger startup
+
+        # Start task queue + worker pool (after all components are ready)
+        await self._start_worker_pool()
 
         # Subscribe orchestrator to important events
         self.event_bus.subscribe("component.error", self._handle_component_error)
@@ -159,6 +166,38 @@ class Orchestrator:
 
         # Health check task
         self._tasks.append(asyncio.create_task(self._health_monitor()))
+
+    async def _start_worker_pool(self):
+        """Start the task queue worker pool and register all task handlers."""
+        from pathlib import Path
+        jarvis_home = Path(self.config.workspace_root)
+        queue = TaskQueue(jarvis_home)
+        n_workers = (getattr(self.config.config, "queue_workers", None) or
+                     getattr(self.config, "queue_workers", 3))
+        pool = WorkerPool(queue, n_workers=int(n_workers))
+
+        # Services injected into every task handler
+        services = {
+            "knowledge_builder": self.components.get("knowledge_builder"),
+            "html_generator":    self.components.get("html_generator"),
+            "event_bus":         self.event_bus,
+            "config":            self.config,
+        }
+        pool.set_services(services)
+
+        # Register handlers
+        kb = self.components.get("knowledge_builder")
+        hg = self.components.get("html_generator")
+        if kb:
+            pool.register("gap_fill",          kb.handle_gap_fill)
+            pool.register("workspace_extract", kb.handle_workspace_extract)
+            pool.register("cross_deal_sync",   kb.handle_cross_deal_sync)
+        if hg:
+            pool.register("html_refresh",      hg.handle_html_refresh)
+
+        await pool.start()
+        self.components["worker_pool"] = pool
+        self.logger.info("Worker pool started", workers=n_workers)
 
     async def _init_component(self, name: str):
         """Initialize a single component."""
@@ -226,6 +265,10 @@ class Orchestrator:
         # Stop all tasks
         for task in self._tasks:
             task.cancel()
+
+        # Stop worker pool first
+        if "worker_pool" in self.components:
+            await self.components["worker_pool"].stop()
 
         # Stop components in reverse order
         for name in reversed(list(self.components.keys())):

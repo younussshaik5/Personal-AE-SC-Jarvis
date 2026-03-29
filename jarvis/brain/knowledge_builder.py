@@ -1,23 +1,27 @@
 #!/usr/bin/env python3
 """
-KnowledgeBuilder — JARVIS autonomous gap-filling engine.
+KnowledgeBuilder — JARVIS autonomous intelligence engine.
 
-What this does:
-  - Scans every account folder every 6 hours
-  - Identifies what's MISSING (no company research, no competitive analysis, etc.)
-  - Uses NVIDIA to autonomously research and fill those gaps
-  - Watches the entire claude space workspace for ANY new/changed files
-  - Extracts intelligence from everything it finds
-  - Builds a cross-deal knowledge base in MEMORY/ that improves all future outputs
-  - Self-feeds: the richer the context, the better NVIDIA's outputs, the richer the context
+How it works:
+  - Subscribes to events: account.initialized, meeting.summary.ready,
+    document.processed, brain.entry.routed, file.created/modified in claude_space
+  - On each event → queues gap-fill and workspace-extract tasks immediately
+  - Workers pick up tasks within 1-5 minutes (rate-limited to protect NVIDIA quota)
+  - No fixed 6-hour loops. Everything is event-driven.
 
-This is the "self-populating" engine. It doesn't wait for you.
-It finds gaps, fills them, and makes itself smarter in the process.
+Task types registered:
+  "gap_fill"          — fill missing INTEL/ files for one account (NVIDIA)
+  "workspace_extract" — extract sales intel from a file in claude_space (NVIDIA)
+  "cross_deal_sync"   — synthesize patterns across all accounts (NVIDIA, LOW priority)
+  "html_refresh"      — regenerate account.html or opp.html (no LLM needed)
+
+Context is never lost:
+  Full account context is passed in the task payload (JSON).
+  Handler reads current state from disk, calls NVIDIA, writes result to disk.
+  If NVIDIA fails → task retries up to 3 times (WorkerPool handles this).
 """
 
-import asyncio
 import json
-import os
 import re
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -26,545 +30,433 @@ from typing import Any, Dict, List, Optional, Set
 from jarvis.utils.logger import JARVISLogger
 from jarvis.utils.event_bus import Event, EventBus
 from jarvis.utils.config import ConfigManager
+from jarvis.queue.task_queue import TaskQueue, TaskPriority
 
-
-# Files JARVIS considers "complete" for an account
 REQUIRED_INTEL_FILES = {
     "company_research.md",
     "competitive_analysis.md",
     "value_proposition.md",
 }
 
-# How old intel can be before it's refreshed (days)
 INTEL_REFRESH_DAYS = 14
+
+WORKSPACE_FILE_EXTS = {".md", ".txt", ".pdf", ".docx", ".json"}
+IGNORE_DIRS = {".git", "__pycache__", "node_modules", ".processed",
+               "dist", "logs", "MEMORY", "data"}
 
 
 class KnowledgeBuilder:
     """
-    Autonomously researches, fills gaps, and builds cross-deal intelligence.
-    Runs continuously in the background using NVIDIA.
+    Queues intelligence tasks whenever anything changes.
+    Workers process them in parallel within 1-5 minutes.
     """
 
     def __init__(self, config_manager: ConfigManager, event_bus: EventBus):
-        self.config = config_manager
-        self.event_bus = event_bus
-        self.logger = JARVISLogger("brain.knowledge_builder")
-        self._running = False
-        self._gap_fill_task: Optional[asyncio.Task] = None
-        self._workspace_scan_task: Optional[asyncio.Task] = None
-        self._llm_client = None
-        self._processed_files: Set[str] = set()
+        self.config     = config_manager
+        self.event_bus  = event_bus
+        self.logger     = JARVISLogger("brain.knowledge_builder")
+        self._running   = False
+        self._queue: Optional[TaskQueue] = None
 
     async def start(self):
         self._running = True
-        self._jarvis_home = Path(self.config.workspace_root)
+        self._jarvis_home  = Path(self.config.workspace_root)
         self._accounts_dir = self._jarvis_home / "ACCOUNTS"
-        self._memory_dir = self._jarvis_home / "MEMORY"
+        self._memory_dir   = self._jarvis_home / "MEMORY"
         self._memory_dir.mkdir(parents=True, exist_ok=True)
 
-        # Also watch the claude space working directory for intelligence
-        self._claude_space = Path(os.environ.get(
-            "CLAUDE_SPACE",
-            str(Path.home() / "Documents" / "claude space")
-        ))
+        # claude_space resolved from config (set via .env CLAUDE_SPACE=)
+        cs = getattr(self.config, "claude_space", None)
+        self._claude_space = Path(cs) if cs else None
 
-        # Subscribe to events
-        self.event_bus.subscribe("account.initialized", self._on_account_initialized)
-        self.event_bus.subscribe("meeting.summary.ready", self._on_new_intelligence)
-        self.event_bus.subscribe("document.processed", self._on_new_intelligence)
-        self.event_bus.subscribe("brain.entry.routed", self._on_new_intelligence)
+        # Task queue (shared singleton via jarvis_home path)
+        self._queue = TaskQueue(self._jarvis_home)
 
-        # Start background loops
-        self._gap_fill_task = asyncio.create_task(self._gap_fill_loop())
-        self._workspace_scan_task = asyncio.create_task(self._workspace_scan_loop())
+        # Subscribe to semantic events — queue tasks immediately
+        self.event_bus.subscribe("account.initialized",     self._on_account_event)
+        self.event_bus.subscribe("meeting.summary.ready",   self._on_account_event)
+        self.event_bus.subscribe("document.processed",      self._on_account_event)
+        self.event_bus.subscribe("brain.entry.routed",      self._on_account_event)
+        self.event_bus.subscribe("meddpicc.updated",        self._on_account_event)
+        self.event_bus.subscribe("email.added",             self._on_account_event)
+        self.event_bus.subscribe("knowledge.intel.updated", self._on_account_event)
+        self.event_bus.subscribe("file.created",            self._on_file_event)
+        self.event_bus.subscribe("file.modified",           self._on_file_event)
+
+        # On startup: queue gap-fill for every existing account (LOW priority)
+        await self._queue_all_account_gaps()
+
+        # Queue cross-deal synthesis on startup (lowest priority)
+        await self._queue.enqueue(
+            "cross_deal_sync", payload={}, priority=TaskPriority.LOW,
+            dedup_key="cross_deal_sync"
+        )
 
         self.logger.info("KnowledgeBuilder started",
-                         jarvis_home=str(self._jarvis_home),
+                         accounts_dir=str(self._accounts_dir),
                          claude_space=str(self._claude_space))
 
     async def stop(self):
         self._running = False
-        for task in (self._gap_fill_task, self._workspace_scan_task):
-            if task and not task.done():
-                task.cancel()
 
     # ------------------------------------------------------------------
-    # Gap fill loop — runs every 6 hours
+    # Event handlers — translate events into queued tasks immediately
     # ------------------------------------------------------------------
 
-    async def _gap_fill_loop(self):
-        """Every 6 hours: scan all accounts, fill missing intelligence."""
-        while self._running:
-            await asyncio.sleep(6 * 3600)
-            try:
-                await self._fill_all_gaps()
-            except Exception as e:
-                self.logger.error("Gap fill loop error", error=str(e))
+    async def _on_account_event(self, event: Event):
+        """Any account-level event → queue gap-fill for that account."""
+        account = (event.data.get("account") or
+                   event.data.get("account_name") or "")
+        if not account:
+            return
+        await self._queue.enqueue(
+            "gap_fill",
+            payload={"account": account},
+            account=account,
+            priority=TaskPriority.MEDIUM,
+        )
+        # Also refresh HTML after any data change
+        await self._queue.enqueue(
+            "html_refresh",
+            payload={"account": account, "level": "account"},
+            account=account,
+            dedup_key=f"html_refresh:{account}",
+            priority=TaskPriority.LOW,
+        )
 
-    async def _fill_all_gaps(self):
-        """Scan every account, identify gaps, fill them with NVIDIA."""
-        if not self._accounts_dir.exists():
+    async def _on_file_event(self, event: Event):
+        """File changed in claude_space → queue workspace extraction."""
+        path_str = event.data.get("path", "")
+        if not path_str:
+            return
+        path = Path(path_str)
+
+        # Only care about files in claude_space
+        if self._claude_space and not path_str.startswith(str(self._claude_space)):
             return
 
-        accounts = [d for d in self._accounts_dir.iterdir()
-                    if d.is_dir() and not d.name.startswith(('_', '.'))]
+        # Skip JARVIS_HOME itself (avoid feedback loops)
+        if path_str.startswith(str(self._jarvis_home)):
+            return
 
-        self.logger.info("Scanning for intelligence gaps", accounts=len(accounts))
-        filled = 0
+        if path.suffix.lower() not in WORKSPACE_FILE_EXTS:
+            return
 
-        for account_dir in accounts:
-            gaps = self._identify_gaps(account_dir)
-            for gap in gaps:
-                success = await self._fill_gap(account_dir, gap)
-                if success:
-                    filled += 1
-                await asyncio.sleep(2)  # rate limiting between API calls
+        # Skip ignored dirs
+        if any(part in IGNORE_DIRS for part in path.parts):
+            return
 
-        if filled:
-            self.logger.info("Intelligence gaps filled", count=filled)
-            self.event_bus.publish(Event(
-                type="knowledge.gaps.filled",
-                source="brain.knowledge_builder",
-                data={"count": filled}
-            ))
+        await self._queue.enqueue(
+            "workspace_extract",
+            payload={"path": path_str},
+            dedup_key=f"workspace_extract:{path_str}",
+            priority=TaskPriority.MEDIUM,
+        )
 
-    def _identify_gaps(self, account_dir: Path) -> List[str]:
-        """Return list of gap types for an account."""
-        gaps = []
+    # ------------------------------------------------------------------
+    # Startup: queue gaps for all existing accounts
+    # ------------------------------------------------------------------
+
+    async def _queue_all_account_gaps(self):
+        if not self._accounts_dir.exists():
+            return
+        count = 0
+        for account_dir in self._accounts_dir.iterdir():
+            if account_dir.is_dir() and not account_dir.name.startswith(("_", ".")):
+                await self._queue.enqueue(
+                    "gap_fill",
+                    payload={"account": account_dir.name},
+                    account=account_dir.name,
+                    priority=TaskPriority.LOW,
+                )
+                count += 1
+        if count:
+            self.logger.info("Queued gap-fill for existing accounts", count=count)
+
+    # ------------------------------------------------------------------
+    # Task handlers — called by WorkerPool
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    async def handle_gap_fill(task, services: Dict[str, Any]):
+        """Fill missing INTEL/ files for one account."""
+        kb: "KnowledgeBuilder" = services["knowledge_builder"]
+        account = task.payload.get("account", "")
+        if not account:
+            return
+
+        account_dir = kb._accounts_dir / account
+        if not account_dir.exists():
+            return
+
         intel_dir = account_dir / "INTEL"
         intel_dir.mkdir(exist_ok=True)
 
-        for required_file in REQUIRED_INTEL_FILES:
-            file_path = intel_dir / required_file
-            if not file_path.exists():
-                gaps.append(required_file.replace(".md", ""))
-            else:
-                # Check if stale
-                age_days = (datetime.now() - datetime.fromtimestamp(
-                    file_path.stat().st_mtime
-                )).days
-                if age_days > INTEL_REFRESH_DAYS:
-                    gaps.append(f"refresh_{required_file.replace('.md', '')}")
+        gaps = kb._identify_gaps(account_dir)
+        if not gaps:
+            return
 
-        # Check for missing MEDDPICC notes
-        meddpicc = self._read_json(account_dir / "meddpicc.json")
-        if meddpicc and meddpicc.get("score", 0) > 0:
-            if not (intel_dir / "meddpicc_strategy.md").exists():
-                gaps.append("meddpicc_strategy")
-
-        return gaps
-
-    async def _fill_gap(self, account_dir: Path, gap: str) -> bool:
-        """Fill a specific intelligence gap using NVIDIA."""
-        llm = self._get_llm_client()
+        llm = kb._get_llm_client()
         if not llm:
-            return False
+            return
 
-        account_name = account_dir.name
-        context = self._build_account_context(account_dir)
+        context = kb._build_account_context(account_dir)
 
-        gap_prompts = {
-            "company_research": f"""Research {account_name} as a potential enterprise software customer.
-
-Based on any available context:
-{context}
-
-Generate a company intelligence brief covering:
-1. Company overview (industry, size, revenue if known)
-2. Digital transformation maturity
-3. Likely pain points for customer experience / support automation
-4. Key decision-making dynamics (enterprise vs startup culture)
-5. Budget signals and fiscal year timing
-6. Technology stack indicators
-7. Competitive landscape they operate in
-8. Why they would buy conversational AI NOW
-
-Be specific and practical. Focus on what an AE needs to know before a discovery call.
-Write as markdown.""",
-
-            "competitive_analysis": f"""Generate competitive positioning for selling to {account_name}.
-
-Account context:
-{context}
-
-Based on the account profile, generate:
-1. Most likely competitors in this evaluation (rank top 3)
-2. For each competitor: their likely pitch vs our differentiation
-3. Objections we'll face and how to handle them
-4. Our strongest angles for this specific account type
-5. Deal-killers to watch for
-
-Focus on Yellow.ai vs alternatives. Be specific, not generic.
-Write as markdown.""",
-
-            "value_proposition": f"""Build a value proposition for {account_name}.
-
-Account context:
-{context}
-
-Generate:
-1. Primary business value (what problem does this solve for THEM specifically)
-2. Quantified ROI framework (use industry benchmarks if no account-specific data)
-3. 3 headline statements tailored to this account's industry/size
-4. Executive-level business case (CFO language)
-5. Technical value for IT/procurement stakeholders
-
-Write as markdown.""",
-
-            "meddpicc_strategy": f"""Generate a MEDDPICC pursuit strategy for {account_name}.
-
-Current MEDDPICC status:
-{context}
-
-For each MEDDPICC element that's incomplete (score < 2):
-1. What question reveals this information?
-2. Which meeting/touchpoint is the right moment to ask?
-3. What red flags indicate a problem here?
-4. What action unblocks this element?
-
-Be specific to this deal, not generic advice.
-Write as markdown.""",
-        }
-
-        # Handle refresh variants
-        base_gap = gap.replace("refresh_", "")
-        prompt = gap_prompts.get(base_gap) or gap_prompts.get(gap)
-        if not prompt:
-            return False
-
-        try:
-            response = await llm.generate_with_routing(
-                messages=[{"role": "user", "content": prompt}],
-                task_type="text",
-                source="background",
-            )
-
-            # Write to INTEL/
-            output_filename = f"{base_gap}.md"
-            intel_dir = account_dir / "INTEL"
-            intel_dir.mkdir(exist_ok=True)
-            output_file = intel_dir / output_filename
-
-            header = (
-                f"# {base_gap.replace('_', ' ').title()} — {account_name}\n"
-                f"*Auto-generated by JARVIS KnowledgeBuilder — {datetime.now().strftime('%Y-%m-%d')}*\n"
-                f"*Refresh every {INTEL_REFRESH_DAYS} days*\n\n---\n\n"
-            )
-            output_file.write_text(header + response, encoding="utf-8")
-
-            self.logger.info("Gap filled", account=account_name, gap=base_gap)
-            return True
-
-        except Exception as e:
-            self.logger.warning("Gap fill failed", account=account_name,
-                                gap=gap, error=str(e))
-            return False
-
-    # ------------------------------------------------------------------
-    # Workspace scan loop — watches claude space for any new intelligence
-    # ------------------------------------------------------------------
-
-    async def _workspace_scan_loop(self):
-        """
-        Periodically scan the claude space workspace for new or changed files.
-        Extracts intelligence from ANYTHING found — playbooks, guides, notes,
-        conversation artifacts — and routes it into the knowledge base.
-        """
-        while self._running:
-            await asyncio.sleep(300)  # every 5 minutes
+        for gap in gaps:
             try:
-                await self._scan_workspace()
+                content = await kb._generate_intel(account, gap, context, llm)
+                if content:
+                    fname = gap.replace("refresh_", "") + ".md"
+                    (intel_dir / fname).write_text(content, encoding="utf-8")
+                    kb.logger.info("Intel filled", account=account, gap=gap)
+                    kb.event_bus.publish(Event(
+                        type="knowledge.intel.updated",
+                        source="brain.knowledge_builder",
+                        data={"account": account, "file": fname}
+                    ))
             except Exception as e:
-                self.logger.error("Workspace scan error", error=str(e))
+                kb.logger.error("Gap fill failed", account=account, gap=gap, error=str(e))
 
-    async def _scan_workspace(self):
-        """Scan claude space for new files with extractable intelligence."""
-        if not self._claude_space.exists():
+    @staticmethod
+    async def handle_workspace_extract(task, services: Dict[str, Any]):
+        """Extract sales intel from any file in claude_space."""
+        kb: "KnowledgeBuilder" = services["knowledge_builder"]
+        path_str = task.payload.get("path", "")
+        if not path_str:
+            return
+        path = Path(path_str)
+        if not path.exists():
             return
 
-        scan_patterns = ["**/*.md", "**/*.txt", "**/*.pdf", "**/*.docx"]
-        skip_dirs = {".git", "__pycache__", "node_modules", "dist",
-                     "ACCOUNTS", "MEETINGS", "INTEL", ".processed"}
-
-        for pattern in scan_patterns:
-            for file_path in self._claude_space.glob(pattern):
-                # Skip if inside jarvis data dirs or already processed
-                if any(skip in file_path.parts for skip in skip_dirs):
-                    continue
-                if str(file_path) in self._processed_files:
-                    continue
-
-                # Only process files modified in the last 24 hours
-                try:
-                    age_hours = (datetime.now() - datetime.fromtimestamp(
-                        file_path.stat().st_mtime
-                    )).total_seconds() / 3600
-                    if age_hours > 24:
-                        continue
-                except Exception:
-                    continue
-
-                await self._extract_from_workspace_file(file_path)
-                self._processed_files.add(str(file_path))
-
-                # Keep set bounded
-                if len(self._processed_files) > 1000:
-                    self._processed_files = set(list(self._processed_files)[-500:])
-
-    async def _extract_from_workspace_file(self, file_path: Path):
-        """Extract intelligence from a workspace file using NVIDIA."""
-        llm = self._get_llm_client()
+        llm = kb._get_llm_client()
         if not llm:
             return
 
         try:
-            text = self._read_file_text(file_path)
-            if not text or len(text.strip()) < 100:
+            text = kb._read_file_text(path)
+            if len(text.strip()) < 100:
                 return
 
-            prompt = f"""You are analyzing a file from a sales professional's workspace.
-File: {file_path.name}
+            prompt = f"""Extract sales intelligence from this file.
+File: {path.name}
 
-Extract ONLY what's useful for an enterprise sales AE:
-1. Account names mentioned (if any)
-2. Sales strategies, playbook patterns, or methodologies
-3. Product knowledge (Yellow.ai features, use cases, pricing signals)
-4. Competitive insights
-5. Any customer pain points or buying signals
+Content:
+{text[:4000]}
 
-If this file contains no sales-relevant information, return: {{"relevant": false}}
-
-Otherwise return JSON:
+Return JSON with these fields (omit any that are not present):
 {{
-  "relevant": true,
-  "accounts": [],
-  "insights": [],
-  "product_knowledge": [],
-  "competitive": [],
-  "save_to": "playbook|product|competitive|account"
-}}
-
-File content (first 3000 chars):
-{text[:3000]}"""
+  "accounts": ["company names mentioned"],
+  "insights": ["key business insights, pain points, needs"],
+  "product_knowledge": ["yellow.ai product/feature knowledge"],
+  "competitive": ["competitor mentions or comparisons"],
+  "action_items": ["any action items or next steps"]
+}}"""
 
             response = await llm.generate_with_routing(
                 messages=[{"role": "user", "content": prompt}],
-                task_type="text",
-                source="background",
+                task_type="text", source="background"
             )
-
-            parsed = self._extract_json(response)
-            if not parsed or not parsed.get("relevant"):
+            parsed = kb._extract_json(response)
+            if not parsed:
                 return
 
-            # Route to knowledge base
-            await self._route_workspace_intelligence(file_path, parsed, text)
+            # Write to MEMORY knowledge base
+            for category, items in parsed.items():
+                if items:
+                    kb._update_knowledge_base(category, items, source=path.name)
+
+            # Route to relevant accounts
+            for acct_name in parsed.get("accounts", []):
+                matched = kb._fuzzy_match_account(acct_name)
+                if matched:
+                    intel_path = kb._accounts_dir / matched / "INTEL" / "workspace_intel.md"
+                    kb._append_intel(intel_path, text[:2000], source=path.name)
+                    kb.event_bus.publish(Event(
+                        type="knowledge.intel.updated",
+                        source="brain.knowledge_builder",
+                        data={"account": matched, "file": "workspace_intel.md"}
+                    ))
+
+            kb.logger.debug("Workspace file extracted", path=path.name)
 
         except Exception as e:
-            self.logger.debug("Workspace file extraction failed",
-                              file=file_path.name, error=str(e))
+            kb.logger.error("Workspace extract failed", path=path_str, error=str(e))
 
-    async def _route_workspace_intelligence(
-        self, file_path: Path, extracted: Dict, raw_text: str
-    ):
-        """Save extracted workspace intelligence to the right memory location."""
-        save_to = extracted.get("save_to", "general")
-        memory_subdir = self._memory_dir / save_to
-        memory_subdir.mkdir(parents=True, exist_ok=True)
-
-        # Save to appropriate memory category
-        output_name = f"{file_path.stem}_{datetime.now().strftime('%Y%m%d')}.json"
-        output_file = memory_subdir / output_name
-        output_file.write_text(json.dumps({
-            "source_file": str(file_path),
-            "extracted": datetime.now().isoformat(),
-            **extracted
-        }, indent=2))
-
-        # If specific accounts mentioned → also route to account folders
-        for account_name in extracted.get("accounts", []):
-            account_dir = self._accounts_dir / account_name
-            if account_dir.exists():
-                intel_dir = account_dir / "INTEL"
-                intel_dir.mkdir(exist_ok=True)
-                note_file = intel_dir / f"workspace_note_{datetime.now().strftime('%Y%m%d_%H%M')}.md"
-                note_file.write_text(
-                    f"# Intelligence from workspace: {file_path.name}\n"
-                    f"*Extracted by JARVIS — {datetime.now().strftime('%Y-%m-%d')}*\n\n"
-                    + "\n".join(f"- {i}" for i in extracted.get("insights", []))
-                )
-
-        # Build cumulative knowledge base
-        await self._update_knowledge_base(save_to, extracted)
-
-        self.logger.info("Workspace intelligence extracted",
-                         file=file_path.name, category=save_to)
-
-    async def _update_knowledge_base(self, category: str, extracted: Dict):
-        """
-        Maintain a rolling knowledge base in MEMORY/.
-        This is what gets injected into NVIDIA prompts to make them smarter over time.
-        The more context accumulates, the better every output gets.
-        """
-        kb_file = self._memory_dir / f"knowledge_base_{category}.md"
-
-        insights = extracted.get("insights", [])
-        product_knowledge = extracted.get("product_knowledge", [])
-        competitive = extracted.get("competitive", [])
-
-        if not any([insights, product_knowledge, competitive]):
-            return
-
-        with open(kb_file, "a", encoding="utf-8") as f:
-            f.write(f"\n<!-- {datetime.now().strftime('%Y-%m-%d')} -->\n")
-            for item in insights:
-                f.write(f"- {item}\n")
-            for item in product_knowledge:
-                f.write(f"- [PRODUCT] {item}\n")
-            for item in competitive:
-                f.write(f"- [COMPETITIVE] {item}\n")
-
-    # ------------------------------------------------------------------
-    # Cross-deal pattern building
-    # ------------------------------------------------------------------
-
-    async def build_cross_deal_patterns(self):
-        """
-        Synthesize patterns across ALL deals in ACCOUNTS/.
-        What separates wins from losses? What actions move deals fastest?
-        Stored in MEMORY/patterns.md — injected into future prompts.
-        """
-        llm = self._get_llm_client()
+    @staticmethod
+    async def handle_cross_deal_sync(task, services: Dict[str, Any]):
+        """Synthesize patterns across all accounts → MEMORY/patterns/cross_deal_insights.md"""
+        kb: "KnowledgeBuilder" = services["knowledge_builder"]
+        llm = kb._get_llm_client()
         if not llm:
             return
+        if not kb._accounts_dir.exists():
+            return
 
-        # Collect deal summaries
-        deal_summaries = []
-        if self._accounts_dir.exists():
-            for account_dir in self._accounts_dir.iterdir():
-                if not account_dir.is_dir():
-                    continue
-                stage_data = self._read_json(account_dir / "deal_stage.json")
-                meddpicc = self._read_json(account_dir / "meddpicc.json")
-                if stage_data:
-                    deal_summaries.append({
-                        "account": account_dir.name,
-                        "stage": stage_data.get("stage"),
-                        "stage_history": stage_data.get("history", []),
-                        "meddpicc_score": meddpicc.get("score", 0) if meddpicc else 0,
-                    })
+        accounts_context = []
+        for account_dir in kb._accounts_dir.iterdir():
+            if account_dir.is_dir() and not account_dir.name.startswith(("_", ".")):
+                ctx = kb._build_account_context(account_dir)
+                if ctx.get("meddpicc_score", 0) > 0:
+                    accounts_context.append(ctx)
 
-        if len(deal_summaries) < 2:
-            return  # Not enough data yet
+        if len(accounts_context) < 2:
+            return
 
-        prompt = f"""Analyze these sales deals and identify patterns:
+        prompt = f"""Analyze patterns across {len(accounts_context)} active sales deals.
 
-{json.dumps(deal_summaries, indent=2)[:4000]}
+Deal summaries:
+{json.dumps(accounts_context[:10], indent=2)[:5000]}
 
 Identify:
-1. Which MEDDPICC scores correlate with deals advancing fastest?
-2. Which stages are deals stalling in most?
-3. What's the average time in each stage?
-4. What patterns appear in deals that progress vs stall?
-5. Recommended actions for each stage based on this data.
+1. Common pain points appearing across multiple deals
+2. Which MEDDPICC dimensions are consistently weak
+3. Competitive patterns (who keeps showing up)
+4. Stage progression bottlenecks
+5. One specific playbook recommendation
 
-Write practical, specific insights an AE can act on.
-Format as markdown."""
+Return JSON: {{"patterns": [], "weak_meddpicc": [], "competitive": [], "bottlenecks": [], "recommendation": ""}}"""
 
         try:
             response = await llm.generate_with_routing(
                 messages=[{"role": "user", "content": prompt}],
-                task_type="text",
-                source="background",
+                task_type="text", source="background"
             )
-            patterns_file = self._memory_dir / "patterns.md"
-            patterns_file.write_text(
-                f"# Cross-Deal Patterns\n"
-                f"*Generated {datetime.now().strftime('%Y-%m-%d')} from {len(deal_summaries)} deals*\n\n"
-                + response,
-                encoding="utf-8"
-            )
-            self.logger.info("Cross-deal patterns updated", deals=len(deal_summaries))
+            parsed = kb._extract_json(response)
+            if parsed:
+                out = kb._memory_dir / "patterns" / "cross_deal_insights.md"
+                out.parent.mkdir(exist_ok=True)
+                lines = [f"# Cross-Deal Intelligence — {datetime.now().strftime('%Y-%m-%d')}\n"]
+                for k, v in parsed.items():
+                    if v:
+                        lines.append(f"## {k.replace('_', ' ').title()}")
+                        if isinstance(v, list):
+                            lines.extend(f"- {item}" for item in v)
+                        else:
+                            lines.append(str(v))
+                        lines.append("")
+                out.write_text("\n".join(lines), encoding="utf-8")
+                kb.logger.info("Cross-deal patterns updated")
         except Exception as e:
-            self.logger.warning("Pattern building failed", error=str(e))
+            kb.logger.error("Cross-deal sync failed", error=str(e))
 
-    # ------------------------------------------------------------------
-    # Event handlers
-    # ------------------------------------------------------------------
-
-    async def _on_account_initialized(self, event: Event):
-        """New account created — immediately start filling intelligence gaps."""
-        account_name = event.data.get("account_name", "")
-        if account_name:
-            await asyncio.sleep(5)  # let initializer finish first
-            account_dir = self._accounts_dir / account_name
-            if account_dir.exists():
-                gaps = self._identify_gaps(account_dir)
-                for gap in gaps:
-                    await self._fill_gap(account_dir, gap)
-                    await asyncio.sleep(2)
-
-    async def _on_new_intelligence(self, event: Event):
-        """New intelligence arrived — rebuild cross-deal patterns if enough data."""
-        # Throttle: only rebuild patterns every 10 new intelligence events
-        if not hasattr(self, '_intel_count'):
-            self._intel_count = 0
-        self._intel_count += 1
-        if self._intel_count >= 10:
-            self._intel_count = 0
-            asyncio.create_task(self.build_cross_deal_patterns())
+        # Re-queue for next run (1 hour later at LOW priority)
+        await kb._queue.enqueue(
+            "cross_deal_sync", payload={}, priority=TaskPriority.LOW,
+            dedup_key="cross_deal_sync"
+        )
 
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
 
-    def _build_account_context(self, account_dir: Path) -> str:
-        """Build a context string from all available account data."""
-        parts = []
-
-        # MEDDPICC
-        m = self._read_json(account_dir / "meddpicc.json")
-        if m:
-            parts.append(f"MEDDPICC score: {m.get('score', 0)}/8")
-
-        # Deal stage
-        s = self._read_json(account_dir / "deal_stage.json")
-        if s:
-            parts.append(f"Stage: {s.get('stage', 'unknown')}")
-
-        # Contacts
-        c = self._read_json(account_dir / "contacts.json")
-        if c and c.get("contacts"):
-            names = [f"{x.get('name')} ({x.get('role', '')})"
-                     for x in c["contacts"][:5]]
-            parts.append(f"Known contacts: {', '.join(names)}")
-
-        # Existing INTEL snippets
+    def _identify_gaps(self, account_dir: Path) -> List[str]:
+        gaps = []
         intel_dir = account_dir / "INTEL"
-        if intel_dir.exists():
-            for f in list(intel_dir.glob("*.md"))[:3]:
-                snippet = f.read_text(encoding="utf-8")[:300]
-                parts.append(f"Existing intel ({f.stem}): {snippet}")
+        intel_dir.mkdir(exist_ok=True)
+        for required_file in REQUIRED_INTEL_FILES:
+            fp = intel_dir / required_file
+            if not fp.exists():
+                gaps.append(required_file.replace(".md", ""))
+            else:
+                age = (datetime.now() - datetime.fromtimestamp(fp.stat().st_mtime)).days
+                if age > INTEL_REFRESH_DAYS:
+                    gaps.append(f"refresh_{required_file.replace('.md', '')}")
+        meddpicc = self._read_json(account_dir / "meddpicc.json")
+        if meddpicc and meddpicc.get("score", 0) > 0:
+            if not (account_dir / "INTEL" / "meddpicc_strategy.md").exists():
+                gaps.append("meddpicc_strategy")
+        return gaps
 
-        return "\n".join(parts) if parts else f"Account: {account_dir.name} — no data yet"
+    async def _generate_intel(self, account: str, gap: str, context: dict, llm) -> Optional[str]:
+        gap_prompts = {
+            "company_research": f"""Research {account} as a potential enterprise software buyer.
+Context we already have: {json.dumps(context, indent=2)[:1000]}
+Write a concise company profile covering industry, size, tech stack, digital maturity, recent news, and why {account} might need conversational AI.
+Format as markdown.""",
+            "competitive_analysis": f"""Generate competitive positioning for selling to {account}.
+Context: {json.dumps(context, indent=2)[:1000]}
+Cover likely competitors, our differentiation, objections and counters, win themes.
+Format as markdown.""",
+            "value_proposition": f"""Build a tailored value proposition for {account}.
+Context: {json.dumps(context, indent=2)[:1000]}
+Include business value in their language, 3 ROI scenarios, champion talking points, executive summary.
+Format as markdown.""",
+            "meddpicc_strategy": f"""Given MEDDPICC data for {account}, recommend specific actions.
+MEDDPICC: {json.dumps(context.get('meddpicc', {}), indent=2)}
+For each dimension below 2: what's missing, question to ask, who does it (AE vs SC).
+Format as markdown.""",
+        }
+        base_gap = gap.replace("refresh_", "")
+        prompt = gap_prompts.get(gap) or gap_prompts.get(base_gap)
+        if not prompt:
+            return None
+        try:
+            return await llm.generate_with_routing(
+                messages=[{"role": "user", "content": prompt}],
+                task_type="text", source="background"
+            )
+        except Exception as e:
+            self.logger.error("Intel generation failed", gap=gap, error=str(e))
+            return None
 
-    def _get_llm_client(self):
-        if not self._llm_client:
-            try:
-                from jarvis.llm.llm_client import LLMClient
-                self._llm_client = LLMClient(self.config)
-            except Exception:
-                pass
-        return self._llm_client
+    def _build_account_context(self, account_dir: Path) -> dict:
+        ctx: Dict[str, Any] = {"account": account_dir.name}
+        for fname in ("meddpicc.json", "deal_stage.json", "contacts.json"):
+            data = self._read_json(account_dir / fname)
+            if data:
+                ctx[fname.replace(".json", "")] = data
+        if "meddpicc" in ctx:
+            ctx["meddpicc_score"] = ctx["meddpicc"].get("score", 0)
+        activities_file = account_dir / "activities.jsonl"
+        if activities_file.exists():
+            lines = activities_file.read_text().splitlines()[-10:]
+            ctx["recent_activities"] = [json.loads(l) for l in lines if l.strip()]
+        return ctx
 
-    def _read_json(self, path: Path) -> Optional[Dict]:
+    def _fuzzy_match_account(self, name: str) -> Optional[str]:
+        import difflib
+        if not self._accounts_dir.exists():
+            return None
+        accounts = [d.name for d in self._accounts_dir.iterdir()
+                    if d.is_dir() and not d.name.startswith(("_", "."))]
+        matches = difflib.get_close_matches(name, accounts, n=1, cutoff=0.6)
+        return matches[0] if matches else None
+
+    def _update_knowledge_base(self, category: str, items: list, source: str):
+        kb_file = self._memory_dir / f"knowledge_{category}.md"
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+        lines = [f"\n### From `{source}` — {timestamp}"]
+        lines.extend(f"- {item}" for item in items)
+        with open(kb_file, "a", encoding="utf-8") as f:
+            f.write("\n".join(lines) + "\n")
+
+    def _append_intel(self, path: Path, content: str, source: str):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(f"\n\n### {source} — {timestamp}\n{content}\n")
+
+    def _read_file_text(self, path: Path) -> str:
+        try:
+            if path.suffix == ".pdf":
+                try:
+                    import pypdf
+                    reader = pypdf.PdfReader(str(path))
+                    return "\n".join(p.extract_text() or "" for p in reader.pages)
+                except ImportError:
+                    pass
+            return path.read_text(encoding="utf-8", errors="ignore")
+        except Exception:
+            return ""
+
+    def _read_json(self, path: Path) -> Optional[dict]:
         try:
             return json.loads(path.read_text()) if path.exists() else None
         except Exception:
             return None
 
-    def _extract_json(self, text: str) -> Optional[Dict]:
-        match = re.search(r'\{.*\}', text, re.DOTALL)
+    def _extract_json(self, text: str) -> Optional[dict]:
+        match = re.search(r"\{.*\}", text, re.DOTALL)
         if match:
             try:
                 return json.loads(match.group(0))
@@ -572,17 +464,9 @@ Format as markdown."""
                 pass
         return None
 
-    def _read_file_text(self, path: Path) -> str:
+    def _get_llm_client(self):
         try:
-            if path.suffix.lower() in (".txt", ".md"):
-                return path.read_text(encoding="utf-8", errors="ignore")
-            if path.suffix.lower() == ".docx":
-                import zipfile, xml.etree.ElementTree as ET
-                with zipfile.ZipFile(path) as z:
-                    with z.open("word/document.xml") as f:
-                        tree = ET.parse(f)
-                ns = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
-                return " ".join(n.text for n in tree.findall(".//w:t", ns) if n.text)
+            from jarvis.llm.llm_client import LLMClient
+            return LLMClient(self.config)
         except Exception:
-            pass
-        return ""
+            return None

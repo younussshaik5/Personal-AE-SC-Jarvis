@@ -3,7 +3,6 @@
 SelfLearner — JARVIS prompt evolution engine.
 
 What this does:
-  - Watches every output JARVIS generates (saved in INTEL/ folders)
   - Tracks which outputs you used, edited heavily, or ignored
   - Uses NVIDIA to analyze the diffs (generated vs what you actually sent/used)
   - Identifies patterns: "emails always get shortened" / "proposals need more ROI numbers"
@@ -13,7 +12,8 @@ What this does:
 This is NOT model training. It's prompt evolution.
 The system's behavior changes based on what actually works for YOU.
 
-Runs: weekly (Sunday night) + triggered by outcome signals
+Runs: event-driven — evolves immediately when feedback accumulates (>=3 signals per skill),
+not on a fixed weekly schedule. The more you rate/edit, the faster it adapts.
 """
 
 import asyncio
@@ -44,8 +44,9 @@ class SelfLearner:
         self.event_bus = event_bus
         self.logger = JARVISLogger("brain.self_learner")
         self._running = False
-        self._weekly_task: Optional[asyncio.Task] = None
         self._llm_client = None
+        # Minimum feedback signals before evolving a skill prompt
+        self._evolve_threshold = 3
 
     async def start(self):
         self._running = True
@@ -53,20 +54,16 @@ class SelfLearner:
         PROMPT_TEMPLATES_DIR.mkdir(parents=True, exist_ok=True)
         (self._jarvis_home / "MEMORY").mkdir(exist_ok=True)
 
-        # Subscribe to outcome signals
-        self.event_bus.subscribe("output.rated", self._on_output_rated)
-        self.event_bus.subscribe("output.edited", self._on_output_edited)
-        self.event_bus.subscribe("deal.won", self._on_deal_outcome)
-        self.event_bus.subscribe("deal.lost", self._on_deal_outcome)
+        # Subscribe to outcome signals — evolve immediately when threshold reached
+        self.event_bus.subscribe("output.rated",   self._on_output_rated)
+        self.event_bus.subscribe("output.edited",  self._on_output_edited)
+        self.event_bus.subscribe("deal.won",       self._on_deal_outcome)
+        self.event_bus.subscribe("deal.lost",      self._on_deal_outcome)
 
-        # Weekly evolution loop
-        self._weekly_task = asyncio.create_task(self._weekly_evolution_loop())
-        self.logger.info("SelfLearner started")
+        self.logger.info("SelfLearner started (event-driven, no weekly schedule)")
 
     async def stop(self):
         self._running = False
-        if self._weekly_task and not self._weekly_task.done():
-            self._weekly_task.cancel()
 
     # ------------------------------------------------------------------
     # Event handlers
@@ -75,10 +72,36 @@ class SelfLearner:
     async def _on_output_rated(self, event: Event):
         """User rated a JARVIS output via jarvis_rate_output MCP tool."""
         self._append_feedback_signal(event.data)
+        await self._maybe_evolve_skill(event.data.get("skill", ""))
 
     async def _on_output_edited(self, event: Event):
         """User significantly edited a JARVIS draft before using it."""
         self._append_feedback_signal(event.data)
+        await self._maybe_evolve_skill(event.data.get("skill", ""))
+
+    async def _maybe_evolve_skill(self, skill: str):
+        """Check if we have enough signals to evolve this skill's prompt now."""
+        if not skill:
+            return
+        signals = [s for s in self._load_all_feedback_signals()
+                   if s.get("skill") == skill]
+        if len(signals) >= self._evolve_threshold:
+            self.logger.info("Evolving skill prompt", skill=skill, signals=len(signals))
+            asyncio.create_task(self._run_single_skill_evolution(skill, signals))
+
+    async def _run_single_skill_evolution(self, skill: str, signals: list):
+        """Evolve one skill's prompt immediately (not waiting for weekly batch)."""
+        llm = self._get_llm_client()
+        if not llm:
+            return
+        result = await self._evolve_skill_prompt(skill, signals, llm)
+        if result:
+            self._write_evolution_log([result])
+            self.event_bus.publish(Event(
+                type="jarvis.evolved",
+                source="brain.self_learner",
+                data={"skills_evolved": [skill]}
+            ))
 
     async def _on_deal_outcome(self, event: Event):
         """Deal closed won/lost — strong signal for what worked."""
@@ -89,26 +112,8 @@ class SelfLearner:
         asyncio.create_task(self._analyze_deal_history(account, outcome))
 
     # ------------------------------------------------------------------
-    # Weekly evolution loop
+    # Batch evolution (can be called manually via MCP tool if desired)
     # ------------------------------------------------------------------
-
-    async def _weekly_evolution_loop(self):
-        """Run evolution analysis every Sunday night."""
-        while self._running:
-            now = datetime.now()
-            # Next Sunday at 23:00
-            days_until_sunday = (6 - now.weekday()) % 7
-            if days_until_sunday == 0 and now.hour >= 23:
-                days_until_sunday = 7
-            next_run = now.replace(hour=23, minute=0, second=0, microsecond=0) + \
-                       timedelta(days=days_until_sunday)
-            wait_seconds = (next_run - now).total_seconds()
-
-            self.logger.info("Next evolution run scheduled", next_run=str(next_run))
-            await asyncio.sleep(min(wait_seconds, 3600))  # check every hour
-
-            if datetime.now() >= next_run:
-                await self.run_evolution_cycle()
 
     async def run_evolution_cycle(self):
         """

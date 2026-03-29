@@ -44,7 +44,7 @@ class PlaybookAutomationEngine:
         """Start the automation engine and subscribe to events."""
         self._running = True
         self._subscribe_to_events()
-        # Start periodic stale deal checker (every 6 hours)
+        # Start periodic stale deal checker (every 5 minutes — real-time alerting)
         self._stale_check_task = asyncio.create_task(self._stale_check_loop())
         self.logger.info("Playbook automation engine started")
 
@@ -381,10 +381,10 @@ class PlaybookAutomationEngine:
         self.logger.info("Subscribed to playbook trigger events")
 
     async def _stale_check_loop(self):
-        """Periodically check for stale deals."""
+        """Periodically check for stale deals — every 5 minutes."""
         while self._running:
             try:
-                await asyncio.sleep(6 * 3600)  # Every 6 hours
+                await asyncio.sleep(5 * 60)  # Every 5 minutes
                 await self.check_stale_deals()
             except asyncio.CancelledError:
                 break
