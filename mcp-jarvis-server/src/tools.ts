@@ -568,6 +568,50 @@ const TOOLS = [
       required: ["account"],
     },
   },
+  // ── Architecture Diagram ────────────────────────────────────────────────
+  {
+    name: "jarvis_get_architecture_diagram",
+    description:
+      "Get the Mermaid.js solution architecture diagram for an account. " +
+      "Returns the raw Mermaid source + path to the standalone HTML file. " +
+      "Use this to share architecture with the customer or include in a presentation.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        account: { type: "string" as const, description: "Account folder name" },
+      },
+      required: ["account"],
+    },
+  },
+  // ── Proposal ───────────────────────────────────────────────────────────
+  {
+    name: "jarvis_get_proposal",
+    description:
+      "Get the current proposal for an account. Returns the proposal HTML path and " +
+      "structured proposal_data.json. Open the HTML in a browser to edit pricing, " +
+      "discounts, and send to the customer. Use claude-haiku or claude-sonnet only for any doc generation.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        account: { type: "string" as const, description: "Account folder name" },
+      },
+      required: ["account"],
+    },
+  },
+  // ── SOW ────────────────────────────────────────────────────────────────
+  {
+    name: "jarvis_get_sow",
+    description:
+      "Get the Scope of Work document for an account. Returns the full SOW markdown with " +
+      "all sections: objectives, deliverables, timeline, roles, success metrics, commercial terms.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        account: { type: "string" as const, description: "Account folder name" },
+      },
+      required: ["account"],
+    },
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -1632,6 +1676,50 @@ export function registerTools(server: Server, dataDir: string) {
         }
         return { content: [{ type: "text" as const,
           text: `${roi}\n\n---\n\n${tco || ""}\n\n---\n\n## Structured Value Data (for Excel/PPT — use Haiku or Sonnet to generate)\n\`\`\`json\n${valueData || "{}"}\n\`\`\`` }] };
+      }
+
+      // ---------------------------------------------------------------
+      case "jarvis_get_architecture_diagram": {
+        const { account } = args as { account: string };
+        const archDir = path.join(accountsDir, account, "ARCHITECTURE");
+        const mdFile = readFileOrNull(path.join(archDir, "architecture_diagram.md"));
+        const htmlPath = path.join(archDir, "architecture_diagram.html");
+        const htmlExists = fs.existsSync(htmlPath);
+        if (!mdFile) {
+          return { content: [{ type: "text" as const,
+            text: `No architecture diagram found for "${account}" yet. JARVIS generates this from discovery + intel data — it should be ready after the first discovery call.` }] };
+        }
+        return { content: [{ type: "text" as const,
+          text: `# Architecture Diagram — ${account}\n\n${mdFile}\n\n---\n\n**Interactive HTML:** ${htmlExists ? htmlPath : "Not yet generated"}\n\nOpen the HTML file in a browser to view the full interactive diagram with download.` }] };
+      }
+
+      // ---------------------------------------------------------------
+      case "jarvis_get_proposal": {
+        const { account } = args as { account: string };
+        const propDir = path.join(accountsDir, account, "PROPOSAL");
+        const jsonData = readFileOrNull(path.join(propDir, "proposal_data.json"));
+        const htmlPath = path.join(propDir, "proposal.html");
+        const htmlExists = fs.existsSync(htmlPath);
+        if (!jsonData && !htmlExists) {
+          return { content: [{ type: "text" as const,
+            text: `No proposal found for "${account}" yet. JARVIS auto-generates this after value architecture is ready — or ask "generate proposal for ${account}" to trigger it now.` }] };
+        }
+        const data = jsonData ? JSON.parse(jsonData) : {};
+        return { content: [{ type: "text" as const,
+          text: `# Proposal — ${account}\n\n**Status:** ${data.status || "Draft"}\n**Generated:** ${data.generated_at || "Unknown"}\n\n**Executive Summary:**\n${data.executive_summary || "(not yet filled)"}\n\n**Proposed Solution:** ${data.proposed_solution || "(not yet filled)"}\n\n**Open to edit pricing and send:** ${htmlExists ? htmlPath : "HTML not yet generated"}\n\n---\n\n## Structured Data (use claude-haiku or claude-sonnet to create PPT/Excel)\n\`\`\`json\n${jsonData || "{}"}\n\`\`\`` }] };
+      }
+
+      // ---------------------------------------------------------------
+      case "jarvis_get_sow": {
+        const { account } = args as { account: string };
+        const sowDir = path.join(accountsDir, account, "SOW");
+        const sow = readFileOrNull(path.join(sowDir, "sow.md"));
+        if (!sow) {
+          return { content: [{ type: "text" as const,
+            text: `No SOW found for "${account}" yet. JARVIS generates this from the proposal + discovery data — ask "generate SOW for ${account}" to trigger it now.` }] };
+        }
+        return { content: [{ type: "text" as const,
+          text: sow }] };
       }
 
       // ---------------------------------------------------------------

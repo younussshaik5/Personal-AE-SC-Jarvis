@@ -47,6 +47,9 @@ from jarvis.brain.self_learner import SelfLearner
 from jarvis.brain.knowledge_builder import KnowledgeBuilder
 from jarvis.observers.account_watcher import AccountWatcher
 from jarvis.skills.html_generator_skill import HTMLGeneratorSkill
+from jarvis.skills.architecture_diagram_skill import ArchitectureDiagramSkill
+from jarvis.skills.proposal_skill import ProposalSkill
+from jarvis.skills.sow_skill import SOWSkill
 from jarvis.queue.task_queue import TaskQueue
 from jarvis.queue.worker_pool import WorkerPool
 
@@ -103,6 +106,9 @@ class Orchestrator:
         'self_learner': SelfLearner,
         'knowledge_builder': KnowledgeBuilder,
         'html_generator': HTMLGeneratorSkill,
+        'architecture_diagram': ArchitectureDiagramSkill,
+        'proposal': ProposalSkill,
+        'sow': SOWSkill,
     }
 
     def __init__(self, config):
@@ -147,6 +153,7 @@ class Orchestrator:
             'meeting_processor', 'playbook_engine', 'claude_sync',
             'conversation_extractor', 'document_processor',
             'self_learner', 'knowledge_builder', 'html_generator',
+            'architecture_diagram', 'proposal', 'sow',
             'scanner', 'archiver', 'websocket_server'
         ]
 
@@ -202,6 +209,15 @@ class Orchestrator:
             pool.register("fill_rfp",                kb.handle_fill_rfp)
         if hg:
             pool.register("html_refresh",            hg.handle_html_refresh)
+        arch = self.components.get("architecture_diagram")
+        if arch:
+            pool.register("generate_diagram",        arch.handle_generate_diagram)
+        prop = self.components.get("proposal")
+        if prop:
+            pool.register("generate_proposal",       prop.handle_generate_proposal)
+        sow = self.components.get("sow")
+        if sow:
+            pool.register("generate_sow",            sow.handle_generate_sow)
 
         await pool.start()
         self.components["worker_pool"] = pool

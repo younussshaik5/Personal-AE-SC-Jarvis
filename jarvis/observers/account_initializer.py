@@ -261,6 +261,32 @@ class AccountAutoInitializer:
                         "tco": {}
                     }, indent=2),
                 },
+                "ARCHITECTURE": {
+                    "README.md": (
+                        f"# Solution Architecture — {account_name}\n\n"
+                        "JARVIS auto-generates a Mermaid.js architecture diagram here.\n\n"
+                        "- `architecture_diagram.md` — raw Mermaid source\n"
+                        "- `architecture_diagram.html` — standalone visual (open in browser)\n\n"
+                        "Regenerates after: discovery updates, new intel, MEDDPICC changes.\n"
+                    ),
+                },
+                "PROPOSAL": {
+                    "README.md": (
+                        f"# Proposal — {account_name}\n\n"
+                        "JARVIS auto-generates a dynamic HTML proposal here.\n\n"
+                        "- `proposal_data.json` — structured data (auto-filled by JARVIS)\n"
+                        "- `proposal.html` — open in browser to edit fields, pricing, discounts\n\n"
+                        "Regenerates after: value architecture updates, discovery, stage changes.\n"
+                    ),
+                },
+                "SOW": {
+                    "README.md": (
+                        f"# Scope of Work — {account_name}\n\n"
+                        "JARVIS auto-generates a detailed Scope of Work document here.\n\n"
+                        "- `sow.md` — full SOW with all 10 sections\n\n"
+                        "Regenerates after: proposal updates, discovery, value architecture changes.\n"
+                    ),
+                },
             }
 
             presales_created = []

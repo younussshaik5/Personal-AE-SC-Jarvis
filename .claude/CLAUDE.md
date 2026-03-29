@@ -134,6 +134,23 @@ Files are account-isolated — a change for Tata Sky never touches Acme Corp.
 2. If user wants Excel/PPT → create from value_data.json using **claude-haiku-4-5 or claude-sonnet-4-6 ONLY — never Opus**
 3. Always present 3 scenarios: conservative, realistic, optimistic
 
+### When user asks for architecture / solution diagram / Mermaid:
+1. Call `jarvis_get_architecture_diagram` → returns Mermaid source + HTML path
+2. Present the Mermaid diagram inline (Claude renders Mermaid in markdown)
+3. Tell user the HTML file path — they can open it in browser for full interactive view + SVG download
+4. JARVIS auto-regenerates after every discovery/intel/MEDDPICC update
+
+### When user asks for proposal / commercial proposal / pricing:
+1. Call `jarvis_get_proposal` → returns proposal_data.json + HTML file path
+2. Tell user to open the HTML in browser — all fields are editable, pricing/discounts calculate live
+3. Auto-saves to localStorage; print/PDF from browser
+4. Use **claude-haiku-4-5 or claude-sonnet-4-6 ONLY** if generating PPT/Excel from proposal data
+
+### When user asks for SOW / scope of work / statement of work:
+1. Call `jarvis_get_sow` → returns full SOW markdown
+2. Present inline with all sections
+3. If user wants to update → tell them JARVIS regenerates after proposal or discovery updates
+
 ### Account isolation rule:
 When any discussion, meeting note, or file update is for a specific account → ONLY update that account's files. Identify the account first with `jarvis_find_account` if unsure.
 
@@ -173,3 +190,6 @@ When creating spreadsheets or presentations from JARVIS data:
 | **`jarvis_update_risk_report`** | **Append weekly update entry** |
 | **`jarvis_get_next_steps`** | **Stage-appropriate email drafts** |
 | **`jarvis_get_value_architecture`** | **ROI model + TCO + value JSON** |
+| **`jarvis_get_architecture_diagram`** | **Mermaid.js solution architecture diagram** |
+| **`jarvis_get_proposal`** | **HTML proposal with pricing, BoM, discounts** |
+| **`jarvis_get_sow`** | **Scope of Work document (10 sections)** |

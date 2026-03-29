@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{ACCOUNT_NAME}} — Proposal</title>
+<style>
+  /* ── Reset ─────────────────────────────────────────── */
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+       background:#f8fafc;color:#0f172a;font-size:14px}
+
+  /* ── Print ──────────────────────────────────────────── */
+  @media print{
+    .no-print{display:none!important}
+    .page-break{page-break-before:always}
+    body{background:white}
+    .container{max-width:100%;padding:0}
+  }
+
+  /* ── Layout ─────────────────────────────────────────── */
+  .container{max-width:960px;margin:0 auto;padding:0 24px 60px}
+
+  /* ── Cover ──────────────────────────────────────────── */
+  .cover{background:linear-gradient(135deg,#1e1b4b 0%,#312e81 50%,#4c1d95 100%);
+         color:white;padding:60px 56px 50px;border-radius:0 0 16px 16px;
+         margin-bottom:32px;position:relative;overflow:hidden}
+  .cover::before{content:'';position:absolute;top:-60px;right:-60px;width:300px;height:300px;
+                 border-radius:50%;background:rgba(255,255,255,.04)}
+  .cover .label{font-size:11px;text-transform:uppercase;letter-spacing:.12em;
+                color:rgba(255,255,255,.5);margin-bottom:8px}
+  .cover h1{font-size:36px;font-weight:800;line-height:1.15;margin-bottom:6px}
+  .cover .subtitle{font-size:15px;color:rgba(255,255,255,.7);margin-bottom:32px}
+  .cover .meta-row{display:flex;gap:40px;flex-wrap:wrap}
+  .cover .meta-item .key{font-size:11px;color:rgba(255,255,255,.45);margin-bottom:2px}
+  .cover .meta-item .val{font-size:13px;font-weight:600}
+  .cover .badge{display:inline-block;padding:4px 14px;border-radius:999px;
+                background:rgba(255,255,255,.12);font-size:12px;font-weight:600;
+                margin-top:20px;border:1px solid rgba(255,255,255,.18)}
+
+  /* ── Toolbar ─────────────────────────────────────────── */
+  .toolbar{position:sticky;top:0;z-index:50;background:white;
+           border-bottom:1px solid #e2e8f0;padding:10px 0;margin-bottom:24px;
+           display:flex;align-items:center;gap:10px}
+  .toolbar .spacer{flex:1}
+  .btn{padding:7px 18px;border-radius:8px;font-size:12px;font-weight:600;
+       cursor:pointer;border:none;transition:opacity .15s}
+  .btn:hover{opacity:.85}
+  .btn-primary{background:#4f46e5;color:white}
+  .btn-secondary{background:#f1f5f9;color:#334155;border:1px solid #e2e8f0}
+  .btn-danger{background:#fef2f2;color:#dc2626;border:1px solid #fecaca}
+
+  /* ── Section cards ───────────────────────────────────── */
+  .section{background:white;border-radius:12px;padding:24px 28px;
+           box-shadow:0 1px 4px rgba(0,0,0,.07);margin-bottom:20px}
+  .section-hdr{display:flex;align-items:center;justify-content:space-between;
+               margin-bottom:16px}
+  .section h2{font-size:13px;font-weight:700;color:#6d28d9;text-transform:uppercase;
+              letter-spacing:.09em;display:flex;align-items:center;gap:8px}
+  .section h2 .icon{width:22px;height:22px;background:#ede9fe;border-radius:6px;
+                    display:flex;align-items:center;justify-content:center;font-size:12px}
+
+  /* ── Field components ────────────────────────────────── */
+  .field-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:14px}
+  .field-row.full{grid-template-columns:1fr}
+  .field-row.thirds{grid-template-columns:1fr 1fr 1fr}
+  .field-label{font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;
+               letter-spacing:.07em;margin-bottom:4px}
+  .field-input{width:100%;padding:9px 12px;border:1px solid #e2e8f0;border-radius:8px;
+               font-size:13px;color:#0f172a;background:#fafafa;transition:border-color .15s;
+               font-family:inherit}
+  .field-input:focus{outline:none;border-color:#6d28d9;background:white;
+                     box-shadow:0 0 0 3px rgba(109,40,217,.08)}
+  textarea.field-input{resize:vertical;min-height:80px;line-height:1.5}
+
+  /* ── Line items table ────────────────────────────────── */
+  .line-items-table{width:100%;border-collapse:collapse;font-size:13px}
+  .line-items-table th{background:#f8fafc;font-size:11px;font-weight:700;
+                        color:#64748b;text-transform:uppercase;letter-spacing:.07em;
+                        padding:9px 12px;text-align:left;border-bottom:2px solid #e2e8f0}
+  .line-items-table td{padding:9px 12px;border-bottom:1px solid #f1f5f9;vertical-align:middle}
+  .line-items-table tr:last-child td{border-bottom:none}
+  .line-items-table input[type=text],.line-items-table input[type=number]{
+    width:100%;padding:5px 8px;border:1px solid #e2e8f0;border-radius:6px;
+    font-size:12px;background:transparent;font-family:inherit}
+  .line-items-table input:focus{outline:none;border-color:#6d28d9;
+                                 box-shadow:0 0 0 2px rgba(109,40,217,.08)}
+  .line-items-table .num{text-align:right}
+  .line-items-table .del-btn{background:none;border:none;cursor:pointer;
+                               color:#94a3b8;font-size:16px;padding:0 4px}
+  .line-items-table .del-btn:hover{color:#dc2626}
+  .add-row-btn{margin-top:10px;background:#f5f3ff;border:1px dashed #c4b5fd;
+               color:#6d28d9;padding:7px 14px;border-radius:8px;
+               font-size:12px;font-weight:600;cursor:pointer;width:100%}
+  .add-row-btn:hover{background:#ede9fe}
+
+  /* ── Totals ──────────────────────────────────────────── */
+  .totals{margin-top:16px;display:flex;justify-content:flex-end}
+  .totals-box{min-width:280px}
+  .total-row{display:flex;justify-content:space-between;padding:6px 0;
+             font-size:13px;border-bottom:1px solid #f1f5f9}
+  .total-row.grand{font-size:16px;font-weight:800;color:#4f46e5;
+                   border-top:2px solid #4f46e5;border-bottom:none;padding-top:10px;margin-top:4px}
+  .total-row .label{color:#64748b}
+  .total-row .amount{font-weight:600}
+
+  /* ── Terms & validity ────────────────────────────────── */
+  select.field-input{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%2394a3b8' d='M6 8L0 0h12z'/%3E%3C/svg%3E");
+                     background-repeat:no-repeat;background-position:right 10px center;
+                     padding-right:28px}
+
+  /* ── Status badge ────────────────────────────────────── */
+  .status-select{padding:4px 12px;border-radius:999px;font-size:12px;font-weight:600;
+                 border:none;cursor:pointer;background:#dbeafe;color:#1d4ed8}
+
+  /* ── Footer ──────────────────────────────────────────── */
+  .footer-note{font-size:11px;color:#94a3b8;text-align:center;margin-top:32px;
+               padding-top:16px;border-top:1px solid #f1f5f9}
+
+  /* ── Saved indicator ─────────────────────────────────── */
+  #save-indicator{font-size:12px;color:#22c55e;opacity:0;transition:opacity .3s}
+  #save-indicator.show{opacity:1}
+</style>
+</head>
+<body>
+
+<!-- ── Cover ─────────────────────────────────────────── -->
+<div class="cover">
+  <div class="label">Commercial Proposal</div>
+  <h1 id="cover-account">{{ACCOUNT_NAME}}</h1>
+  <div class="subtitle" id="cover-subtitle">{{PROPOSED_SOLUTION}}</div>
+  <div class="meta-row">
+    <div class="meta-item">
+      <div class="key">Prepared by</div>
+      <div class="val" id="cover-rep">{{REP_NAME}}</div>
+    </div>
+    <div class="meta-item">
+      <div class="key">Date</div>
+      <div class="val" id="cover-date">{{GENERATED_DATE}}</div>
+    </div>
+    <div class="meta-item">
+      <div class="key">Valid until</div>
+      <div class="val" id="cover-validity">{{VALIDITY_DATE}}</div>
+    </div>
+    <div class="meta-item">
+      <div class="key">Version</div>
+      <div class="val" id="cover-version">v1.0</div>
+    </div>
+  </div>
+  <div class="badge" id="cover-stage">{{DEAL_STAGE}}</div>
+</div>
+
+<div class="container">
+
+<!-- ── Toolbar ───────────────────────────────────────── -->
+<div class="toolbar no-print">
+  <span style="font-size:12px;color:#64748b">Last saved: <span id="last-saved">never</span></span>
+  <span id="save-indicator">✓ Saved</span>
+  <div class="spacer"></div>
+  <select class="status-select" id="status-select" onchange="updateStatus()">
+    <option value="draft">Draft</option>
+    <option value="review">In Review</option>
+    <option value="sent">Sent to Customer</option>
+    <option value="accepted">Accepted</option>
+    <option value="negotiating">Negotiating</option>
+    <option value="lost">Lost</option>
+  </select>
+  <button class="btn btn-secondary" onclick="window.print()">Print / PDF</button>
+  <button class="btn btn-primary" onclick="saveAll()">Save Changes</button>
+</div>
+
+<!-- ── Executive Summary ──────────────────────────────── -->
+<div class="section">
+  <div class="section-hdr">
+    <h2><span class="icon">📋</span> Executive Summary</h2>
+  </div>
+  <div class="field-row full">
+    <div>
+      <div class="field-label">Summary</div>
+      <textarea class="field-input" id="executive_summary" rows="4">{{EXECUTIVE_SUMMARY}}</textarea>
+    </div>
+  </div>
+  <div class="field-row">
+    <div>
+      <div class="field-label">Primary Contact</div>
+      <input class="field-input" id="primary_contact" type="text" value="{{PRIMARY_CONTACT}}">
+    </div>
+    <div>
+      <div class="field-label">Economic Buyer</div>
+      <input class="field-input" id="economic_buyer" type="text" value="{{ECONOMIC_BUYER}}">
+    </div>
+  </div>
+</div>
+
+<!-- ── Pain Points & Solution ─────────────────────────── -->
+<div class="section">
+  <div class="section-hdr">
+    <h2><span class="icon">🎯</span> Problem & Solution</h2>
+  </div>
+  <div class="field-row">
+    <div>
+      <div class="field-label">Key Pain Points</div>
+      <textarea class="field-input" id="pain_points" rows="5">{{PAIN_POINTS}}</textarea>
+    </div>
+    <div>
+      <div class="field-label">Proposed Solution</div>
+      <textarea class="field-input" id="proposed_solution" rows="5">{{PROPOSED_SOLUTION}}</textarea>
+    </div>
+  </div>
+  <div class="field-row full">
+    <div>
+      <div class="field-label">Key Benefits</div>
+      <textarea class="field-input" id="key_benefits" rows="3">{{KEY_BENEFITS}}</textarea>
+    </div>
+  </div>
+</div>
+
+<!-- ── Implementation Timeline ────────────────────────── -->
+<div class="section">
+  <div class="section-hdr">
+    <h2><span class="icon">📅</span> Implementation Timeline</h2>
+  </div>
+  <div class="field-row full">
+    <div>
+      <div class="field-label">Timeline Overview</div>
+      <textarea class="field-input" id="implementation_timeline" rows="4">{{IMPLEMENTATION_TIMELINE}}</textarea>
+    </div>
+  </div>
+  <div class="field-row thirds">
+    <div>
+      <div class="field-label">Start Date</div>
+      <input class="field-input" id="start_date" type="date" value="">
+    </div>
+    <div>
+      <div class="field-label">Go-Live Target</div>
+      <input class="field-input" id="golive_date" type="date" value="">
+    </div>
+    <div>
+      <div class="field-label">Contract Start</div>
+      <input class="field-input" id="contract_start" type="date" value="">
+    </div>
+  </div>
+</div>
+
+<!-- ── Bill of Materials / Pricing ───────────────────── -->
+<div class="section">
+  <div class="section-hdr">
+    <h2><span class="icon">💰</span> Bill of Materials &amp; Pricing</h2>
+    <div style="display:flex;gap:10px;align-items:center">
+      <span style="font-size:11px;color:#64748b">Currency:</span>
+      <select class="field-input" id="currency" style="width:80px;padding:5px 8px"
+              onchange="recalculate()">
+        <option>USD</option><option>EUR</option><option>GBP</option>
+        <option>INR</option><option>SGD</option><option>AED</option>
+      </select>
+    </div>
+  </div>
+
+  <table class="line-items-table" id="line-items-table">
+    <thead>
+      <tr>
+        <th style="width:30%">Item / Module</th>
+        <th style="width:25%">Description</th>
+        <th style="width:10%" class="num">Qty</th>
+        <th style="width:12%" class="num">Unit Price</th>
+        <th style="width:10%" class="num">Discount %</th>
+        <th style="width:10%" class="num">Net Amount</th>
+        <th style="width:3%"></th>
+      </tr>
+    </thead>
+    <tbody id="line-items-body">
+      <!-- Rows injected by JS -->
+    </tbody>
+  </table>
+
+  <button class="add-row-btn no-print" onclick="addLineItem()">+ Add Line Item</button>
+
+  <div class="totals">
+    <div class="totals-box">
+      <div class="total-row">
+        <span class="label">Subtotal</span>
+        <span class="amount" id="subtotal">0.00</span>
+      </div>
+      <div class="total-row">
+        <span class="label">Total Discount</span>
+        <span class="amount" id="total-discount" style="color:#22c55e">−0.00</span>
+      </div>
+      <div class="total-row">
+        <span class="label">Tax</span>
+        <span style="display:flex;align-items:center;gap:6px">
+          <input type="number" id="tax-rate" value="0" min="0" max="100" step="0.5"
+                 style="width:52px;padding:3px 6px;border:1px solid #e2e8f0;border-radius:6px;font-size:12px"
+                 onchange="recalculate()">
+          <span style="font-size:12px;color:#64748b">%</span>
+          <span class="amount" id="tax-amount">0.00</span>
+        </span>
+      </div>
+      <div class="total-row grand">
+        <span class="label">Total</span>
+        <span class="amount" id="grand-total">0.00</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Commercial Terms ───────────────────────────────── -->
+<div class="section">
+  <div class="section-hdr">
+    <h2><span class="icon">📝</span> Commercial Terms</h2>
+  </div>
+  <div class="field-row thirds">
+    <div>
+      <div class="field-label">Payment Terms</div>
+      <select class="field-input" id="payment_terms">
+        <option>Net 30</option>
+        <option>Net 45</option>
+        <option>Net 60</option>
+        <option>50% Upfront / 50% on Go-Live</option>
+        <option>Annual Upfront</option>
+        <option>Quarterly</option>
+        <option>Monthly</option>
+      </select>
+    </div>
+    <div>
+      <div class="field-label">Contract Duration</div>
+      <select class="field-input" id="contract_duration">
+        <option>12 Months</option>
+        <option>24 Months</option>
+        <option>36 Months</option>
+        <option>Perpetual</option>
+        <option>POC / Pilot (3 months)</option>
+      </select>
+    </div>
+    <div>
+      <div class="field-label">Proposal Valid For</div>
+      <select class="field-input" id="validity_days" onchange="updateValidity()">
+        <option value="30">30 Days</option>
+        <option value="45">45 Days</option>
+        <option value="60">60 Days</option>
+        <option value="90">90 Days</option>
+      </select>
+    </div>
+  </div>
+  <div class="field-row full" style="margin-top:8px">
+    <div>
+      <div class="field-label">Additional Terms / Notes</div>
+      <textarea class="field-input" id="additional_terms" rows="3">{{ADDITIONAL_TERMS}}</textarea>
+    </div>
+  </div>
+</div>
+
+<!-- ── Next Steps ─────────────────────────────────────── -->
+<div class="section">
+  <div class="section-hdr">
+    <h2><span class="icon">→</span> Next Steps</h2>
+  </div>
+  <div class="field-row full">
+    <div>
+      <div class="field-label">Agreed Next Steps</div>
+      <textarea class="field-input" id="next_steps" rows="3">{{NEXT_STEPS}}</textarea>
+    </div>
+  </div>
+  <div class="field-row">
+    <div>
+      <div class="field-label">Decision Date</div>
+      <input class="field-input" id="decision_date" type="date" value="">
+    </div>
+    <div>
+      <div class="field-label">Follow-up Date</div>
+      <input class="field-input" id="followup_date" type="date" value="">
+    </div>
+  </div>
+</div>
+
+<div class="footer-note">
+  This proposal is confidential and prepared exclusively for {{ACCOUNT_NAME}}.
+  Valid for <span id="footer-validity">30</span> days from the date of issue.
+  Generated by JARVIS · {{GENERATED_DATE}}
+</div>
+
+</div><!-- /container -->
+
+<script>
+// ── Initial line items data from JARVIS ──────────────────
+const INITIAL_LINE_ITEMS = {{LINE_ITEMS_JSON}};
+const CURRENCY_SYMBOLS = {USD:'$',EUR:'€',GBP:'£',INR:'₹',SGD:'S$',AED:'AED '};
+
+// ── Boot ────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  loadFromStorage();
+  if (document.getElementById('line-items-body').children.length === 0) {
+    const items = INITIAL_LINE_ITEMS.length ? INITIAL_LINE_ITEMS : [{
+      name:'', description:'', quantity:1, unit_price:0, discount_pct:0
+    }];
+    items.forEach(addLineItem);
+  }
+  recalculate();
+  updateValidity();
+});
+
+// ── Line item management ────────────────────────────────
+let rowId = 0;
+function addLineItem(data) {
+  data = data || {name:'', description:'', quantity:1, unit_price:0, discount_pct:0};
+  const id = rowId++;
+  const tbody = document.getElementById('line-items-body');
+  const tr = document.createElement('tr');
+  tr.id = 'row-' + id;
+  tr.innerHTML = `
+    <td><input type="text" class="item-name" value="${esc(data.name)}" placeholder="Module / Feature" oninput="recalculate()"></td>
+    <td><input type="text" class="item-desc" value="${esc(data.description)}" placeholder="Brief description" oninput="recalculate()"></td>
+    <td class="num"><input type="number" class="item-qty" value="${data.quantity||1}" min="0" step="1" style="width:60px" oninput="recalculate()"></td>
+    <td class="num"><input type="number" class="item-price" value="${data.unit_price||0}" min="0" step="100" style="width:90px" oninput="recalculate()"></td>
+    <td class="num"><input type="number" class="item-disc" value="${data.discount_pct||0}" min="0" max="100" step="1" style="width:60px" oninput="recalculate()"></td>
+    <td class="num item-net" style="font-weight:600">0.00</td>
+    <td><button class="del-btn no-print" onclick="removeRow('row-${id}')">×</button></td>
+  `;
+  tbody.appendChild(tr);
+  recalculate();
+}
+
+function removeRow(id) {
+  const row = document.getElementById(id);
+  if (row) { row.remove(); recalculate(); }
+}
+
+function esc(s) { return (s||'').replace(/"/g,'&quot;'); }
+
+// ── Recalculate totals ──────────────────────────────────
+function recalculate() {
+  const currency = document.getElementById('currency').value;
+  const sym = CURRENCY_SYMBOLS[currency] || currency + ' ';
+  let subtotal = 0, totalDiscount = 0;
+
+  document.querySelectorAll('#line-items-body tr').forEach(tr => {
+    const qty   = parseFloat(tr.querySelector('.item-qty')?.value)   || 0;
+    const price = parseFloat(tr.querySelector('.item-price')?.value) || 0;
+    const disc  = parseFloat(tr.querySelector('.item-disc')?.value)  || 0;
+    const gross = qty * price;
+    const discAmt = gross * (disc / 100);
+    const net = gross - discAmt;
+    subtotal += gross;
+    totalDiscount += discAmt;
+    const netCell = tr.querySelector('.item-net');
+    if (netCell) netCell.textContent = fmt(net);
+  });
+
+  const taxRate = parseFloat(document.getElementById('tax-rate').value) || 0;
+  const taxAmt  = (subtotal - totalDiscount) * (taxRate / 100);
+  const grand   = subtotal - totalDiscount + taxAmt;
+
+  document.getElementById('subtotal').textContent       = sym + fmt(subtotal);
+  document.getElementById('total-discount').textContent = '−' + sym + fmt(totalDiscount);
+  document.getElementById('tax-amount').textContent     = sym + fmt(taxAmt);
+  document.getElementById('grand-total').textContent    = sym + fmt(grand);
+}
+
+function fmt(n) { return n.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}); }
+
+// ── Validity date ───────────────────────────────────────
+function updateValidity() {
+  const days = parseInt(document.getElementById('validity_days').value) || 30;
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  const s = d.toLocaleDateString('en-US', {year:'numeric',month:'long',day:'numeric'});
+  document.getElementById('cover-validity').textContent = s;
+  document.getElementById('footer-validity').textContent = days;
+}
+
+// ── Status badge ────────────────────────────────────────
+function updateStatus() {
+  const s = document.getElementById('status-select').value;
+  const colors = {
+    draft:       '#dbeafe:#1d4ed8',
+    review:      '#fef9c3:#854d0e',
+    sent:        '#e0e7ff:#4338ca',
+    accepted:    '#dcfce7:#15803d',
+    negotiating: '#ffedd5:#c2410c',
+    lost:        '#fee2e2:#dc2626',
+  };
+  const [bg, fg] = (colors[s] || '#f1f5f9:#334155').split(':');
+  const sel = document.getElementById('status-select');
+  sel.style.background = bg;
+  sel.style.color = fg;
+}
+
+// ── Save / load localStorage ────────────────────────────
+function collectData() {
+  const rows = [];
+  document.querySelectorAll('#line-items-body tr').forEach(tr => {
+    rows.push({
+      name:         tr.querySelector('.item-name')?.value  || '',
+      description:  tr.querySelector('.item-desc')?.value  || '',
+      quantity:     parseFloat(tr.querySelector('.item-qty')?.value)   || 1,
+      unit_price:   parseFloat(tr.querySelector('.item-price')?.value) || 0,
+      discount_pct: parseFloat(tr.querySelector('.item-disc')?.value)  || 0,
+    });
+  });
+  return {
+    executive_summary:       document.getElementById('executive_summary')?.value,
+    primary_contact:         document.getElementById('primary_contact')?.value,
+    economic_buyer:          document.getElementById('economic_buyer')?.value,
+    pain_points:             document.getElementById('pain_points')?.value,
+    proposed_solution:       document.getElementById('proposed_solution')?.value,
+    key_benefits:            document.getElementById('key_benefits')?.value,
+    implementation_timeline: document.getElementById('implementation_timeline')?.value,
+    additional_terms:        document.getElementById('additional_terms')?.value,
+    next_steps:              document.getElementById('next_steps')?.value,
+    payment_terms:           document.getElementById('payment_terms')?.value,
+    contract_duration:       document.getElementById('contract_duration')?.value,
+    validity_days:           document.getElementById('validity_days')?.value,
+    currency:                document.getElementById('currency')?.value,
+    tax_rate:                document.getElementById('tax-rate')?.value,
+    status:                  document.getElementById('status-select')?.value,
+    start_date:              document.getElementById('start_date')?.value,
+    golive_date:             document.getElementById('golive_date')?.value,
+    decision_date:           document.getElementById('decision_date')?.value,
+    followup_date:           document.getElementById('followup_date')?.value,
+    line_items: rows,
+  };
+}
+
+function saveAll() {
+  const key = 'jarvis_proposal_{{ACCOUNT_NAME_SAFE}}';
+  localStorage.setItem(key, JSON.stringify(collectData()));
+  const now = new Date().toLocaleTimeString();
+  document.getElementById('last-saved').textContent = now;
+  const ind = document.getElementById('save-indicator');
+  ind.classList.add('show');
+  setTimeout(() => ind.classList.remove('show'), 2000);
+}
+
+function loadFromStorage() {
+  const key = 'jarvis_proposal_{{ACCOUNT_NAME_SAFE}}';
+  const raw = localStorage.getItem(key);
+  if (!raw) return;
+  try {
+    const d = JSON.parse(raw);
+    const set = (id, val) => { const el = document.getElementById(id); if (el && val !== undefined) el.value = val; };
+    set('executive_summary', d.executive_summary);
+    set('primary_contact', d.primary_contact);
+    set('economic_buyer', d.economic_buyer);
+    set('pain_points', d.pain_points);
+    set('proposed_solution', d.proposed_solution);
+    set('key_benefits', d.key_benefits);
+    set('implementation_timeline', d.implementation_timeline);
+    set('additional_terms', d.additional_terms);
+    set('next_steps', d.next_steps);
+    set('payment_terms', d.payment_terms);
+    set('contract_duration', d.contract_duration);
+    set('validity_days', d.validity_days);
+    set('currency', d.currency);
+    set('tax-rate', d.tax_rate);
+    set('status-select', d.status);
+    set('start_date', d.start_date);
+    set('golive_date', d.golive_date);
+    set('decision_date', d.decision_date);
+    set('followup_date', d.followup_date);
+    if (d.line_items && d.line_items.length) {
+      document.getElementById('line-items-body').innerHTML = '';
+      d.line_items.forEach(addLineItem);
+    }
+    updateStatus();
+  } catch(e) { console.warn('Could not restore saved data', e); }
+}
+
+// Auto-save every 60 seconds
+setInterval(saveAll, 60000);
+</script>
+</body>
+</html>

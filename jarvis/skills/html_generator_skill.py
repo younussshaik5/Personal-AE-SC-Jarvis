@@ -50,8 +50,11 @@ class HTMLGeneratorSkill:
         self.event_bus.subscribe("battlecard.updated",       self._on_account_change)
         self.event_bus.subscribe("risk.report.updated",      self._on_account_change)
         self.event_bus.subscribe("demo.strategy.updated",    self._on_account_change)
-        self.event_bus.subscribe("next_steps.updated",       self._on_account_change)
-        self.event_bus.subscribe("value_architecture.updated", self._on_account_change)
+        self.event_bus.subscribe("next_steps.updated",           self._on_account_change)
+        self.event_bus.subscribe("value_architecture.updated",   self._on_account_change)
+        self.event_bus.subscribe("architecture.diagram.updated", self._on_account_change)
+        self.event_bus.subscribe("proposal.updated",             self._on_account_change)
+        self.event_bus.subscribe("sow.updated",                  self._on_account_change)
 
         self.logger.info("HTMLGeneratorSkill started")
 
