@@ -16,6 +16,6 @@
   },
   "logging": {
     "level": "info",
-    "file": "/private/tmp/test-jarvis/logs/observer.log"
+    "file": "/Users/syounus/JARVIS/logs/observer.log"
   }
 }
