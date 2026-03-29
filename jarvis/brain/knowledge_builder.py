@@ -202,9 +202,13 @@ class KnowledgeBuilder:
 
         context = kb._build_account_context(account_dir)
 
+        # Use long_context model when there's a lot of account data to analyse
+        context_json = json.dumps(context)
+        gap_task_type = "long_context" if len(context_json) > 10000 else "text"
+
         for gap in gaps:
             try:
-                content = await kb._generate_intel(account, gap, context, llm)
+                content = await kb._generate_intel(account, gap, context, llm, gap_task_type)
                 if content:
                     fname = gap.replace("refresh_", "") + ".md"
                     (intel_dir / fname).write_text(content, encoding="utf-8")
@@ -319,7 +323,7 @@ Return JSON: {{"patterns": [], "weak_meddpicc": [], "competitive": [], "bottlene
         try:
             response = await llm.generate_with_routing(
                 messages=[{"role": "user", "content": prompt}],
-                task_type="text", source="background"
+                task_type="reasoning", source="background"
             )
             parsed = kb._extract_json(response)
             if parsed:
@@ -367,7 +371,7 @@ Return JSON: {{"patterns": [], "weak_meddpicc": [], "competitive": [], "bottlene
                 gaps.append("meddpicc_strategy")
         return gaps
 
-    async def _generate_intel(self, account: str, gap: str, context: dict, llm) -> Optional[str]:
+    async def _generate_intel(self, account: str, gap: str, context: dict, llm, task_type: str = "text") -> Optional[str]:
         gap_prompts = {
             "company_research": f"""Research {account} as a potential enterprise software buyer.
 Context we already have: {json.dumps(context, indent=2)[:1000]}
@@ -383,7 +387,7 @@ Include business value in their language, 3 ROI scenarios, champion talking poin
 Format as markdown.""",
             "meddpicc_strategy": f"""Given MEDDPICC data for {account}, recommend specific actions.
 MEDDPICC: {json.dumps(context.get('meddpicc', {}), indent=2)}
-For each dimension below 2: what's missing, question to ask, who does it (AE vs SC).
+For each dimension below 2: what's missing, question to ask, who does it.
 Format as markdown.""",
         }
         base_gap = gap.replace("refresh_", "")
@@ -393,7 +397,7 @@ Format as markdown.""",
         try:
             return await llm.generate_with_routing(
                 messages=[{"role": "user", "content": prompt}],
-                task_type="text", source="background"
+                task_type=task_type, source="background"
             )
         except Exception as e:
             self.logger.error("Intel generation failed", gap=gap, error=str(e))

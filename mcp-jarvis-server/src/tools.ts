@@ -4,7 +4,9 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import * as fs from "fs";
+import * as os from "os";
 import * as path from "path";
+import { execSync } from "child_process";
 import { glob } from "glob";
 
 // ---------------------------------------------------------------------------
@@ -103,6 +105,49 @@ function sanitize(s: string): string {
 // ---------------------------------------------------------------------------
 
 const TOOLS = [
+  {
+    name: "jarvis_setup",
+    description:
+      "Initialize JARVIS for first use OR check current configuration status. " +
+      "Run this first when opening JARVIS with Claude or OpenCode. " +
+      "Detects unconfigured state and guides you through setup interactively.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        action: {
+          type: "string" as const,
+          enum: ["check_status", "save_config"],
+          description:
+            "check_status: detect what is configured and what is missing. " +
+            "save_config: write .env and generate config files from provided values.",
+        },
+        config: {
+          type: "object" as const,
+          description: "Required when action=save_config",
+          properties: {
+            nvidia_api_key: {
+              type: "string" as const,
+              description: "NVIDIA API key from build.nvidia.com",
+            },
+            jarvis_home: {
+              type: "string" as const,
+              description: "Where JARVIS stores your deal data (default: ~/JARVIS)",
+            },
+            claude_space: {
+              type: "string" as const,
+              description:
+                "Your Claude/OpenCode workspace folder path (optional)",
+            },
+            anthropic_api_key: {
+              type: "string" as const,
+              description: "Anthropic API key (optional, only for Claude fallback)",
+            },
+          },
+        },
+      },
+      required: ["action"],
+    },
+  },
   {
     name: "jarvis_list_accounts",
     description:
@@ -282,6 +327,70 @@ const TOOLS = [
 // Registration
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Setup helpers
+// ---------------------------------------------------------------------------
+
+function getRepoRoot(): string {
+  // MCP server dist/ is at <repo>/mcp-jarvis-server/dist/
+  // So: __dirname -> dist/, parent -> mcp-jarvis-server/, parent -> repo root
+  return path.resolve(__dirname, "..", "..");
+}
+
+function checkJarvisStatus(): {
+  configured: boolean;
+  missing: string[];
+  present: string[];
+  jarvis_home: string;
+  env_path: string;
+} {
+  const repoRoot = getRepoRoot();
+  const envPath = path.join(repoRoot, ".env");
+  const missing: string[] = [];
+  const present: string[] = [];
+
+  // Check .env file
+  const envExists = fs.existsSync(envPath);
+  if (envExists) {
+    present.push(".env file");
+  } else {
+    missing.push(".env file (run ./setup.sh or use jarvis_setup save_config)");
+  }
+
+  // Check NVIDIA key
+  const nvidiaKey = process.env.NVIDIA_API_KEY || "";
+  if (nvidiaKey && nvidiaKey !== "YOUR_NVIDIA_API_KEY_HERE") {
+    present.push("NVIDIA_API_KEY");
+  } else {
+    missing.push("NVIDIA_API_KEY (get from https://build.nvidia.com/)");
+  }
+
+  // Check JARVIS_HOME
+  const jarvisHome = process.env.JARVIS_HOME || path.join(os.homedir(), "JARVIS");
+  const jarvisHomeExists = fs.existsSync(jarvisHome);
+  if (jarvisHomeExists) {
+    present.push(`JARVIS_HOME (${jarvisHome})`);
+  } else {
+    missing.push(`JARVIS_HOME directory not created yet (will be at ${jarvisHome})`);
+  }
+
+  // Check ACCOUNTS directory
+  const accountsPath = path.join(jarvisHome, "ACCOUNTS");
+  if (fs.existsSync(accountsPath)) {
+    present.push("ACCOUNTS/ directory");
+  } else {
+    missing.push("ACCOUNTS/ directory (created automatically by setup)");
+  }
+
+  return {
+    configured: missing.length === 0,
+    missing,
+    present,
+    jarvis_home: jarvisHome,
+    env_path: envPath,
+  };
+}
+
 export function registerTools(server: Server, dataDir: string) {
   const accountsDir = path.join(dataDir, "ACCOUNTS");
   const memoryDir = path.join(dataDir, "MEMORY");
@@ -296,6 +405,203 @@ export function registerTools(server: Server, dataDir: string) {
     const { name, arguments: args } = request.params;
 
     switch (name) {
+      // ---------------------------------------------------------------
+      case "jarvis_setup": {
+        const { action, config } = args as {
+          action: "check_status" | "save_config";
+          config?: {
+            nvidia_api_key?: string;
+            jarvis_home?: string;
+            claude_space?: string;
+            anthropic_api_key?: string;
+          };
+        };
+
+        if (action === "check_status") {
+          const status = checkJarvisStatus();
+
+          if (status.configured) {
+            return {
+              content: [
+                {
+                  type: "text" as const,
+                  text: [
+                    "✅ JARVIS is configured and ready.",
+                    "",
+                    "**What's set up:**",
+                    ...status.present.map((p) => `  • ${p}`),
+                    "",
+                    `**JARVIS Home:** ${status.jarvis_home}`,
+                    "",
+                    "**Quick commands:**",
+                    "  • `jarvis_list_accounts` — see your accounts",
+                    "  • `jarvis_get_pipeline` — see deal pipeline",
+                    "  • Create a folder in ACCOUNTS/ → JARVIS auto-initializes it",
+                    "",
+                    "**To start JARVIS daemon:** run `./start_jarvis.sh` in the project folder",
+                  ].join("\n"),
+                },
+              ],
+            };
+          }
+
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: [
+                  "⚠️ JARVIS needs setup. Here's what's missing:",
+                  "",
+                  ...status.missing.map((m) => `  ❌ ${m}`),
+                  "",
+                  "**What's already configured:**",
+                  ...(status.present.length > 0
+                    ? status.present.map((p) => `  ✅ ${p}`)
+                    : ["  (nothing yet)"]),
+                  "",
+                  "─────────────────────────────────────────",
+                  "**OPTION A — Guided setup (recommended for new users):**",
+                  "",
+                  "Please ask me the following questions one by one:",
+                  "1. What is your NVIDIA API key? (get free key at https://build.nvidia.com/)",
+                  "2. Where do you want JARVIS to store your deal data?",
+                  "   (press Enter to use default: ~/JARVIS)",
+                  "3. What is your Claude/OpenCode workspace folder path?",
+                  "   (the folder where you use Claude Code/OpenCode — optional)",
+                  "",
+                  "Once you have the answers, call:",
+                  "  `jarvis_setup(action='save_config', config={nvidia_api_key: '...', jarvis_home: '~/JARVIS', claude_space: '...'})`",
+                  "",
+                  "─────────────────────────────────────────",
+                  "**OPTION B — Manual setup:**",
+                  "  Run `./setup.sh` in the project folder — it will prompt for everything.",
+                  "",
+                  `**Project folder:** ${getRepoRoot()}`,
+                ].join("\n"),
+              },
+            ],
+          };
+        }
+
+        // action === "save_config"
+        if (!config) {
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: "Error: config object is required for save_config action.",
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        const nvidiaKey = config.nvidia_api_key || "";
+        const jarvisHome = config.jarvis_home
+          ? config.jarvis_home.replace(/^~/, os.homedir())
+          : path.join(os.homedir(), "JARVIS");
+        const claudeSpace = config.claude_space
+          ? config.claude_space.replace(/^~/, os.homedir())
+          : "";
+        const anthropicKey = config.anthropic_api_key || "";
+
+        const repoRoot = getRepoRoot();
+        const envPath = path.join(repoRoot, ".env");
+
+        // Write .env
+        const envContent = [
+          "# JARVIS v2 — Configuration",
+          "# Generated by jarvis_setup MCP tool",
+          "",
+          `NVIDIA_API_KEY=${nvidiaKey}`,
+          `ANTHROPIC_API_KEY=${anthropicKey}`,
+          `JARVIS_HOME=${jarvisHome}`,
+          `CLAUDE_SPACE=${claudeSpace}`,
+          "TELEGRAM_BOT_TOKEN=",
+        ].join("\n");
+        fs.writeFileSync(envPath, envContent);
+
+        // Create directory structure
+        const dirs = [
+          "ACCOUNTS", "MEETINGS", "MEMORY", "MEMORY/patterns",
+          "data/personas", "data/templates", "data/meeting_queue",
+          "data/cache", "logs", "recordings",
+          "ACCOUNTS/_template/MEETINGS", "ACCOUNTS/_template/DOCUMENTS",
+          "ACCOUNTS/_template/EMAILS", "ACCOUNTS/_template/INTEL",
+        ];
+        for (const d of dirs) {
+          fs.mkdirSync(path.join(jarvisHome, d), { recursive: true });
+        }
+
+        // Create ACCOUNTS/.claude/CLAUDE.md for when user opens ACCOUNTS in OpenCode
+        const claudeMdDir = path.join(jarvisHome, "ACCOUNTS", ".claude");
+        fs.mkdirSync(claudeMdDir, { recursive: true });
+        fs.writeFileSync(
+          path.join(claudeMdDir, "CLAUDE.md"),
+          [
+            "# ACCOUNTS — JARVIS Deal Intelligence",
+            "",
+            "This folder contains all your account and opportunity data.",
+            "Each subfolder is one account or opportunity — create them freely.",
+            "",
+            "JARVIS monitors this folder automatically:",
+            "- Drop a recording in MEETINGS/ → JARVIS transcribes and summarizes",
+            "- Drop a document in DOCUMENTS/ → JARVIS extracts intelligence",
+            "- Paste emails in EMAILS/ → JARVIS tracks sentiment and action items",
+            "- INTEL/ is auto-generated by JARVIS — do not edit manually",
+            "",
+            "MCP tools are registered globally — you can ask Claude about any account here.",
+            "",
+            "**Quick commands to try:**",
+            "  • 'list my accounts'",
+            "  • 'show my pipeline'",
+            "  • 'brief me on [account name]'",
+          ].join("\n")
+        );
+
+        // Run generate_config.py to create jarvis.yaml and mcp configs
+        let configGenOutput = "";
+        try {
+          const scriptPath = path.join(repoRoot, "scripts", "generate_config.py");
+          const args = [
+            `--jarvis-home="${jarvisHome}"`,
+            claudeSpace ? `--claude-space="${claudeSpace}"` : "",
+            nvidiaKey ? `--nvidia-key="${nvidiaKey}"` : "",
+            anthropicKey ? `--anthropic-key="${anthropicKey}"` : "",
+          ].filter(Boolean).join(" ");
+          configGenOutput = execSync(`python3 ${scriptPath} ${args}`, {
+            encoding: "utf-8",
+            cwd: repoRoot,
+            timeout: 30000,
+          });
+        } catch (e: any) {
+          configGenOutput = `Config generation: ${e.message || String(e)}`;
+        }
+
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: [
+                "✅ JARVIS configured successfully!",
+                "",
+                `**JARVIS Home:** ${jarvisHome}`,
+                claudeSpace ? `**Claude Space:** ${claudeSpace}` : "",
+                `**NVIDIA Key:** ${nvidiaKey ? "set (" + nvidiaKey.slice(0, 8) + "...)" : "NOT SET — please add manually to .env"}`,
+                "",
+                "**Next steps:**",
+                "1. Start JARVIS: open a terminal in the project folder and run `./start_jarvis.sh`",
+                "2. Create your first account: `mkdir ~/JARVIS/ACCOUNTS/YourAccountName`",
+                "3. JARVIS will auto-initialize it within seconds",
+                "",
+                "**Config output:**",
+                configGenOutput || "(no output)",
+              ].filter(Boolean).join("\n"),
+            },
+          ],
+        };
+      }
+
       // ---------------------------------------------------------------
       case "jarvis_list_accounts": {
         const accounts = listDirs(accountsDir);

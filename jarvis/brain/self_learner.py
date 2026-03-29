@@ -222,7 +222,7 @@ Return JSON:
         try:
             response = await llm.generate_with_routing(
                 messages=[{"role": "user", "content": prompt}],
-                task_type="text",
+                task_type="reasoning",
                 source="background",
             )
             parsed = self._extract_json(response)
@@ -282,7 +282,7 @@ Return JSON: {{"signals": [], "gaps": [], "recommendations": []}}"""
         try:
             response = await llm.generate_with_routing(
                 [{"role": "user", "content": prompt}],
-                task_type="text",
+                task_type="reasoning",
                 source="background",
             )
             parsed = self._extract_json(response)

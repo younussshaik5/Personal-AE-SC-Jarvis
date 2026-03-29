@@ -1,201 +1,67 @@
-# JARVIS - Autonomous AI Professional (Sales & Presales Template)
+# JARVIS — Personal AI Sales Assistant
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
+Autonomous background AI that watches your deals, processes meetings/docs/emails, and briefs you via Claude Desktop or OpenCode. Built for a sales professional doing both AE and SC work.
 
-> **Welcome to the JARVIS Open-Source Template!**  
-> This is a fully functional, self-evolving AI assistant designed specifically for **Account Executives (AEs)**, **Sales Reps**, **Solution Engineers (SEs)**, and **Presales** professionals. Fork this repository to run your own autonomous double locally.
+## How it works
 
----
+JARVIS runs 24/7 on your machine using NVIDIA LLMs. You talk to it through Claude Desktop or OpenCode using MCP tools — you ask in plain English, Claude calls JARVIS tools automatically.
 
-## 🗺️ Project Architecture: Why, What, and How
+Every account is a folder in `~/JARVIS/ACCOUNTS/`. Drop files in, JARVIS processes them. That's it.
 
-### The "Why": Solving the Sales & Presales Documentation Gap
-Sales professionals and Solution Engineers spend 30-40% of their time on tedious administrative tasks: summarizing meeting notes, drafting discovery docs, and filling out risk assessments. **JARVIS** was built to automate this by observing your real-world conversations and turning them into professional, high-impact business artifacts.
+## Quick Start
 
-### The "What": High-Level System Design
-JARVIS is a multi-layered autonomous system that bridges your AI chat environments with a professional documentation suite.
-
-```mermaid
-graph TD
-    subgraph "Chat Environments"
-        OC[OpenCode Chat]
-        CC[ClaudeCode Chat]
-    end
-
-    subgraph "MCP Observer (Node.js)"
-        DB1[(OpenCode SQLite)]
-        DB2[(Claude SQLite)]
-        OBS[Observer Service]
-        WS[WebSocket Server]
-    end
-
-    subgraph "JARVIS Core (Python)"
-        ORCH[Orchestrator]
-        BUS[Event Bus]
-        MEM[(Memory System)]
-        LLM[LLM Synthesis]
-    end
-
-    subgraph "Outputs"
-        DOCS[Markdown Reports]
-        DASH[Interactive Dashboard]
-    end
-
-    OC --> DB1
-    CC --> DB2
-    DB1 -- Polling --> OBS
-    DB2 -- Polling --> OBS
-    OBS -- Stream --> WS
-    WS -- Data --> ORCH
-    ORCH -- Broadcast --> BUS
-    BUS -- Trigger --> SKILLS
-    SKILLS -- Context --> LLM
-    LLM -- MD Content --> SKILLS
-    SKILLS -- Write --> DOCS
-    SKILLS -- Update --> DASH
-```
-
-### The "How": Detailed Component Breakdown
-
-#### 1. The Real-Time Observer Loop
-The **MCP Observer** is the "eyes" of the system. It monitors your local conversation history without needing access to any cloud platform, ensuring your data stays private.
-
-```mermaid
-sequenceDiagram
-    participant SQLite as Claude/OpenCode DB
-    participant Obs as MCP Observer (Node.js)
-    participant Core as JARVIS Core (Python)
-    
-    loop Every 60 Seconds
-        Obs->>SQLite: Query NEW sessions & messages
-        SQLite-->>Obs: Return raw JSON rows
-        Note over Obs: Filter by workspace_root
-        Obs->>Core: WebSocket push (New Message)
-    end
-```
-
-#### 2. The Skill Pipeline: Turning Chat into Strategy
-When the Core receives a message, it doesn't just "summarize"—it uses specialized **Skills** to synthesize the data into different business lens (e.g., Risk, Discovery, MEDDPICC).
-
-```mermaid
-flowchart LR
-    Msg[New Chat Message] --> Bus[Event Bus]
-    Bus --> S1[Risk Assessment Skill]
-    Bus --> S2[Discovery Skill]
-    Bus --> S3[ROI Model Skill]
-    
-    S1 --> LLM{LLM Synthesis}
-    S2 --> LLM
-    S3 --> LLM
-    
-    LLM --> R1[TECHNICAL_RISK_ASSESSMENT.md]
-    LLM --> R2[discovery/internal_discovery.md]
-    LLM --> R3[value_architecture/roi_model.md]
-```
-
-#### 3. Persistent Memory & Account Isolation
-JARVIS organizes its knowledge using a structured directory system. Each account you specify has its own sandbox where documents are created and updated.
-
-- **MEMORY/**: Stores global competitor data, common product patterns, and long-term user preferences.
-- **ACCOUNTS/**: Contains the per-deal intelligence suite.
-
----
-
-## 🚀 Quick Start: Post-Fork Setup
-
-Congratulations on forking JARVIS! Follow these steps to make it work seamlessly in your local environment.
-
-### 1. Install Dependencies
-Navigate to the observer directory and install the required Node.js modules.
 ```bash
-cd mcp-opencode-observer
-npm install
+git clone https://github.com/younussshaik5/Personal-AE-SC-Jarvis.git
+cd Personal-AE-SC-Jarvis
+./setup.sh
+./start_jarvis.sh
 ```
 
-### 2. Environment Configuration
-Copy the example configurations and update them with your local paths.
-- **Main Config**: `jarvis/config/jarvis.yaml`
-- **Observer Config**: `mcp-opencode-observer/config/mcp-observer.json`
+Open Claude Desktop → type **"run jarvis_setup"** → JARVIS will guide you if anything is missing.
 
----
+## Requirements
 
-## 🤖 AI-Assisted Configuration & Repair
+- Python 3.11+, Node.js 18+, ffmpeg
+- NVIDIA API key — free tier at [build.nvidia.com](https://build.nvidia.com/)
+- Claude Desktop or OpenCode
 
-Because this project has a complex architecture (Python and Node.js working together), if you find any "broken" files or startup errors, you can have your AI assistant (ClaudeCode or OpenCode) fix them automatically.
+`./setup.sh` installs missing dependencies automatically on macOS and Linux.
 
-### Recommended Prompt:
-> "I have just forked this JARVIS AI template. 
-> 1. Please first **analyze the entire project architecture** to understand how the MCP Observer and JARVIS Core interact.
-> 2. Once you understand the system, perform the following setup:
->    - Update `mcp-opencode-observer/config/mcp-observer.json` with my local paths.
->    - Ensure the `dbPath` correctly points to my local OpenCode/Claude database.
->    - Run `npm install` in the observer directory.
->    - Fix any syntax or path errors you find to make the system fully functional."
+## NVIDIA Models (run concurrently, each for its expertise)
 
----
+| Task | Model |
+|------|-------|
+| General reasoning | Nemotron Super 49B |
+| Long documents / full dossiers | Nemotron 3 Super 120B (1M token) |
+| Video / slide analysis | Cosmos Reason2 8B |
+| Audio transcription | Whisper Large v3 Turbo |
+| Code / technical analysis | Qwen2.5 Coder 32B |
+| Fast classification / tagging | Minitron 8B |
+| Deep strategy / deal analysis | Nemotron Ultra 253B |
 
-## ✨ Key Capabilities
+Claude (Anthropic) is only used as a last-resort fallback for user-facing requests when NVIDIA is unavailable.
 
-JARVIS acts as your autonomous double. Whatever you chat about in **ClaudeCode** or **OpenCode**, JARVIS synthesizes it in real-time.
+## Account & Opportunity Structure
 
-- **🧠 Real-Time Conversation Synthesis** – Polls your chat history every 60s to extract customer interests, pain points, and technical requirements.
-- **📝 Autonomous Document Generation** – Automatically creates and updates Technical Risk Assessments, Deep Discovery docs, MEDDPICC reports, ROI models, and Demo Strategies.
-- **🎭 Multi-Persona Intelligence** – Detects if your conversation is deal-focused (AE) or technical (SC) and adjusts its output focus.
-- **📊 Interactive Dashboards** – Aggregates all insights into a premium HTML interface with one-click exports to PDF, Word, and Excel.
-
----
-
-## 📁 Generated Documents (Per Account)
-
-Each opportunity under `ACCOUNTS/<team>/<Account Name>/` gets an automated intelligence suite:
+Every folder directly in `ACCOUNTS/` is an account or opportunity — you decide what it represents. JARVIS treats them identically.
 
 ```
-├── DASHBOARD.html                 ← Master CRM-style view with exports
-├── TECHNICAL_RISK_ASSESSMENT.md   ← LLM-synthesized risk analysis
-├── discovery/
-│   ├── internal_discovery.md      ← Deep technical dive
-│   ├── final_discovery.md         ← Handoff summary
-│   └── Q2A.md                     ← Questions to answer
-├── meddpicc/
-│   ├── qualification_report.md    ← MEDDPICC analysis
-│   └── stakeholder_analysis.md    ← MAP/Champion tracking
-├── battlecards/
-│   ├── competitive_intel.md       ← Competitor deep-dives
-│   └── pricing_comparison.md      ← Pricing vs market
-├── value_architecture/
-│   ├── roi_model.md               ← Financial impact analysis
-│   └── tco_analysis.md            ← Total Cost of Ownership
-├── demo_strategy/
-│   ├── demo_strategy.md           ← Tailored demo flow
-│   └── tech_talking_points.md     ← Key proof points
-└── notes.json                     ← Raw facts & knowledge gaps
+~/JARVIS/ACCOUNTS/
+  Tata Sky/              ← account or opportunity — your choice
+    account.html         ← open in browser, auto-updated dashboard
+    meddpicc.json        ← MEDDPICC scoring (0-3 per dimension)
+    deal_stage.json      ← current stage + history
+    contacts.json        ← stakeholders
+    MEETINGS/            ← drop recordings here (mp4/wav/m4a)
+    DOCUMENTS/           ← drop RFPs, contracts, briefs here
+    EMAILS/              ← paste email threads here (.md/.txt)
+    INTEL/               ← auto-generated by JARVIS
+    meetings/            ← processed meeting notes (auto-written)
+  Tata Tele/             ← separate folder, same structure
 ```
 
----
+**Forkable:** no hardcoded paths. All paths resolve from `JARVIS_HOME` env var (default: `~/JARVIS`). Clone, run `./setup.sh`, done.
 
-## 🔧 Advanced Configuration
+## Full Guide
 
-### Persona Management
-- To modify persona definitions, edit the files in `jarvis/persona/`.
-- To add new rules for autonomous behavior, edit `mcp-opencode-observer/config/rules.yaml`.
-
-### Troubleshooting
-| Issue | Solution |
-|-------|----------|
-| Path Errors | Ask AI: *"Update observer database paths to my local Claude/OpenCode history."* |
-| Orchestrator crashes | Check `logs/orchestrator_manual.log` for missing methods |
-| LLM not responding | Verify API key in `jarvis/config/jarvis.yaml` |
-| Files not updating | Ensure folder is under `ACCOUNTS/` with `notes.json` |
-| Port 8080 in use | `lsof -i :8080` → kill conflicting process |
-| MCP not filtering | Verify `workspace_root` in `config/mcp-observer.json` |
-
----
-
-## 📄 License
-
-MIT – Created for Yellow.ai SE Team by YOUR_NAME.
-
----
-
-*This README is part of the JARVIS autonomous system and is kept up-to-date automatically.*
+See [HOW_THIS_WORKS.md](HOW_THIS_WORKS.md) for complete documentation.

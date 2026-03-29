@@ -84,24 +84,60 @@ identity:
   role: "Sales & Presales"
   company: "Your Company"
 
-# Primary LLM - NVIDIA (used for ALL background processing)
-llm:
-  provider: "openai"
-  api_key: "${{NVIDIA_API_KEY}}"
-  base_url: "https://integrate.api.nvidia.com/v1"
-  model: "nvidia/llama-3.3-nemotron-super-49b-v1"
-  temperature: 0.7
-  max_tokens: 8192
-  context_window: 32768
+# NVIDIA LLM Models — each model used for its specific expertise
+# All run concurrently via the async worker pool (3 parallel workers)
+# All use the same NVIDIA API endpoint and key
+llm_models:
+  # General text reasoning — primary workhorse for most tasks
+  text:
+    model: "nvidia/llama-3.3-nemotron-super-49b-v1"
+    temperature: 0.7
+    max_tokens: 8192
+    context_window: 32768
 
-# Video Analysis LLM - NVIDIA Cosmos
-llm_video:
-  provider: "openai"
-  api_key: "${{NVIDIA_API_KEY}}"
-  base_url: "https://integrate.api.nvidia.com/v1"
-  model: "nvidia/cosmos-reason2-8b"
-  temperature: 0.3
-  max_tokens: 4096
+  # Long-context — Nemotron 3 Super 120B (1M token window)
+  # Used for: full account dossiers, large RFPs, long transcripts, cross-deal analysis
+  long_context:
+    model: "nvidia/nemotron-3-super-120b"
+    temperature: 0.3
+    max_tokens: 32768
+    context_window: 1048576
+
+  # Video/slide analysis — NVIDIA Cosmos multimodal
+  video:
+    model: "nvidia/cosmos-reason2-8b"
+    temperature: 0.3
+    max_tokens: 4096
+    context_window: 8192
+
+  # Audio transcription — Whisper large v3
+  audio:
+    model: "nvidia/whisper-large-v3-turbo"
+    temperature: 0.0
+    max_tokens: 4096
+
+  # Code/technical analysis
+  code:
+    model: "nvidia/qwen2.5-coder-32b-instruct"
+    temperature: 0.2
+    max_tokens: 8192
+    context_window: 32768
+
+  # Lightweight/quick tasks — classification, tagging, short summaries
+  quick:
+    model: "nvidia/mistral-nemo-minitron-8b-8k-instruct"
+    temperature: 0.5
+    max_tokens: 2048
+    context_window: 8192
+
+  # Deep reasoning — complex deal strategy, competitive analysis
+  reasoning:
+    model: "nvidia/llama-3.1-nemotron-ultra-253b-v1"
+    temperature: 0.4
+    max_tokens: 8192
+    context_window: 128000
+
+llm_nvidia_base_url: "https://integrate.api.nvidia.com/v1"
 
 # Fallback LLM - Claude (only for user-facing requests when NVIDIA fails)
 llm_fallback:

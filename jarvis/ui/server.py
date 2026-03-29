@@ -99,8 +99,8 @@ class UIHandler(http.server.SimpleHTTPRequestHandler):
         except:
             pass
 
-        # Get active persona (default to solution_consultant if missing)
-        active_persona = 'solution_consultant'  # default
+        # Get active persona (single sales_professional persona)
+        active_persona = 'sales_professional'  # default
         try:
             persona_file = Path('MEMORY/active_persona.json')
             if persona_file.exists():
@@ -144,7 +144,7 @@ class UIHandler(http.server.SimpleHTTPRequestHandler):
                 personas.add(switch['from'])
                 personas.add(switch['to'])
             return list(personas)
-        return ['solution_consultant', 'account_executive']
+        return ['sales_professional']
     
     def get_deals(self):
         """Read deals from persona data."""
@@ -159,7 +159,7 @@ class UIHandler(http.server.SimpleHTTPRequestHandler):
     def get_patterns(self):
         """Read learned patterns."""
         patterns = {}
-        for persona in ['solution_consultant', 'account_executive']:
+        for persona in ['sales_professional']:
             path = Path(f'MEMORY/patterns/{persona}_patterns.json')
             if path.exists():
                 with open(path) as f:
@@ -192,7 +192,7 @@ class UIHandler(http.server.SimpleHTTPRequestHandler):
     def count_files(self):
         """Count observed files."""
         try:
-            patterns_file = Path('MEMORY/patterns/solution_consultant_patterns.json')
+            patterns_file = Path('MEMORY/patterns/sales_professional_patterns.json')
             if patterns_file.exists():
                 with open(patterns_file) as f:
                     data = json.load(f)
@@ -204,7 +204,7 @@ class UIHandler(http.server.SimpleHTTPRequestHandler):
     def count_patterns(self):
         """Count learned patterns."""
         try:
-            patterns_file = Path('MEMORY/patterns/solution_consultant_patterns.json')
+            patterns_file = Path('MEMORY/patterns/sales_professional_patterns.json')
             if patterns_file.exists():
                 with open(patterns_file) as f:
                     data = json.load(f)

@@ -176,12 +176,25 @@ class LLMManager:
         "none": MockProvider,
     }
 
-    # Fallback models — NVIDIA only (background tasks should never use Claude tokens)
+    # Text-task fallback chain — NVIDIA only (background tasks never use Claude)
     FALLBACK_MODELS = [
         "nvidia/llama-3.3-nemotron-super-49b-v1",       # Primary
         "nvidia/llama-3.1-nemotron-ultra-253b-v1",      # Fallback 1
-        "nvidia/mistral-nemo-minitron-8b-8k-instruct",  # Fallback 2
+        "nvidia/mistral-nemo-minitron-8b-8k-instruct",  # Fallback 2 (fast)
     ]
+
+    # Default model config per task type (used when llm_models not in yaml)
+    DEFAULT_MODELS = {
+        "text":         ("nvidia/llama-3.3-nemotron-super-49b-v1", 0.7, 8192, 32768),
+        "long_context": ("nvidia/nemotron-3-super-120b", 0.3, 32768, 1048576),
+        "video":        ("nvidia/cosmos-reason2-8b", 0.3, 4096, 8192),
+        "audio":        ("nvidia/whisper-large-v3-turbo", 0.0, 4096, 16000),
+        "code":         ("nvidia/qwen2.5-coder-32b-instruct", 0.2, 8192, 32768),
+        "quick":        ("nvidia/mistral-nemo-minitron-8b-8k-instruct", 0.5, 2048, 8192),
+        "reasoning":    ("nvidia/llama-3.1-nemotron-ultra-253b-v1", 0.4, 8192, 128000),
+    }
+
+    NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1"
 
     def __init__(self, config_manager):
         self.config_manager = config_manager
@@ -240,6 +253,34 @@ class LLMManager:
             system_prompt_override=video_cfg.get('system_prompt', ''),
             extra_body=video_cfg.get('extra_body'),
             task_type="video"
+        )
+
+    def get_config_for(self, task_type: str) -> LLMConfig:
+        """Return the NVIDIA LLMConfig for a specific task type.
+
+        Reads from llm_models[task_type] in yaml. Falls back to DEFAULT_MODELS.
+        All NVIDIA tasks share the same endpoint and API key.
+        """
+        cfg = self.config_manager.config
+        api_key = os.getenv("NVIDIA_API_KEY", "")
+        base_url = getattr(cfg, 'llm_nvidia_base_url', self.NVIDIA_BASE_URL) or self.NVIDIA_BASE_URL
+
+        models_cfg = getattr(cfg, 'llm_models', {}) or {}
+        section = models_cfg.get(task_type, {}) if isinstance(models_cfg, dict) else {}
+
+        default_model, default_temp, default_max_tokens, default_ctx = self.DEFAULT_MODELS.get(
+            task_type, self.DEFAULT_MODELS["text"]
+        )
+
+        return LLMConfig(
+            provider="openai",
+            api_key=api_key,
+            model=section.get('model', default_model),
+            temperature=section.get('temperature', default_temp),
+            max_tokens=section.get('max_tokens', default_max_tokens),
+            context_window=section.get('context_window', default_ctx),
+            base_url=base_url,
+            task_type=task_type,
         )
 
     def get_anthropic_fallback_config(self) -> LLMConfig:
@@ -372,11 +413,18 @@ class LLMManager:
         return f"[LLM Error: {last_error}]"
 
     async def generate_with_routing(self, messages: List[Message], task_type: str = "text", source: str = "background") -> str:
-        """Generate a response with task-type routing and source-aware fallback.
+        """Generate a response routing to the right NVIDIA model for each task type.
 
         Args:
             messages: List of Message objects for the conversation.
-            task_type: "text", "video", or "audio" — determines which config/model to use.
+            task_type: Determines which NVIDIA model to use:
+                "text"         — Nemotron Super 49B (general reasoning)
+                "long_context" — Nemotron 3 Super 120B (1M token, full dossiers/RFPs)
+                "video"        — Cosmos Reason2 8B (slide/frame analysis)
+                "audio"        — Whisper large-v3-turbo (transcription)
+                "code"         — Qwen2.5 Coder 32B (technical/code analysis)
+                "quick"        — Minitron 8B (fast classification/tagging)
+                "reasoning"    — Nemotron Ultra 253B (deep deal strategy)
             source: "background" (never use Claude) or "user_request" (Claude as final fallback).
 
         Returns:
@@ -385,45 +433,54 @@ class LLMManager:
         if not self._provider:
             await self.initialize()
 
-        # --- Video task routing ---
-        if task_type == "video":
-            video_config = self._video_config or self.get_video_config()
-            openai_provider = OpenAIProvider()
+        # Route to the specific NVIDIA model for this task type
+        primary_config = self.get_config_for(task_type)
+        openai_provider = OpenAIProvider()
+
+        self.logger.debug(f"Routing task", task_type=task_type, model=primary_config.model, source=source)
+
+        try:
+            result = await openai_provider.generate(messages, primary_config)
+            if not result.startswith("[LLM Error:"):
+                return result
+            raise Exception(result)
+        except Exception as first_error:
+            error_str = str(first_error)
+            self.logger.warning(f"Primary model failed for {task_type}", model=primary_config.model, error=error_str)
+
+        # For non-text task types with no natural fallback, return error immediately
+        if task_type not in ("text", "long_context", "reasoning"):
+            if source == "user_request":
+                # User-facing: try Claude as last resort
+                pass
+            else:
+                return f"[LLM Error: {task_type} model {primary_config.model} failed: {first_error}]"
+
+        # --- Text-family fallback chain (text / long_context / reasoning all degrade gracefully) ---
+        # long_context → text → quick; reasoning → text → quick
+        text_fallback_chain = [
+            self.get_config_for("text"),
+            self.get_config_for("quick"),
+        ]
+
+        last_error = first_error
+        for config in text_fallback_chain:
+            if config.model == primary_config.model:
+                continue
             try:
-                result = await openai_provider.generate(messages, video_config)
+                result = await openai_provider.generate(messages, config)
                 if not result.startswith("[LLM Error:"):
+                    self.logger.info(f"Fallback successful", task_type=task_type, fallback_model=config.model)
                     return result
                 raise Exception(result)
             except Exception as e:
-                self.logger.error(f"Video generation failed", model=video_config.model, error=str(e))
-                return f"[LLM Error: Video generation failed: {str(e)}]"
-
-        # --- Text (or audio) task routing ---
-        # Build the NVIDIA-only fallback chain
-        nvidia_configs = self._fallback_configs if self._fallback_configs else self._build_fallback_configs()
-
-        last_error = None
-        for i, config in enumerate(nvidia_configs):
-            try:
-                result = await self._provider.generate(messages, config)
-                if result.startswith("[LLM Error:"):
-                    raise Exception(result)
-                if i > 0:
-                    self.logger.info(f"Routed fallback successful", model=config.model, attempts=i+1, source=source)
-                    self._active_model_index = i
-                return result
-            except Exception as e:
                 last_error = e
                 error_str = str(e)
-                if "429" in error_str or "Too Many Requests" in error_str:
-                    self.logger.warning(f"Model {config.model} rate limited, trying next fallback", error=error_str)
+                if "429" in error_str or "Too Many Requests" in error_str or "404" in error_str:
+                    self.logger.warning(f"Fallback model {config.model} also failed", error=error_str)
                     continue
-                elif "404" in error_str or "not found" in error_str.lower():
-                    self.logger.warning(f"Model {config.model} not found, trying next fallback", error=error_str)
-                    continue
-                else:
-                    self.logger.error(f"Non-retryable LLM error with {config.model}", error=error_str)
-                    break
+                self.logger.error(f"Non-retryable error on fallback {config.model}", error=error_str)
+                break
 
         # --- Claude as final fallback (only for user_request, never background) ---
         if source == "user_request":
@@ -440,8 +497,7 @@ class LLMManager:
                 self.logger.error(f"Anthropic fallback also failed", error=str(e))
                 last_error = e
 
-        # All fallbacks exhausted
-        self.logger.error(f"All LLM models failed (source={source}), last error: {last_error}")
+        self.logger.error(f"All LLM models failed (task_type={task_type}, source={source}), last error: {last_error}")
         return f"[LLM Error: {last_error}]"
 
 
@@ -477,18 +533,14 @@ class ContextBuilder:
     def _get_system_prompt(self) -> str:
         """Generate the system prompt for the LLM."""
         try:
-            active_persona = "solution_consultant"
-            try:
-                with open('MEMORY/active_persona.json') as f:
-                    data = json.load(f)
-                    active_persona = data.get('current_persona', active_persona)
-            except:
-                pass
+            active_persona = "sales_professional"
 
-            persona_desc = {
-                "solution_consultant": "You are a Solution Consultant focused on technical architecture, demos, and integration planning. You are analytical, detail-oriented, and help design solutions.",
-                "account_executive": "You are an Account Executive focused on business development, negotiations, and deal strategy. You are persuasive, strategic, and relationship-focused."
-            }.get(active_persona, "You are an AI assistant.")
+            persona_desc = (
+                "You are a Sales Professional who operates as both Account Executive and Solution Consultant. "
+                "You combine commercial acumen with deep technical knowledge — you close deals AND design solutions. "
+                "You lead with business outcomes and ROI, but go deep on architecture and integration when needed. "
+                "You use MEDDPICC to qualify and advance every deal."
+            )
 
             workspace = self.config.config.workspace_root
             workspace_name = workspace.name if hasattr(workspace, 'name') else str(workspace)
@@ -497,7 +549,7 @@ class ContextBuilder:
             patterns_summary = "No patterns learned yet."
             recent_patterns = []
             try:
-                patterns_file = Path('MEMORY/patterns') / f'{active_persona}_patterns.json'
+                patterns_file = Path('MEMORY/patterns') / 'sales_professional_patterns.json'
                 if patterns_file.exists():
                     with open(patterns_file) as f:
                         data = json.load(f)
@@ -602,7 +654,6 @@ class ContextBuilder:
 
             system_prompt = f"""You are JARVIS, an autonomous AI employee working in '{workspace_name}'.
 
-Current Role: {active_persona.replace('_', ' ').title()}
 {persona_desc}
 
 Your Knowledge (Real-time workspace data):
@@ -628,7 +679,7 @@ Your Knowledge (Real-time workspace data):
 *Your Capabilities:*
 1. **Query Information**: Answer questions about deals, patterns, competitors, workspace activity
 2. **Execute Commands**: Run /scan (analyze workspace), /archive (create snapshot), /status (system health)
-3. **Manage Persona**: Switch between personas (solution_consultant, account_executive)
+3. **Manage Knowledge**: Access patterns, competitor intel, and deal context across all accounts
 4. **Provide Insights**: Analyze patterns, suggest optimizations, identify opportunities
 5. **Natural Conversation**: Contextual dialogue that remembers previous exchanges
 
