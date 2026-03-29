@@ -321,6 +321,114 @@ const TOOLS = [
       required: [],
     },
   },
+  {
+    name: "jarvis_find_account",
+    description:
+      "Fuzzy-match a company name to an existing ACCOUNTS/ folder. " +
+      "Use this when you read a Gmail, calendar event, or Drive doc and need to find " +
+      "the right JARVIS account folder. Returns the best match and a confidence score. " +
+      "Always call this before saving Google Workspace data to JARVIS.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        name: {
+          type: "string" as const,
+          description: "Company or account name to search for (e.g. 'Tata Sky Limited')",
+        },
+      },
+      required: ["name"],
+    },
+  },
+  {
+    name: "jarvis_log_calendar_event",
+    description:
+      "Save a Google Calendar meeting to the right JARVIS account. " +
+      "Call this when you see a calendar event that relates to a deal or account. " +
+      "JARVIS will queue meeting prep automatically if the event is upcoming.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        account: {
+          type: "string" as const,
+          description: "Account folder name (use jarvis_find_account first if unsure)",
+        },
+        title: { type: "string" as const, description: "Meeting title from calendar" },
+        date: { type: "string" as const, description: "Meeting date (YYYY-MM-DD)" },
+        time: { type: "string" as const, description: "Meeting time (HH:MM)" },
+        attendees: {
+          type: "array" as const,
+          items: { type: "string" as const },
+          description: "Attendee names and emails from the calendar event",
+        },
+        description: {
+          type: "string" as const,
+          description: "Calendar event description or agenda (optional)",
+        },
+        is_upcoming: {
+          type: "boolean" as const,
+          description: "True if meeting is in the future (triggers auto-prep)",
+        },
+      },
+      required: ["account", "title", "date", "attendees"],
+    },
+  },
+  {
+    name: "jarvis_save_google_email",
+    description:
+      "Save a Gmail thread to the right JARVIS account for intelligence extraction. " +
+      "Call this automatically whenever you read an email related to a deal or account. " +
+      "JARVIS will extract sentiment, objections, buying signals, and action items.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        account: {
+          type: "string" as const,
+          description: "Account folder name (use jarvis_find_account first if unsure)",
+        },
+        subject: { type: "string" as const, description: "Email subject line" },
+        from_name: { type: "string" as const, description: "Sender name" },
+        from_email: { type: "string" as const, description: "Sender email address" },
+        date: { type: "string" as const, description: "Email date (YYYY-MM-DD)" },
+        body: { type: "string" as const, description: "Full email body or thread content" },
+        thread_summary: {
+          type: "string" as const,
+          description: "Optional 1-2 line summary of what this email is about",
+        },
+      },
+      required: ["account", "subject", "from_email", "date", "body"],
+    },
+  },
+  {
+    name: "jarvis_save_drive_document",
+    description:
+      "Save a Google Drive document (RFP, proposal, contract, brief) to the right JARVIS account. " +
+      "Call this when you read a Drive document related to a deal. " +
+      "JARVIS will extract requirements, budget, timeline, and stakeholders.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        account: {
+          type: "string" as const,
+          description: "Account folder name (use jarvis_find_account first if unsure)",
+        },
+        title: { type: "string" as const, description: "Document title" },
+        doc_type: {
+          type: "string" as const,
+          enum: ["rfp", "proposal", "contract", "brief", "presentation", "other"],
+          description: "Type of document",
+        },
+        content: {
+          type: "string" as const,
+          description: "Full document content or extracted text",
+        },
+        drive_url: {
+          type: "string" as const,
+          description: "Google Drive URL for reference (optional)",
+        },
+      },
+      required: ["account", "title", "doc_type", "content"],
+    },
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -1068,6 +1176,167 @@ export function registerTools(server: Server, dataDir: string) {
               text: JSON.stringify(pending, null, 2),
             },
           ],
+        };
+      }
+
+      // ---------------------------------------------------------------
+      case "jarvis_find_account": {
+        const { name: searchName } = args as { name: string };
+        const accounts = listDirs(accountsDir);
+
+        if (accounts.length === 0) {
+          return {
+            content: [{ type: "text" as const, text: JSON.stringify({ match: null, confidence: 0, all_accounts: [], message: "No accounts found. Create a folder in ACCOUNTS/ first." }) }],
+          };
+        }
+
+        const lower = searchName.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+        // Score each account
+        const scored = accounts.map((acct) => {
+          const acctLower = acct.toLowerCase().replace(/[^a-z0-9]/g, "");
+          let score = 0;
+          if (acctLower === lower) score = 100;
+          else if (acctLower.startsWith(lower) || lower.startsWith(acctLower)) score = 85;
+          else if (acctLower.includes(lower) || lower.includes(acctLower)) score = 70;
+          else {
+            // Word overlap
+            const searchWords = lower.split(/\s+/);
+            const acctWords = acctLower.split(/\s+/);
+            const overlap = searchWords.filter((w) => acctWords.some((a) => a.includes(w) || w.includes(a)));
+            score = Math.round((overlap.length / Math.max(searchWords.length, acctWords.length)) * 60);
+          }
+          return { account: acct, confidence: score };
+        });
+
+        scored.sort((a, b) => b.confidence - a.confidence);
+        const best = scored[0];
+
+        return {
+          content: [{
+            type: "text" as const,
+            text: JSON.stringify({
+              match: best.confidence >= 50 ? best.account : null,
+              confidence: best.confidence,
+              top_matches: scored.slice(0, 3),
+              all_accounts: accounts,
+              message: best.confidence >= 50
+                ? `Best match: "${best.account}" (${best.confidence}% confidence)`
+                : `No strong match found for "${searchName}". Create a new account folder or check the name.`,
+            }, null, 2),
+          }],
+        };
+      }
+
+      // ---------------------------------------------------------------
+      case "jarvis_log_calendar_event": {
+        const { account, title, date, time, attendees, description: desc, is_upcoming } = args as {
+          account: string; title: string; date: string; time?: string;
+          attendees: string[]; description?: string; is_upcoming?: boolean;
+        };
+        const accountPath = path.join(accountsDir, account);
+        ensureDir(path.join(accountPath, "meetings"));
+
+        const filename = `${date}_calendar_${sanitize(title)}.md`;
+        const filePath = path.join(accountPath, "meetings", filename);
+        const content = [
+          `# ${title}`,
+          ``,
+          `**Source:** Google Calendar`,
+          `**Date:** ${date}${time ? ` at ${time}` : ""}`,
+          `**Attendees:** ${attendees.join(", ")}`,
+          desc ? `\n**Agenda:**\n${desc}` : "",
+          ``,
+          is_upcoming ? `## Pre-Meeting Notes\n\n*Meeting prep will be generated automatically by JARVIS.*` : `## Meeting Notes\n\n*Add notes here or drop recording in MEETINGS/ folder.*`,
+        ].filter((l) => l !== undefined).join("\n");
+
+        fs.writeFileSync(filePath, content);
+
+        // Queue meeting prep if upcoming
+        if (is_upcoming) {
+          const queueDir = path.join(dataDir, "data", "prep_queue");
+          ensureDir(queueDir);
+          fs.writeFileSync(
+            path.join(queueDir, `${timestamp()}.json`),
+            JSON.stringify({ account, title, attendees, date, submitted_at: new Date().toISOString(), status: "pending", source: "google_calendar" }, null, 2)
+          );
+        }
+
+        return {
+          content: [{
+            type: "text" as const,
+            text: `Calendar event saved: ACCOUNTS/${account}/meetings/${filename}\n${is_upcoming ? "Meeting prep queued — JARVIS will prepare a brief automatically." : "Event logged."}`,
+          }],
+        };
+      }
+
+      // ---------------------------------------------------------------
+      case "jarvis_save_google_email": {
+        const { account, subject, from_name, from_email, date, body, thread_summary } = args as {
+          account: string; subject: string; from_name?: string; from_email: string;
+          date: string; body: string; thread_summary?: string;
+        };
+        const emailsDir = path.join(accountsDir, account, "EMAILS");
+        ensureDir(emailsDir);
+
+        const filename = `${date}_${sanitize(subject)}.md`;
+        const content = [
+          `# ${subject}`,
+          ``,
+          `**Source:** Gmail`,
+          `**Date:** ${date}`,
+          `**From:** ${from_name ? `${from_name} <${from_email}>` : from_email}`,
+          thread_summary ? `\n**Summary:** ${thread_summary}` : "",
+          ``,
+          `## Content`,
+          ``,
+          body,
+        ].join("\n");
+
+        fs.writeFileSync(path.join(emailsDir, filename), content);
+
+        // Log to activities
+        const actFile = path.join(accountsDir, account, "activities.jsonl");
+        const act = { type: "email", date, subject, from: from_email, summary: thread_summary || subject, source: "gmail" };
+        fs.appendFileSync(actFile, JSON.stringify(act) + "\n");
+
+        return {
+          content: [{
+            type: "text" as const,
+            text: `Email saved: ACCOUNTS/${account}/EMAILS/${filename}\nJARVIS will extract intelligence (sentiment, objections, buying signals, action items) in the background.`,
+          }],
+        };
+      }
+
+      // ---------------------------------------------------------------
+      case "jarvis_save_drive_document": {
+        const { account, title, doc_type, content: docContent, drive_url } = args as {
+          account: string; title: string; doc_type: string; content: string; drive_url?: string;
+        };
+        const docsDir = path.join(accountsDir, account, "DOCUMENTS");
+        ensureDir(docsDir);
+
+        const filename = `${dateStr()}_${doc_type}_${sanitize(title)}.md`;
+        const content = [
+          `# ${title}`,
+          ``,
+          `**Source:** Google Drive`,
+          `**Type:** ${doc_type.toUpperCase()}`,
+          `**Saved:** ${dateStr()}`,
+          drive_url ? `**Drive URL:** ${drive_url}` : "",
+          ``,
+          `## Content`,
+          ``,
+          docContent,
+        ].filter(Boolean).join("\n");
+
+        fs.writeFileSync(path.join(docsDir, filename), content);
+
+        return {
+          content: [{
+            type: "text" as const,
+            text: `Document saved: ACCOUNTS/${account}/DOCUMENTS/${filename}\nJARVIS will extract requirements, budget signals, and stakeholders in the background.`,
+          }],
         };
       }
 
