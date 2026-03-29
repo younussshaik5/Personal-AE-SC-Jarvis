@@ -5,6 +5,11 @@
 google_token.json
 credentials.json
 
+# Generated configs (machine-specific, created by setup.sh)
+config/mcp-observer.json
+mcp-opencode-observer/.env
+jarvis/config/jarvis.yaml
+
 # Runtime data (lives in JARVIS_HOME, not repo)
 # JARVIS_HOME/ is the portable template — keep structure, ignore real data
 JARVIS_HOME/ACCOUNTS/*/

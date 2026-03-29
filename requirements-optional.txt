@@ -1,0 +1,10 @@
+# JARVIS v2 Optional Dependencies
+# These are heavy packages — only needed for advanced features.
+# Install separately: pip install -r requirements-optional.txt
+
+# Pattern recognition & embedding generation
+sentence-transformers>=2.2
+numpy>=1.24
+
+# Local whisper transcription (if not using NVIDIA Whisper API)
+# openai-whisper>=20231117

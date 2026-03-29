@@ -7,7 +7,7 @@ import * as os from "os";
 
 const JARVIS_DATA_DIR =
   process.env.JARVIS_DATA_DIR ||
-  path.join(os.homedir(), "Documents", "claude space", "JARVIS");
+  path.join(os.homedir(), "JARVIS");
 
 async function main() {
   const server = new Server(

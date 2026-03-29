@@ -5,7 +5,7 @@ import { ConversationDB } from './db';
 
 // ============== Configuration ==============
 
-const WORKSPACE_ROOT = process.env.OPENCODE_WORKSPACE || process.cwd() || '/path/to/your/workspace';
+const WORKSPACE_ROOT = process.env.OPENCODE_WORKSPACE || process.cwd();
 const RULES_PATH = join(WORKSPACE_ROOT, 'config', 'rules.yaml');
 
 interface Rule {

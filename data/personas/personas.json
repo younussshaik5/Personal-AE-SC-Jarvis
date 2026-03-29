@@ -4,9 +4,7 @@
       "id": "work",
       "name": "Work",
       "persona_type": "solution_consultant",
-      "workspaces": [
-        "/path/to/your/workspace"
-      ],
+      "workspaces": [],
       "preferences": {},
       "deals": [],
       "knowledge_graph": {},

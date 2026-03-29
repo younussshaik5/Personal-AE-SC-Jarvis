@@ -1,8 +1,8 @@
 {
   "opencode": {
-    "dbPath": "~/.local/share/opencode/opencode.db",
-    "logDir": "~/.local/share/opencode/log",
-    "toolOutputDir": "~/.local/share/opencode/tool-output"
+    "dbPath": "/Users/syounus/.local/share/opencode/opencode.db",
+    "logDir": "/Users/syounus/.local/share/opencode/log",
+    "toolOutputDir": "/Users/syounus/.local/share/opencode/tool-output"
   },
   "observer": {
     "port": 3000,
@@ -16,6 +16,6 @@
   },
   "logging": {
     "level": "info",
-    "file": "./logs/observer.log"
+    "file": "/private/tmp/test-jarvis/logs/observer.log"
   }
 }

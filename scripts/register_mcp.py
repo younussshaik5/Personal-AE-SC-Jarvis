@@ -36,7 +36,7 @@ def register_jarvis_mcp():
     mcp_server_path = repo_root / "mcp-jarvis-server" / "dist" / "index.js"
 
     # JARVIS data directory
-    jarvis_home = os.environ.get("JARVIS_HOME", str(Path.home() / "Documents" / "claude space" / "JARVIS"))
+    jarvis_home = os.environ.get("JARVIS_HOME", str(Path.home() / "JARVIS"))
 
     # Build MCP server entry
     jarvis_entry = {

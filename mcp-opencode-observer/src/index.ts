@@ -2,8 +2,16 @@ import { ConversationDB } from './db';
 import { createServer as createHttpServer } from 'http';
 import { readFileSync, existsSync, unlinkSync } from 'fs';
 import { join } from 'path';
+import { homedir } from 'os';
 import { WebSocketServer } from 'ws';
 import { startAutonomy, getStatus } from './autonomy';
+
+function expandHome(p: string): string {
+  if (p.startsWith('~/') || p === '~') {
+    return join(homedir(), p.slice(2));
+  }
+  return p;
+}
 
 // Load configuration
 const configPath = process.env.OPENCODE_OBSERVER_CONFIG || join(process.cwd(), 'config', 'mcp-observer.json');
@@ -15,14 +23,34 @@ try {
   }
 } catch (e: any) {
   console.error('Failed to load config:', e.message);
-  config = {
-    opencode: {
-      dbPath: '~/.local/share/opencode/opencode.db',
-      toolOutputDir: '~/.local/share/opencode/tool-output'
-    },
-    observer: { port: 3000, wsPort: 3001, pollInterval: 1000 }
+  config = {};
+}
+
+// Portable defaults — detect OpenCode DB per OS
+if (!config.opencode) {
+  config.opencode = {};
+}
+if (!config.opencode.dbPath) {
+  config.opencode.dbPath = expandHome(
+    process.env.OPENCODE_DB_PATH || '~/.local/share/opencode/opencode.db'
+  );
+}
+if (!config.opencode.toolOutputDir) {
+  config.opencode.toolOutputDir = expandHome(
+    process.env.OPENCODE_TOOL_OUTPUT_DIR || '~/.local/share/opencode/tool-output'
+  );
+}
+if (!config.observer) {
+  config.observer = {
+    port: parseInt(process.env.OPENCODE_OBSERVER_PORT || '3000', 10),
+    wsPort: parseInt(process.env.OPENCODE_OBSERVER_WS_PORT || '3001', 10),
+    pollInterval: parseInt(process.env.OPENCODE_OBSERVER_POLL_INTERVAL || '1000', 10)
   };
 }
+
+// Expand ~ in all path fields
+config.opencode.dbPath = expandHome(config.opencode.dbPath);
+config.opencode.toolOutputDir = expandHome(config.opencode.toolOutputDir);
 
 // Initialize database
 const db = new ConversationDB(config.opencode.dbPath);

@@ -185,12 +185,12 @@ class ConfigManager:
         else:
             # Create default config file
             self.save(self.config, config_path)
-        # Convert path strings to Path objects before ensuring dirs
+        # Convert path strings to Path objects and expand ~ before ensuring dirs
         from pathlib import Path
         for attr in ["workspace_root","data_dir","logs_dir","temp_dir","opencode_db_path","killswitch_path"]:
             val = getattr(self.config, attr)
             if isinstance(val, str):
-                setattr(self.config, attr, Path(val))
+                setattr(self.config, attr, Path(val).expanduser().resolve())
         
         # Handle OpenCode AI integration: override LLM config if enabled
         if getattr(self.config, 'opencode_ai_enabled', False):
