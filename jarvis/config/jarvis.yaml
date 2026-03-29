@@ -1,9 +1,15 @@
 # JARVIS v2 - Personal AE + SC Sales Assistant
 # All paths are resolved at runtime from JARVIS_HOME env var or defaults
 
-workspace_root: ~/Documents/claude space/JARVIS
-data_dir: ~/Documents/claude space/JARVIS/data
-logs_dir: ~/Documents/claude space/JARVIS/logs
+workspace_root: ~/JARVIS
+data_dir: ~/JARVIS/data
+logs_dir: ~/JARVIS/logs
+
+# Claude workspace directory — where you use Claude Desktop / Claude Code
+# Set this to your actual Claude workspace folder on this machine
+# Leave empty ("") to disable claude space watching
+# Override via CLAUDE_SPACE env var in .env
+claude_space: ""
 approval_required: true
 approval_threshold: 50
 
@@ -57,8 +63,8 @@ llm_fallback:
 
 # Meeting processing
 meeting:
-  recordings_dir: ~/Documents/claude space/JARVIS/recordings
-  queue_dir: ~/Documents/claude space/JARVIS/data/meeting_queue
+  recordings_dir: ""  # resolved from JARVIS_HOME/recordings at runtime
+  queue_dir: ""       # resolved from JARVIS_HOME/data/meeting_queue at runtime
   auto_record: false
   frame_interval_seconds: 30
 

@@ -27,6 +27,15 @@ class JarvisConfig:
     logs_dir: Path = field(default_factory=lambda: _default_jarvis_home() / "logs")
     temp_dir: Path = field(default_factory=lambda: _default_jarvis_home() / "data" / "cache")
 
+    # Claude workspace directory — the folder where you use Claude Desktop / Claude Code
+    # Set via CLAUDE_SPACE env var or directly in jarvis.yaml / .env
+    # FileSystemObserver watches this alongside JARVIS_HOME so KnowledgeBuilder can
+    # extract intelligence from any file you work on with Claude
+    # Example: /Users/yourname/projects/claude-workspace
+    #          /home/yourname/work/claude-space
+    # Leave empty ("") to disable claude space watching
+    claude_space: str = field(default_factory=lambda: os.environ.get("CLAUDE_SPACE", ""))
+
     # MCP / OpenCode integration
     opencode_db_path: Path = Path.home() / ".local/share/opencode/opencode.db"
     opencode_api_url: str = "http://localhost:4096"
@@ -221,6 +230,9 @@ class ConfigManager:
         self.temp_dir = self.config.temp_dir
         self.opencode_db_path = self.config.opencode_db_path
         self.killswitch_path = self.config.killswitch_path
+        # claude_space — expand ~ if set, resolve to Path; None if not configured
+        _cs = self.config.claude_space
+        self.claude_space = Path(_cs).expanduser().resolve() if _cs else None
         self._file_mtime = config_path.stat().st_mtime
         return self.config
 

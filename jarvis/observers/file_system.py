@@ -3,7 +3,6 @@
 
 import asyncio
 import json
-import os
 from pathlib import Path
 from typing import Set, Dict, Optional, Any
 from watchdog.observers import Observer
@@ -109,12 +108,16 @@ class FileSystemObserver:
                 self.handlers.append(handler)
                 self._workspaces.add(ws)
                 self.logger.debug("Watching workspace", path=str(ws))
-        # Also watch CLAUDE_SPACE directory (where Claude conversations happen)
-        claude_space = Path(os.environ.get(
-            "CLAUDE_SPACE",
-            str(Path.home() / "Documents" / "claude space")
-        )).resolve()
-        if claude_space.exists() and claude_space not in self._workspaces:
+        # Also watch claude_space directory (where Claude conversations happen)
+        # Resolved from config.claude_space (set in .env / jarvis.yaml)
+        claude_space = getattr(self.config, 'claude_space', None)
+        if claude_space and isinstance(claude_space, Path):
+            claude_space = claude_space.resolve()
+        elif claude_space and isinstance(claude_space, str) and claude_space:
+            claude_space = Path(claude_space).expanduser().resolve()
+        else:
+            claude_space = None
+        if claude_space and claude_space.exists() and claude_space not in self._workspaces:
             cs_handler = JarvisFileSystemEventHandler(
                 self.event_bus, claude_space, self._main_loop, self.ignore_patterns
             )

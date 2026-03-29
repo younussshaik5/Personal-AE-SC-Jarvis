@@ -72,6 +72,28 @@ if [ ! -f .env ]; then
     cp .env.example .env
     echo ""
     echo "  Created .env from template"
+
+    # Prompt for CLAUDE_SPACE (the folder where they use Claude Desktop/Code)
+    echo ""
+    echo "  JARVIS watches your Claude workspace folder to extract sales intelligence"
+    echo "  from anything you work on with Claude."
+    echo ""
+    printf "  Where is your Claude workspace folder? (press Enter to skip): "
+    read -r CLAUDE_SPACE_INPUT
+    if [ -n "$CLAUDE_SPACE_INPUT" ]; then
+        # Expand ~ manually since sed won't do it
+        CLAUDE_SPACE_EXPANDED="${CLAUDE_SPACE_INPUT/#\~/$HOME}"
+        # Write to .env
+        if grep -q "^CLAUDE_SPACE=" .env; then
+            sed -i.bak "s|^CLAUDE_SPACE=.*|CLAUDE_SPACE=$CLAUDE_SPACE_EXPANDED|" .env && rm -f .env.bak
+        else
+            echo "CLAUDE_SPACE=$CLAUDE_SPACE_EXPANDED" >> .env
+        fi
+        echo "  Set CLAUDE_SPACE=$CLAUDE_SPACE_EXPANDED"
+    else
+        echo "  Skipped. Set CLAUDE_SPACE in .env later to enable claude space watching."
+    fi
+
     echo "  >>> IMPORTANT: Edit .env and add your NVIDIA_API_KEY <<<"
 fi
 
