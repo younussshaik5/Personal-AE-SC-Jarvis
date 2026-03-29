@@ -467,10 +467,10 @@ const TOOLS = [
     },
   },
   {
-    name: "jarvis_fill_rfp",
+    name: "jarvis_fill_rfi",
     description:
       "Trigger RFP analysis for an account and return the analysis for Claude to complete. " +
-      "Returns rfp_analysis.md (requirements map) and rfp_responses.md (draft responses). " +
+      "Returns rfi_analysis.md (requirements map) and rfi_responses.md (draft responses). " +
       "Call when user drops an RFP or asks you to fill/respond to an RFP.",
     inputSchema: {
       type: "object" as const,
@@ -1573,22 +1573,22 @@ export function registerTools(server: Server, dataDir: string) {
       }
 
       // ---------------------------------------------------------------
-      case "jarvis_fill_rfp": {
+      case "jarvis_fill_rfi": {
         const { account } = args as { account: string };
-        const rfpDir = path.join(accountsDir, account, "RFP");
-        const analysis = readFileOrNull(path.join(rfpDir, "rfp_analysis.md"));
-        const responses = readFileOrNull(path.join(rfpDir, "rfp_responses.md"));
-        const files = fs.existsSync(rfpDir)
-          ? fs.readdirSync(rfpDir).filter(f => !f.startsWith(".") && f !== "README.md")
+        const rfiDir = path.join(accountsDir, account, "RFI");
+        const analysis = readFileOrNull(path.join(rfiDir, "rfi_analysis.md"));
+        const responses = readFileOrNull(path.join(rfiDir, "rfi_responses.md"));
+        const files = fs.existsSync(rfiDir)
+          ? fs.readdirSync(rfiDir).filter(f => !f.startsWith(".") && f !== "README.md")
           : [];
 
         if (files.length === 0) {
           return { content: [{ type: "text" as const,
-            text: `No RFP files found in ACCOUNTS/${account}/RFP/. Drop the RFP document there first, then JARVIS will auto-process it.` }] };
+            text: `No RFI files found in ACCOUNTS/${account}/RFI/. Drop the RFI document there first, then JARVIS will auto-process it.` }] };
         }
         if (!analysis && !responses) {
           return { content: [{ type: "text" as const,
-            text: `RFP files found: ${files.join(", ")}\nJARVIS is still processing — check back in 2-3 minutes.\nFiles in RFP/: ${files.join(", ")}` }] };
+            text: `RFI files found: ${files.join(", ")}\nJARVIS is still processing — check back in 2-3 minutes.\nFiles in RFI/: ${files.join(", ")}` }] };
         }
         return { content: [{ type: "text" as const,
           text: `# RFP Intelligence for ${account}\n\nFiles: ${files.join(", ")}\n\n## Requirements Analysis\n${analysis || "Processing..."}\n\n---\n\n## Draft Responses\n${responses || "Processing..."}` }] };

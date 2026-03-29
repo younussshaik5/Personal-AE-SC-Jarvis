@@ -95,7 +95,7 @@ When you spot these, proactively say "I found a MEDDPICC signal — want me to u
 
 ## Presales Intelligence — Auto-Rules for 7 Sections
 
-Every ACCOUNTS/ folder has: DISCOVERY, RFP, BATTLECARD, DEMO_STRATEGY, RISK_REPORT, NEXT_STEPS, VALUE_ARCHITECTURE.
+Every ACCOUNTS/ folder has: DISCOVERY, RFI, BATTLECARD, DEMO_STRATEGY, RISK_REPORT, NEXT_STEPS, VALUE_ARCHITECTURE.
 All are auto-populated by JARVIS in the background using NVIDIA LLMs + live DuckDuckGo web research.
 Files are account-isolated — a change for Tata Sky never touches Acme Corp.
 
@@ -124,9 +124,9 @@ Files are account-isolated — a change for Tata Sky never touches Acme Corp.
 2. Present both options. Let user pick. Personalize further if asked.
 3. JARVIS auto-generates new drafts after each meeting summary
 
-### When user drops RFP file / asks to fill RFP:
-1. Confirm file is in ACCOUNTS/[account]/RFP/ folder
-2. Call `jarvis_fill_rfp` → returns analysis + draft responses
+### When user drops RFI file / asks to fill RFI:
+1. Confirm file is in ACCOUNTS/[account]/RFI/ folder
+2. Call `jarvis_fill_rfi` → returns analysis + draft responses
 3. Assemble the final document. Use long-context model if very large.
 
 ### When user asks for ROI / business case / value architecture:
@@ -183,7 +183,7 @@ When creating spreadsheets or presentations from JARVIS data:
 | `jarvis_get_notifications` | Check JARVIS alerts |
 | **`jarvis_get_discovery`** | **Discovery prep questions + final notes** |
 | **`jarvis_update_discovery`** | **Save notes after discovery call** |
-| **`jarvis_fill_rfp`** | **Get RFP analysis + draft responses** |
+| **`jarvis_fill_rfi`** | **Get RFI analysis + draft responses** |
 | **`jarvis_get_battlecard_full`** | **Full battlecard + JSON for PPT/Excel** |
 | **`jarvis_get_demo_strategy`** | **Demo flow + script** |
 | **`jarvis_get_risk_report`** | **Weekly risk report** |

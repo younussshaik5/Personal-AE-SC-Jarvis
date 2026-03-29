@@ -102,7 +102,7 @@ class DocumentProcessor:
     async def start(self):
         self.event_bus.subscribe("document.added",   self._on_document_added)
         self.event_bus.subscribe("email.added",       self._on_email_added)
-        self.event_bus.subscribe("rfp.file.added",    self._on_rfp_file_added)
+        self.event_bus.subscribe("rfi.file.added",    self._on_rfi_file_added)
         self.event_bus.subscribe("presales.file.added", self._on_presales_file_added)
         self.logger.info("DocumentProcessor started")
 
@@ -123,19 +123,19 @@ class DocumentProcessor:
             folder_type="EMAILS",
         )
 
-    async def _on_rfp_file_added(self, event: Event):
-        """User dropped an RFP source file — extract intel, then queue fill_rfp task."""
+    async def _on_rfi_file_added(self, event: Event):
+        """User dropped an RFI source file — extract intel, then queue fill_rfi task."""
         file_path = Path(event.data["path"])
         account_name = event.data["account"]
         await self.process_document(
             file_path=file_path,
             account_name=account_name,
-            folder_type="RFP",
-            doc_type_override="rfp",
+            folder_type="RFI",
+            doc_type_override="rfi",
         )
-        # After extraction, queue the RFP fill task (generates the filled response copy)
+        # After extraction, queue the RFI fill task (generates the filled response copy)
         self.event_bus.publish(Event(
-            type="rfp.source.ready",
+            type="rfi.source.ready",
             source="brain.documents",
             data={"account": account_name, "path": str(file_path),
                   "filename": file_path.name}

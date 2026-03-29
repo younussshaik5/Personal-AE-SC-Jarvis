@@ -40,7 +40,7 @@ IGNORE_NAMES = {
     "demo_strategy.md", "demo_script.md",
     "risk_report.md", "next_steps.md", "email_drafts.json",
     "roi_model.md", "tco_analysis.md", "value_data.json",
-    "rfp_analysis.md", "rfp_responses.md",
+    "rfi_analysis.md", "rfi_responses.md",
 }
 IGNORE_DIRS = {".git", "__pycache__", "node_modules", ".processed",
                "failed", "dist", "logs", "data", "INTEL"}
@@ -48,7 +48,7 @@ IGNORE_DIRS = {".git", "__pycache__", "node_modules", ".processed",
 # Presales sections that can receive user-dropped files
 # Files dropped here are extracted and fed to relevant downstream sections
 PRESALES_SECTIONS = {
-    "DISCOVERY", "RFP", "BATTLECARD", "DEMO_STRATEGY",
+    "DISCOVERY", "RFI", "BATTLECARD", "DEMO_STRATEGY",
     "RISK_REPORT", "NEXT_STEPS", "VALUE_ARCHITECTURE"
 }
 
@@ -195,17 +195,17 @@ class AccountWatcher:
             ))
             return
 
-        # ── RFP/ — user drops an RFP file ────────────────────────────
+        # ── RFI/ — user drops an RFI document ────────────────────────────
         # Only triggers on actual source RFPs (PDFs, DOCX, TXT) — not on
         # JARVIS-generated analysis/response files (those are in IGNORE_NAMES)
-        if (sub == "RFP"
+        if (sub == "RFI"
                 and not is_dir
                 and evt_type == "file.created"
                 and path.suffix.lower() in DOC_EXTS
                 and path.name not in IGNORE_NAMES
                 and "_filled" not in path.stem):
             self.event_bus.publish(Event(
-                type="rfp.file.added",
+                type="rfi.file.added",
                 source="account_watcher",
                 data={"path": str(path), "account": account_name,
                       "filename": path.name}

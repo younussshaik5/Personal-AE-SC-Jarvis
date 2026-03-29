@@ -158,15 +158,15 @@ class AccountAutoInitializer:
                         "**Attendees:**\n**Pain Points Confirmed:**\n**Budget Signal:**\n**Champion:**\n**Next Step:**\n"
                     ),
                 },
-                "RFP": {
+                "RFI": {
                     "README.md": (
-                        f"# RFP — {account_name}\n\n"
-                        "Drop the RFP document here (PDF, DOCX, or TXT).\n\n"
+                        f"# RFI — {account_name}\n\n"
+                        "Drop the RFI document here (PDF, DOCX, or TXT).\n\n"
                         "JARVIS will automatically:\n"
                         "1. Extract all requirements and scoring criteria\n"
-                        "2. Generate `rfp_analysis.md` — requirements mapped to our capabilities\n"
-                        "3. Generate `rfp_responses.md` — draft responses to each question\n\n"
-                        "Ask Claude: *'fill the RFP for [account]'* to get the complete assembled response.\n"
+                        "2. Generate `rfi_analysis.md` — requirements mapped to our capabilities\n"
+                        "3. Generate `rfi_responses.md` — draft responses to each question\n\n"
+                        "Ask Claude: *'fill the RFI for [account]'* to get the complete assembled response.\n"
                     ),
                 },
                 "BATTLECARD": {

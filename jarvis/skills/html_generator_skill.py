@@ -153,7 +153,7 @@ class HTMLGeneratorSkill:
             "nextsteps_status":    section_status("NEXT_STEPS", "next_steps.md"),
             "nextsteps_stage":     (self._read_json(account_dir / "NEXT_STEPS" / "email_drafts.json") or {}).get("current_stage", ""),
             "va_status":           section_status("VALUE_ARCHITECTURE", "roi_model.md"),
-            "rfp_files":           self._list_dir(account_dir / "RFP", "*.*"),
+            "rfi_files":           self._list_dir(account_dir / "RFI", "*.*"),
         }
 
     # ------------------------------------------------------------------
