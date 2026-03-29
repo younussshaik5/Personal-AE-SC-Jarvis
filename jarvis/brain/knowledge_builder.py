@@ -73,15 +73,19 @@ class KnowledgeBuilder:
         self._queue = TaskQueue(self._jarvis_home)
 
         # Subscribe to semantic events — queue tasks immediately
-        self.event_bus.subscribe("account.initialized",     self._on_account_event)
-        self.event_bus.subscribe("meeting.summary.ready",   self._on_account_event)
-        self.event_bus.subscribe("document.processed",      self._on_account_event)
-        self.event_bus.subscribe("brain.entry.routed",      self._on_account_event)
-        self.event_bus.subscribe("meddpicc.updated",        self._on_account_event)
-        self.event_bus.subscribe("email.added",             self._on_account_event)
-        self.event_bus.subscribe("knowledge.intel.updated", self._on_account_event)
+        self.event_bus.subscribe("account.initialized",      self._on_account_event)
+        self.event_bus.subscribe("meeting.summary.ready",    self._on_account_event)
+        self.event_bus.subscribe("document.processed",       self._on_account_event)
+        self.event_bus.subscribe("brain.entry.routed",       self._on_account_event)
+        self.event_bus.subscribe("meddpicc.updated",         self._on_account_event)
+        self.event_bus.subscribe("email.added",              self._on_account_event)
+        self.event_bus.subscribe("knowledge.intel.updated",  self._on_account_event)
         self.event_bus.subscribe("file.created",             self._on_file_event)
         self.event_bus.subscribe("file.modified",            self._on_file_event)
+        # Presales section events — cascade refreshes
+        self.event_bus.subscribe("account.sections.created", self._on_sections_created)
+        self.event_bus.subscribe("discovery.updated",        self._on_discovery_updated)
+        self.event_bus.subscribe("meddpicc.updated",         self._on_meddpicc_updated_presales)
 
         # On startup: queue gap-fill for every existing account (LOW priority)
         await self._queue_all_account_gaps()
@@ -104,7 +108,7 @@ class KnowledgeBuilder:
     # ------------------------------------------------------------------
 
     async def _on_account_event(self, event: Event):
-        """Any account-level event → queue gap-fill for that account."""
+        """Any account-level event → queue gap-fill + relevant presales refreshes."""
         account = (event.data.get("account") or
                    event.data.get("account_name") or "")
         if not account:
@@ -123,6 +127,61 @@ class KnowledgeBuilder:
             dedup_key=f"html_refresh:{account}",
             priority=TaskPriority.LOW,
         )
+        # On meeting summary or document processed → cascade presales refreshes
+        if event.type in ("meeting.summary.ready", "document.processed"):
+            for task_type in ("fill_discovery", "fill_demo_strategy",
+                              "fill_risk_report", "fill_next_steps"):
+                await self._queue.enqueue(
+                    task_type,
+                    payload={"account": account},
+                    account=account,
+                    priority=TaskPriority.MEDIUM,
+                    dedup_key=f"{task_type}:{account}:{event.type}",
+                )
+
+    async def _on_sections_created(self, event: Event):
+        """When 7 presales folders are created → queue initial population of all sections."""
+        account = event.data.get("account_name", "")
+        if not account:
+            return
+        # Queue all presales sections at LOW priority (background population)
+        for task_type in ("fill_discovery", "fill_battlecard", "fill_demo_strategy",
+                          "fill_risk_report", "fill_next_steps", "fill_value_architecture"):
+            await self._queue.enqueue(
+                task_type,
+                payload={"account": account},
+                account=account,
+                priority=TaskPriority.LOW,
+                dedup_key=f"{task_type}:{account}:init",
+            )
+
+    async def _on_discovery_updated(self, event: Event):
+        """Discovery updated → refresh demo strategy + value architecture."""
+        account = event.data.get("account", "") or event.data.get("account_name", "")
+        if not account:
+            return
+        for task_type in ("fill_demo_strategy", "fill_value_architecture"):
+            await self._queue.enqueue(
+                task_type,
+                payload={"account": account},
+                account=account,
+                priority=TaskPriority.MEDIUM,
+                dedup_key=f"{task_type}:{account}:discovery_cascade",
+            )
+
+    async def _on_meddpicc_updated_presales(self, event: Event):
+        """MEDDPICC changed → refresh discovery prep + risk report + value architecture."""
+        account = event.data.get("account", "") or event.data.get("account_name", "")
+        if not account:
+            return
+        for task_type in ("fill_discovery", "fill_risk_report", "fill_value_architecture"):
+            await self._queue.enqueue(
+                task_type,
+                payload={"account": account},
+                account=account,
+                priority=TaskPriority.MEDIUM,
+                dedup_key=f"{task_type}:{account}:meddpicc_cascade",
+            )
 
     async def _on_file_event(self, event: Event):
         """File changed in claude_space → queue workspace extraction."""
@@ -350,8 +409,683 @@ Return JSON: {{"patterns": [], "weak_meddpicc": [], "competitive": [], "bottlene
         )
 
     # ------------------------------------------------------------------
+    # Presales section handlers — called by WorkerPool
+    # Each writes to account's presales folder + publishes cascade event
+    # All paths via config.workspace_root — zero hardcoding
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    async def handle_fill_discovery(task, services: Dict[str, Any]):
+        """Generate/refresh DISCOVERY/discovery_prep.md from company intel + MEDDPICC gaps + web research."""
+        kb: "KnowledgeBuilder" = services["knowledge_builder"]
+        account = task.payload.get("account", "")
+        if not account:
+            return
+        account_dir = kb._accounts_dir / account
+        if not account_dir.exists():
+            return
+        discovery_dir = account_dir / "DISCOVERY"
+        if not discovery_dir.exists():
+            return
+
+        llm = kb._get_llm_client()
+        if not llm:
+            return
+
+        context = kb._build_account_context(account_dir)
+        # Enrich context with live web research
+        web_research = await kb._fetch_web_research(account)
+        context["web_research"] = web_research
+
+        meddpicc = context.get("meddpicc", {})
+        weak_dims = [dim for dim in ("metrics", "economic_buyer", "decision_criteria",
+                                     "decision_process", "paper_process", "implicate_pain",
+                                     "champion", "competition")
+                     if meddpicc.get(dim, 0) < 2]
+
+        intel_context = kb._read_intel_files(account_dir)
+
+        prompt = f"""You are a Sales + Presales expert preparing for a discovery call with {account}.
+
+Company intel:
+{json.dumps(web_research, indent=2)[:2000]}
+
+MEDDPICC status:
+{json.dumps(meddpicc, indent=2)}
+
+Weak MEDDPICC dimensions (score < 2): {weak_dims}
+
+Known intel from files:
+{intel_context[:1500]}
+
+Generate a comprehensive discovery prep document in markdown:
+
+## Company Background
+(2-3 sentences: industry, size, what they do, why they'd need AI/automation)
+
+## Top 10 Discovery Questions
+(industry-specific, open-ended, pain-focused)
+
+## MEDDPICC Gap Questions
+(for each weak dimension: 2 questions that fill the gap)
+
+## Stakeholders to Target
+(roles to engage based on deal stage)
+
+## Competitive Trap Questions
+(questions that expose competitor weaknesses without naming them directly)
+
+## Key Pain Points from Intel
+(summarized from what JARVIS already knows)"""
+
+        try:
+            content = await llm.generate_with_routing(
+                messages=[{"role": "user", "content": prompt}],
+                task_type="text", source="background"
+            )
+            if content:
+                (discovery_dir / "discovery_prep.md").write_text(
+                    f"# Discovery Prep — {account}\n\n"
+                    f"*Auto-generated by JARVIS — {datetime.now().strftime('%Y-%m-%d %H:%M')}*\n\n"
+                    f"---\n\n{content}",
+                    encoding="utf-8"
+                )
+                kb.logger.info("Discovery prep generated", account=account)
+                kb.event_bus.publish(Event(
+                    type="discovery.updated",
+                    source="brain.knowledge_builder",
+                    data={"account": account, "file": "discovery_prep.md"}
+                ))
+        except Exception as e:
+            kb.logger.error("fill_discovery failed", account=account, error=str(e))
+
+    @staticmethod
+    async def handle_fill_battlecard(task, services: Dict[str, Any]):
+        """Generate/refresh BATTLECARD/battlecard.md + battlecard_data.json via web research + Step 3.5 Flash reasoning."""
+        kb: "KnowledgeBuilder" = services["knowledge_builder"]
+        account = task.payload.get("account", "")
+        if not account:
+            return
+        account_dir = kb._accounts_dir / account
+        if not account_dir.exists():
+            return
+        bc_dir = account_dir / "BATTLECARD"
+        if not bc_dir.exists():
+            return
+
+        llm = kb._get_llm_client()
+        if not llm:
+            return
+
+        context = kb._build_account_context(account_dir)
+        web_research = await kb._fetch_web_research(account)
+        competitive_intel = kb._read_text(account_dir / "INTEL" / "competitive_analysis.md")
+        contacts = context.get("contacts", {}).get("contacts", [])
+
+        prompt = f"""You are a competitive intelligence expert. Create a battlecard for the deal with {account}.
+
+Company context from web research:
+{json.dumps(web_research, indent=2)[:1500]}
+
+Competitive analysis intel:
+{competitive_intel[:1500]}
+
+Contacts/roles at {account}:
+{json.dumps(contacts[:5], indent=2)}
+
+Return a JSON object with this exact structure:
+{{
+  "differentiators": ["top 5 unique selling points"],
+  "competitors": [
+    {{
+      "name": "Competitor name",
+      "weaknesses": ["weakness 1", "weakness 2"],
+      "trap_questions": ["question that exposes this competitor without naming them"],
+      "g2_positioning": "1-line G2 sentiment summary"
+    }}
+  ],
+  "objections": [
+    {{"objection": "common objection", "response": "counter response"}}
+  ],
+  "stakeholder_messaging": [
+    {{"role": "CTO/CFO/etc", "key_message": "what resonates with them"}}
+  ],
+  "win_probability": "Low/Medium/High",
+  "win_themes": ["theme 1", "theme 2"]
+}}"""
+
+        try:
+            response = await llm.generate_with_routing(
+                messages=[{"role": "user", "content": prompt}],
+                task_type="reasoning", source="background"
+            )
+            import re
+            match = re.search(r"\{.*\}", response, re.DOTALL)
+            bc_data = json.loads(match.group(0)) if match else {}
+            bc_data["account"] = account
+            bc_data["generated_at"] = datetime.now().isoformat()
+
+            # Write JSON
+            (bc_dir / "battlecard_data.json").write_text(
+                json.dumps(bc_data, indent=2), encoding="utf-8"
+            )
+
+            # Write readable markdown
+            md_lines = [f"# Battlecard — {account}\n",
+                        f"*Auto-generated by JARVIS — {datetime.now().strftime('%Y-%m-%d %H:%M')}*\n\n---\n"]
+            md_lines.append("## Our Top Differentiators\n")
+            for d in bc_data.get("differentiators", []):
+                md_lines.append(f"- {d}")
+            md_lines.append("\n## Competitors\n")
+            for c in bc_data.get("competitors", []):
+                md_lines.append(f"### {c.get('name', 'Unknown')}")
+                md_lines.append(f"**Weaknesses:** {', '.join(c.get('weaknesses', []))}")
+                md_lines.append(f"**G2:** {c.get('g2_positioning', '')}")
+                md_lines.append("**Trap Questions:**")
+                for q in c.get("trap_questions", []):
+                    md_lines.append(f"- {q}")
+                md_lines.append("")
+            md_lines.append("## Objection Handling\n")
+            for o in bc_data.get("objections", []):
+                md_lines.append(f"**{o.get('objection')}**")
+                md_lines.append(f"→ {o.get('response')}\n")
+            md_lines.append(f"\n## Win Probability: {bc_data.get('win_probability', 'TBD')}\n")
+
+            (bc_dir / "battlecard.md").write_text("\n".join(md_lines), encoding="utf-8")
+            kb.logger.info("Battlecard generated", account=account)
+            kb.event_bus.publish(Event(
+                type="battlecard.updated",
+                source="brain.knowledge_builder",
+                data={"account": account}
+            ))
+        except Exception as e:
+            kb.logger.error("fill_battlecard failed", account=account, error=str(e))
+
+    @staticmethod
+    async def handle_fill_demo_strategy(task, services: Dict[str, Any]):
+        """Generate DEMO_STRATEGY/demo_strategy.md + demo_script.md from discovery + intel."""
+        kb: "KnowledgeBuilder" = services["knowledge_builder"]
+        account = task.payload.get("account", "")
+        if not account:
+            return
+        account_dir = kb._accounts_dir / account
+        if not account_dir.exists():
+            return
+        demo_dir = account_dir / "DEMO_STRATEGY"
+        if not demo_dir.exists():
+            return
+
+        llm = kb._get_llm_client()
+        if not llm:
+            return
+
+        context = kb._build_account_context(account_dir)
+        final_discovery = kb._read_text(account_dir / "DISCOVERY" / "final_discovery.md")
+        value_prop = kb._read_text(account_dir / "INTEL" / "value_proposition.md")
+        bc_data_text = kb._read_text(account_dir / "BATTLECARD" / "battlecard_data.json")
+        contacts = context.get("contacts", {}).get("contacts", [])
+
+        prompt = f"""You are a presales expert building a demo strategy for {account}.
+
+Final discovery notes:
+{final_discovery[:2000] if final_discovery and 'Generating' not in final_discovery else 'Not yet available — use company intel'}
+
+Value proposition intel:
+{value_prop[:1000]}
+
+Battlecard context:
+{bc_data_text[:500]}
+
+Key contacts:
+{json.dumps(contacts[:5], indent=2)}
+
+Generate:
+
+# Demo Strategy — {account}
+
+## Narrative Hook
+(1-2 sentences: the pain story that opens the demo)
+
+## 40-Minute Demo Flow
+1. Discovery Recap (5 min) — confirm pain, set agenda
+2. Platform Overview (10 min) — the "aha" moment
+3. AI Capabilities (10 min) — show what they asked about
+4. Competitive Differentiation (5 min) — landmine-free
+5. ROI & Business Value (5 min) — their numbers
+6. Next Steps (5 min) — clear ask
+
+## Use Cases to Demo
+(specific to {account}'s stated requirements)
+
+## Competitive Landmines to Avoid
+(what NOT to say that competitors could use against us)
+
+## Personalization Checklist
+- [ ] Use {account} logo in slides
+- [ ] Reference their industry metrics
+- [ ] Use their terminology from discovery calls
+- [ ] Show use case they mentioned explicitly"""
+
+        try:
+            strategy = await llm.generate_with_routing(
+                messages=[{"role": "user", "content": prompt}],
+                task_type="reasoning", source="background"
+            )
+            if strategy:
+                (demo_dir / "demo_strategy.md").write_text(
+                    f"*Auto-generated by JARVIS — {datetime.now().strftime('%Y-%m-%d %H:%M')}*\n\n{strategy}",
+                    encoding="utf-8"
+                )
+
+            # Generate script only if discovery exists
+            if final_discovery and "Generating" not in final_discovery:
+                script_prompt = f"""Based on this demo strategy for {account}, write a line-by-line demo script.
+
+Strategy:
+{strategy[:2000] if strategy else 'See demo_strategy.md'}
+
+Format each section as:
+**[SLIDE/SCREEN]:** what to show
+**[SAY]:** exact words
+**[IF OBJECTION]:** how to handle
+
+Keep it natural, not robotic. Include 3 transition phrases between sections."""
+
+                script = await llm.generate_with_routing(
+                    messages=[{"role": "user", "content": script_prompt}],
+                    task_type="reasoning", source="background"
+                )
+                if script:
+                    (demo_dir / "demo_script.md").write_text(
+                        f"# Demo Script — {account}\n\n"
+                        f"*Auto-generated by JARVIS — {datetime.now().strftime('%Y-%m-%d %H:%M')}*\n\n"
+                        f"---\n\n{script}",
+                        encoding="utf-8"
+                    )
+
+            kb.logger.info("Demo strategy generated", account=account)
+            kb.event_bus.publish(Event(
+                type="demo.strategy.updated",
+                source="brain.knowledge_builder",
+                data={"account": account}
+            ))
+        except Exception as e:
+            kb.logger.error("fill_demo_strategy failed", account=account, error=str(e))
+
+    @staticmethod
+    async def handle_fill_risk_report(task, services: Dict[str, Any]):
+        """Auto-fill RISK_REPORT/risk_report.md using activities + MEDDPICC + web risk signals."""
+        kb: "KnowledgeBuilder" = services["knowledge_builder"]
+        account = task.payload.get("account", "")
+        if not account:
+            return
+        account_dir = kb._accounts_dir / account
+        if not account_dir.exists():
+            return
+        risk_dir = account_dir / "RISK_REPORT"
+        if not risk_dir.exists():
+            return
+
+        llm = kb._get_llm_client()
+        if not llm:
+            return
+
+        context = kb._build_account_context(account_dir)
+        meddpicc = context.get("meddpicc", {})
+        contacts = context.get("contacts", {}).get("contacts", [])
+        activities = context.get("recent_activities", [])
+        actions = kb._read_text(account_dir / "actions.md")
+
+        # Count activities by type
+        activity_counts = {}
+        for act in activities:
+            atype = act.get("type", "other")
+            activity_counts[atype] = activity_counts.get(atype, 0) + 1
+
+        # Identify weak MEDDPICC dimensions
+        weak_dims = [(dim, meddpicc.get(dim, 0)) for dim in
+                     ("metrics", "economic_buyer", "decision_criteria", "decision_process",
+                      "paper_process", "implicate_pain", "champion", "competition")
+                     if meddpicc.get(dim, 0) < 2]
+
+        discovery_md = kb._read_text(account_dir / "DISCOVERY" / "final_discovery.md")
+        intel_text = kb._read_text(account_dir / "INTEL" / "company_research.md")
+
+        # Get web risk signals
+        web_research = await kb._fetch_web_research(account, query_type="risks")
+
+        prompt = f"""Fill this risk report template for {account}. Use only facts from the data provided.
+
+Account data:
+- Contacts met: {[c.get('name', '') + ' (' + c.get('title', '') + ')' for c in contacts[:5]]}
+- Activity counts: {activity_counts}
+- MEDDPICC weak dimensions: {weak_dims}
+- Discovery notes excerpt: {discovery_md[:500] if discovery_md else 'None'}
+- Company intel excerpt: {intel_text[:500] if intel_text else 'None'}
+- Outstanding actions: {actions[:500] if actions else 'None'}
+- Web risk signals: {json.dumps(web_research, indent=2)[:500] if web_research else 'None'}
+
+Fill in the template below. Where data is missing, write "Unknown — needs discovery".
+
+## Top 3 Technical Use Cases
+1.
+2.
+3.
+
+## 3 Challenges We Are Solving
+1. [Challenge] → [How we solve it]
+2.
+3.
+
+## What Have We Done So Far
+SE activities: ({activity_counts.get('discovery', 0)}) Discovery, ({activity_counts.get('demo', 0)}) Demo, ({activity_counts.get('poc', 0)}) POC, ({activity_counts.get('rfp', 0)}) RFP, ({activity_counts.get('competitive', 0)}) Competitive
+
+## Stakeholders
+Met: (from contacts)
+Upcoming: (from calendar / next steps)
+
+## Outstanding / Next Steps
+(from actions.md)
+
+## Technical Gaps/Risks
+MEDDPICC dimensions below 2: (list them)
+Web risk signals: (layoffs, budget freeze, M&A etc)
+Product gaps: (any requirements we can't meet)"""
+
+        try:
+            filled = await llm.generate_with_routing(
+                messages=[{"role": "user", "content": prompt}],
+                task_type="quick", source="background"
+            )
+            if filled:
+                now = datetime.now()
+                # Append entry to existing risk_report.md (never overwrite)
+                existing = kb._read_text(risk_dir / "risk_report.md") or ""
+                entry = (f"\n\n---\n\n## {now.strftime('%Y-%m-%d')} — Weekly Update\n\n"
+                         f"**Owner:** SE\n\n{filled}")
+                (risk_dir / "risk_report.md").write_text(
+                    existing.rstrip() + entry, encoding="utf-8"
+                )
+                kb.logger.info("Risk report updated", account=account)
+                kb.event_bus.publish(Event(
+                    type="risk.report.updated",
+                    source="brain.knowledge_builder",
+                    data={"account": account}
+                ))
+        except Exception as e:
+            kb.logger.error("fill_risk_report failed", account=account, error=str(e))
+
+    @staticmethod
+    async def handle_fill_next_steps(task, services: Dict[str, Any]):
+        """Generate NEXT_STEPS/next_steps.md with stage-appropriate email drafts."""
+        kb: "KnowledgeBuilder" = services["knowledge_builder"]
+        account = task.payload.get("account", "")
+        if not account:
+            return
+        account_dir = kb._accounts_dir / account
+        if not account_dir.exists():
+            return
+        ns_dir = account_dir / "NEXT_STEPS"
+        if not ns_dir.exists():
+            return
+
+        llm = kb._get_llm_client()
+        if not llm:
+            return
+
+        context = kb._build_account_context(account_dir)
+        stage = context.get("deal_stage", {}).get("stage", "new_account")
+        contacts = context.get("contacts", {}).get("contacts", [])
+        primary_contact = contacts[0] if contacts else {}
+        actions = kb._read_text(account_dir / "actions.md")
+
+        stage_intents = {
+            "new_account": "initial outreach / setting up discovery call",
+            "discovery": "following up on discovery call with summary and next steps",
+            "demo": "thank you for the demo + next steps to advance",
+            "proposal": "following up on proposal / handling objections",
+            "negotiation": "working toward agreement / removing blockers",
+            "closed_won": "congratulations + onboarding next steps",
+            "closed_lost": "post-loss check-in to keep relationship warm",
+        }
+        intent = stage_intents.get(stage, "following up to advance the deal")
+
+        prompt = f"""Write 2 email draft options for {account} at {stage} stage.
+
+Intent: {intent}
+Primary contact: {primary_contact.get('name', '[Contact Name]')} — {primary_contact.get('title', '')}
+Outstanding actions: {actions[:300] if actions else 'None'}
+
+For each email draft:
+Subject: [Subject line]
+Body: [Email body — personalized, concise, clear next action]
+
+Make them sound human, not templated. Reference actual deal context where possible.
+Draft A: More direct/assertive
+Draft B: More consultative/soft touch"""
+
+        try:
+            drafts_text = await llm.generate_with_routing(
+                messages=[{"role": "user", "content": prompt}],
+                task_type="text", source="background"
+            )
+            if drafts_text:
+                now = datetime.now().strftime("%Y-%m-%d %H:%M")
+                (ns_dir / "next_steps.md").write_text(
+                    f"# Next Steps & Email Drafts — {account}\n\n"
+                    f"*Auto-generated by JARVIS — {now}*\n"
+                    f"*Current stage: {stage.replace('_', ' ').title()}*\n\n"
+                    f"---\n\n{drafts_text}",
+                    encoding="utf-8"
+                )
+                # Update JSON index
+                drafts_json = {"account": account, "generated_at": now,
+                               "current_stage": stage, "drafts": [drafts_text]}
+                (ns_dir / "email_drafts.json").write_text(
+                    json.dumps(drafts_json, indent=2), encoding="utf-8"
+                )
+                kb.logger.info("Next steps generated", account=account)
+                kb.event_bus.publish(Event(
+                    type="next_steps.updated",
+                    source="brain.knowledge_builder",
+                    data={"account": account, "stage": stage}
+                ))
+        except Exception as e:
+            kb.logger.error("fill_next_steps failed", account=account, error=str(e))
+
+    @staticmethod
+    async def handle_fill_value_architecture(task, services: Dict[str, Any]):
+        """Generate VALUE_ARCHITECTURE/ files: ROI model, TCO, value_data.json via long-context + web research."""
+        kb: "KnowledgeBuilder" = services["knowledge_builder"]
+        account = task.payload.get("account", "")
+        if not account:
+            return
+        account_dir = kb._accounts_dir / account
+        if not account_dir.exists():
+            return
+        va_dir = account_dir / "VALUE_ARCHITECTURE"
+        if not va_dir.exists():
+            return
+
+        llm = kb._get_llm_client()
+        if not llm:
+            return
+
+        context = kb._build_account_context(account_dir)
+        meddpicc = context.get("meddpicc", {})
+        discovery_notes = kb._read_text(account_dir / "DISCOVERY" / "final_discovery.md")
+        value_prop = kb._read_text(account_dir / "INTEL" / "value_proposition.md")
+        web_research = await kb._fetch_web_research(account)
+
+        metrics_from_discovery = meddpicc.get("notes", {}).get("metrics", "")
+        company_size = web_research.get("company_size", "Unknown")
+
+        prompt = f"""Build a value architecture for {account}.
+
+Company size: {company_size}
+Discovery metrics mentioned: {metrics_from_discovery or 'Not captured yet'}
+Value proposition intel: {value_prop[:800] if value_prop else 'None'}
+Discovery notes: {discovery_notes[:800] if discovery_notes and 'Generating' not in discovery_notes else 'None yet'}
+
+Generate two sections:
+
+## ROI Model — {account}
+
+### Scenario: Conservative (Year 1)
+- Efficiency gain: X%
+- Cost reduction: $X
+- Revenue impact: $X
+- Total ROI: X%
+- Payback period: X months
+
+### Scenario: Realistic (Year 1)
+[same structure]
+
+### Scenario: Optimistic (Year 1)
+[same structure]
+
+### Key Assumptions
+[list assumptions used]
+
+---
+
+## TCO Analysis — {account}
+
+### Current Stack (estimated)
+[tools they likely use, estimated annual cost]
+
+### With Our Solution
+[our pricing + implementation + maintenance]
+
+### 3-Year Total Savings
+[calculation]
+
+### ROI Summary
+[1-paragraph executive summary]"""
+
+        try:
+            va_content = await llm.generate_with_routing(
+                messages=[{"role": "user", "content": prompt}],
+                task_type="long_context", source="background"
+            )
+            if va_content:
+                # Split into ROI and TCO sections
+                if "## TCO Analysis" in va_content:
+                    parts = va_content.split("## TCO Analysis")
+                    roi_part = parts[0]
+                    tco_part = "## TCO Analysis" + parts[1]
+                else:
+                    roi_part = va_content
+                    tco_part = ""
+
+                now = datetime.now().strftime("%Y-%m-%d %H:%M")
+                (va_dir / "roi_model.md").write_text(
+                    f"# ROI Model — {account}\n*Auto-generated by JARVIS — {now}*\n\n---\n\n{roi_part}",
+                    encoding="utf-8"
+                )
+                if tco_part:
+                    (va_dir / "tco_analysis.md").write_text(
+                        f"# TCO Analysis — {account}\n*Auto-generated by JARVIS — {now}*\n\n---\n\n{tco_part}",
+                        encoding="utf-8"
+                    )
+                # Update value_data.json
+                value_data = {"account": account, "generated_at": now,
+                              "status": "generated",
+                              "metrics": {"company_size": company_size},
+                              "web_research_used": bool(web_research)}
+                (va_dir / "value_data.json").write_text(
+                    json.dumps(value_data, indent=2), encoding="utf-8"
+                )
+                kb.logger.info("Value architecture generated", account=account)
+                kb.event_bus.publish(Event(
+                    type="value_architecture.updated",
+                    source="brain.knowledge_builder",
+                    data={"account": account}
+                ))
+        except Exception as e:
+            kb.logger.error("fill_value_architecture failed", account=account, error=str(e))
+
+    # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
+
+    @staticmethod
+    async def _fetch_web_research(account: str, query_type: str = "company") -> dict:
+        """Fetch live web research for an account using DuckDuckGo.
+        Returns dict with company intel — used by all presales skill handlers."""
+        try:
+            import aiohttp
+            from urllib.parse import quote_plus
+            import re as _re
+
+            results = {}
+            queries = {
+                "company": [
+                    f"{account} company industry size overview 2025",
+                    f"{account} technology stack CRM tools customer service",
+                    f"{account} revenue growth employees 2024 2025",
+                ],
+                "risks": [
+                    f"{account} layoff budget freeze 2024 2025",
+                    f"{account} merger acquisition leadership change",
+                ],
+            }
+            search_queries = queries.get(query_type, queries["company"])
+            snippets = []
+
+            async with aiohttp.ClientSession() as session:
+                for query in search_queries:
+                    try:
+                        url = f"https://html.duckduckgo.com/html/?q={quote_plus(query)}"
+                        headers = {
+                            "User-Agent": "Mozilla/5.0 (JARVIS/2.0; Sales Intelligence Bot)"
+                        }
+                        async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                            if resp.status == 200:
+                                html = await resp.text()
+                                found = _re.findall(
+                                    r'<a class="result__snippet">(.*?)</a>', html, _re.DOTALL
+                                )
+                                for s in found[:3]:
+                                    clean = _re.sub(r"<[^>]+>", "", s).strip()
+                                    if clean:
+                                        snippets.append(clean)
+                    except Exception:
+                        pass
+
+            results["raw_snippets"] = snippets[:8]
+            results["account"] = account
+            results["fetched_at"] = datetime.now().isoformat()
+
+            # Basic extractions from snippets
+            text = " ".join(snippets).lower()
+            results["company_size"] = (
+                "Enterprise (10000+)" if any(x in text for x in ["billion", "10,000", "100,000"]) else
+                "Mid-Market (1000-10000)" if any(x in text for x in ["thousand", "1,000"]) else
+                "SMB (<1000)"
+            )
+            return results
+        except Exception:
+            return {"account": account, "raw_snippets": [], "company_size": "Unknown"}
+
+    def _read_intel_files(self, account_dir: Path) -> str:
+        """Read all INTEL/ markdown files and return concatenated text (truncated)."""
+        intel_dir = account_dir / "INTEL"
+        if not intel_dir.exists():
+            return ""
+        parts = []
+        for f in intel_dir.glob("*.md"):
+            try:
+                parts.append(f"### {f.stem}\n{f.read_text(encoding='utf-8', errors='ignore')[:500]}")
+            except Exception:
+                pass
+        return "\n\n".join(parts)[:3000]
+
+    def _read_text(self, path: Path) -> str:
+        try:
+            return path.read_text(encoding="utf-8") if path.exists() else ""
+        except Exception:
+            return ""
 
     def _identify_gaps(self, account_dir: Path) -> List[str]:
         gaps = []

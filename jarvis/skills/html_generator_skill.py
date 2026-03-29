@@ -40,11 +40,18 @@ class HTMLGeneratorSkill:
         self._accounts_dir = self._jarvis_home / "ACCOUNTS"
 
         # Regenerate on any data change
-        self.event_bus.subscribe("knowledge.intel.updated", self._on_account_change)
-        self.event_bus.subscribe("meddpicc.updated",        self._on_account_change)
-        self.event_bus.subscribe("account.initialized",     self._on_account_change)
-        self.event_bus.subscribe("meeting.summary.ready",   self._on_account_change)
-        self.event_bus.subscribe("deal.stage.changed",      self._on_account_change)
+        self.event_bus.subscribe("knowledge.intel.updated",  self._on_account_change)
+        self.event_bus.subscribe("meddpicc.updated",         self._on_account_change)
+        self.event_bus.subscribe("account.initialized",      self._on_account_change)
+        self.event_bus.subscribe("meeting.summary.ready",    self._on_account_change)
+        self.event_bus.subscribe("deal.stage.changed",       self._on_account_change)
+        # Presales section events
+        self.event_bus.subscribe("discovery.updated",        self._on_account_change)
+        self.event_bus.subscribe("battlecard.updated",       self._on_account_change)
+        self.event_bus.subscribe("risk.report.updated",      self._on_account_change)
+        self.event_bus.subscribe("demo.strategy.updated",    self._on_account_change)
+        self.event_bus.subscribe("next_steps.updated",       self._on_account_change)
+        self.event_bus.subscribe("value_architecture.updated", self._on_account_change)
 
         self.logger.info("HTMLGeneratorSkill started")
 
@@ -97,6 +104,27 @@ class HTMLGeneratorSkill:
     # ------------------------------------------------------------------
 
     def _collect_account_data(self, account_dir: Path) -> dict:
+        # Presales section status
+        def section_status(folder: str, key_file: str) -> str:
+            f = account_dir / folder / key_file
+            if not f.exists():
+                return "not_initialized"
+            text = self._read_text(f)
+            if "Generating..." in text or "Waiting for" in text:
+                return "pending"
+            return "ready"
+
+        def section_preview(folder: str, key_file: str, max_chars: int = 400) -> str:
+            f = account_dir / folder / key_file
+            text = self._read_text(f)
+            if not text or "Generating..." in text:
+                return ""
+            # Return first non-heading content lines
+            lines = [l for l in text.splitlines() if l.strip() and not l.startswith("#") and not l.startswith("*Auto")]
+            return " ".join(lines)[:max_chars]
+
+        bc_data = self._read_json(account_dir / "BATTLECARD" / "battlecard_data.json") or {}
+
         return {
             "account":         account_dir.name,
             "generated_at":    datetime.now().strftime("%Y-%m-%d %H:%M"),
@@ -109,6 +137,20 @@ class HTMLGeneratorSkill:
             "meetings_count":  len(self._list_dir(account_dir / "meetings", "*.md")),
             "documents_count": len(self._list_dir(account_dir / "DOCUMENTS", "*.*")),
             "emails_count":    len(self._list_dir(account_dir / "EMAILS", "*.*")),
+            # Presales section statuses and previews
+            "discovery_status":    section_status("DISCOVERY", "discovery_prep.md"),
+            "discovery_preview":   section_preview("DISCOVERY", "final_discovery.md"),
+            "battlecard_status":   section_status("BATTLECARD", "battlecard.md"),
+            "battlecard_win_prob": bc_data.get("win_probability", ""),
+            "battlecard_diff":     bc_data.get("differentiators", [])[:3],
+            "demo_status":         section_status("DEMO_STRATEGY", "demo_strategy.md"),
+            "demo_preview":        section_preview("DEMO_STRATEGY", "demo_strategy.md"),
+            "risk_status":         section_status("RISK_REPORT", "risk_report.md"),
+            "risk_preview":        section_preview("RISK_REPORT", "risk_report.md"),
+            "nextsteps_status":    section_status("NEXT_STEPS", "next_steps.md"),
+            "nextsteps_stage":     (self._read_json(account_dir / "NEXT_STEPS" / "email_drafts.json") or {}).get("current_stage", ""),
+            "va_status":           section_status("VALUE_ARCHITECTURE", "roi_model.md"),
+            "rfp_files":           self._list_dir(account_dir / "RFP", "*.*"),
         }
 
     # ------------------------------------------------------------------
@@ -201,6 +243,16 @@ class HTMLGeneratorSkill:
   .full{{grid-column:1/-1}}
   pre{{font-family:inherit;white-space:pre-wrap;font-size:12px;color:#334155;max-height:180px;overflow-y:auto;line-height:1.5}}
   a{{color:#2563eb;text-decoration:none}}
+  .ps-grid{{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;grid-column:1/-1}}
+  .ps-card{{background:white;border-radius:10px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,.07)}}
+  .ps-card h3{{font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px}}
+  .ps-badge{{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;margin-bottom:6px}}
+  .badge-ready{{background:#dcfce7;color:#15803d}}
+  .badge-pending{{background:#fef9c3;color:#854d0e}}
+  .badge-init{{background:#f1f5f9;color:#94a3b8}}
+  .ps-preview{{font-size:12px;color:#475569;line-height:1.4;margin-top:4px}}
+  .ps-list{{font-size:12px;color:#334155;margin-top:4px}}
+  .ps-list li{{margin-bottom:2px}}
 </style>
 </head>
 <body>
@@ -246,9 +298,78 @@ class HTMLGeneratorSkill:
     <pre>{d['actions'][:3000] or 'No action items yet'}</pre>
   </div>
 
+  <div class="full" style="margin-top:4px">
+    <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">
+      Presales Intelligence
+    </div>
+    <div class="ps-grid">
+      {self._render_ps_card("Discovery", d['discovery_status'], d['discovery_preview'], "DISCOVERY/discovery_prep.md")}
+      {self._render_ps_card_battlecard(d)}
+      {self._render_ps_card("Demo Strategy", d['demo_status'], d['demo_preview'], "DEMO_STRATEGY/demo_strategy.md")}
+      {self._render_ps_card_risk(d)}
+      {self._render_ps_card_nextsteps(d)}
+      {self._render_ps_card("Value Architecture", d['va_status'], "", "VALUE_ARCHITECTURE/roi_model.md")}
+    </div>
+  </div>
+
 </div>
 </body>
 </html>"""
+
+    # ------------------------------------------------------------------
+    # Presales section card renderers
+    # ------------------------------------------------------------------
+
+    def _badge(self, status: str) -> str:
+        cls = {"ready": "badge-ready", "pending": "badge-pending"}.get(status, "badge-init")
+        label = {"ready": "Ready", "pending": "Generating...", "not_initialized": "Not set up"}.get(status, status)
+        return f"<span class='ps-badge {cls}'>{label}</span>"
+
+    def _render_ps_card(self, title: str, status: str, preview: str, link: str) -> str:
+        preview_html = f"<p class='ps-preview'>{preview[:300]}</p>" if preview else ""
+        return (f"<div class='ps-card'>"
+                f"<h3><a href='{link}' style='color:inherit;text-decoration:none'>{title}</a></h3>"
+                f"{self._badge(status)}"
+                f"{preview_html}"
+                f"</div>")
+
+    def _render_ps_card_battlecard(self, d: dict) -> str:
+        status = d.get("battlecard_status", "not_initialized")
+        win_prob = d.get("battlecard_win_prob", "")
+        diffs = d.get("battlecard_diff", [])
+        extras = ""
+        if win_prob:
+            extras += f"<p class='ps-preview'>Win probability: <strong>{win_prob}</strong></p>"
+        if diffs:
+            items = "".join(f"<li>{diff}</li>" for diff in diffs)
+            extras += f"<ul class='ps-list'>{items}</ul>"
+        return (f"<div class='ps-card'>"
+                f"<h3><a href='BATTLECARD/battlecard.md' style='color:inherit;text-decoration:none'>Battlecard</a></h3>"
+                f"{self._badge(status)}"
+                f"{extras}"
+                f"</div>")
+
+    def _render_ps_card_risk(self, d: dict) -> str:
+        status = d.get("risk_status", "not_initialized")
+        preview = d.get("risk_preview", "")
+        color = "#ef4444" if "Critical" in preview or "High" in preview else "#f59e0b" if "Medium" in preview else "#22c55e"
+        dot = f"<span style='display:inline-block;width:8px;height:8px;border-radius:50%;background:{color};margin-right:4px'></span>" if status == "ready" else ""
+        preview_html = f"<p class='ps-preview'>{dot}{preview[:250]}</p>" if preview else ""
+        return (f"<div class='ps-card'>"
+                f"<h3><a href='RISK_REPORT/risk_report.md' style='color:inherit;text-decoration:none'>Risk Report</a></h3>"
+                f"{self._badge(status)}"
+                f"{preview_html}"
+                f"</div>")
+
+    def _render_ps_card_nextsteps(self, d: dict) -> str:
+        status = d.get("nextsteps_status", "not_initialized")
+        stage = d.get("nextsteps_stage", "").replace("_", " ").title()
+        stage_html = f"<p class='ps-preview'>Stage: <strong>{stage}</strong></p>" if stage else ""
+        return (f"<div class='ps-card'>"
+                f"<h3><a href='NEXT_STEPS/next_steps.md' style='color:inherit;text-decoration:none'>Next Steps</a></h3>"
+                f"{self._badge(status)}"
+                f"{stage_html}"
+                f"</div>")
 
     # ------------------------------------------------------------------
     # File helpers

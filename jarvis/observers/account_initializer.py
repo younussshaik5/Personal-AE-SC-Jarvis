@@ -137,6 +137,145 @@ class AccountAutoInitializer:
                         )
                     created_files.append(f"{folder_name}/")
 
+            # 1b. Presales intelligence sections — auto-populated by JARVIS via NVIDIA + web research
+            presales_sections = {
+                "DISCOVERY": {
+                    "discovery_prep.md": (
+                        f"# Discovery Prep — {account_name}\n\n"
+                        "*JARVIS is generating discovery questions based on company intel and MEDDPICC gaps.*\n"
+                        "*This file is auto-refreshed when new intel arrives or MEDDPICC dimensions change.*\n\n"
+                        "---\n\n## Company Background\n*Generating...*\n\n"
+                        "## Top Discovery Questions\n*Generating...*\n\n"
+                        "## MEDDPICC Gap Questions\n*Generating...*\n\n"
+                        "## Stakeholders to Target\n*Generating...*\n"
+                    ),
+                    "final_discovery.md": (
+                        f"# Final Discovery Notes — {account_name}\n\n"
+                        "*Update this file after each discovery call.*\n"
+                        "*Each update is appended — full history is preserved.*\n\n"
+                        "---\n\n"
+                        f"## [Add entry: {datetime.now().strftime('%Y-%m-%d')}]\n\n"
+                        "**Attendees:**\n**Pain Points Confirmed:**\n**Budget Signal:**\n**Champion:**\n**Next Step:**\n"
+                    ),
+                },
+                "RFP": {
+                    "README.md": (
+                        f"# RFP — {account_name}\n\n"
+                        "Drop the RFP document here (PDF, DOCX, or TXT).\n\n"
+                        "JARVIS will automatically:\n"
+                        "1. Extract all requirements and scoring criteria\n"
+                        "2. Generate `rfp_analysis.md` — requirements mapped to our capabilities\n"
+                        "3. Generate `rfp_responses.md` — draft responses to each question\n\n"
+                        "Ask Claude: *'fill the RFP for [account]'* to get the complete assembled response.\n"
+                    ),
+                },
+                "BATTLECARD": {
+                    "battlecard.md": (
+                        f"# Battlecard — {account_name}\n\n"
+                        "*JARVIS is generating competitive positioning using live web research + NVIDIA reasoning.*\n"
+                        "*Auto-refreshed when new intel or competitive signals are detected.*\n\n"
+                        "---\n\n## Top Differentiators\n*Generating...*\n\n"
+                        "## Competitor Weaknesses\n*Generating...*\n\n"
+                        "## Trap-Setting Questions\n*Generating...*\n\n"
+                        "## Objection Responses\n*Generating...*\n\n"
+                        "## Win Probability\n*Generating...*\n"
+                    ),
+                    "battlecard_data.json": json.dumps({
+                        "account": account_name,
+                        "generated_at": datetime.now().isoformat(),
+                        "status": "pending",
+                        "differentiators": [],
+                        "competitors": [],
+                        "objections": [],
+                        "win_probability": None
+                    }, indent=2),
+                },
+                "DEMO_STRATEGY": {
+                    "demo_strategy.md": (
+                        f"# Demo Strategy — {account_name}\n\n"
+                        "*JARVIS generates this from your discovery notes + company intel.*\n"
+                        "*Updates automatically after each discovery call.*\n\n"
+                        "---\n\n## Narrative Hook\n*Generating from pain points...*\n\n"
+                        "## Recommended Demo Flow (40 min)\n*Generating...*\n\n"
+                        "## Use Cases to Show\n*Generating from requirements...*\n\n"
+                        "## Competitive Landmines to Avoid\n*Generating...*\n"
+                    ),
+                    "demo_script.md": (
+                        f"# Demo Script — {account_name}\n\n"
+                        "*Line-by-line script with transitions and fallback responses.*\n"
+                        "*Generated after discovery is complete.*\n\n"
+                        "---\n\n*Waiting for discovery notes to generate script...*\n"
+                    ),
+                },
+                "RISK_REPORT": {
+                    "risk_report.md": (
+                        f"# Risk Report — {account_name}\n\n"
+                        "*Auto-filled weekly from activities, contacts, MEDDPICC, and web risk signals.*\n"
+                        "*Format: [Initials] [Date] — append new entries, never overwrite.*\n\n"
+                        "---\n\n"
+                        f"## {datetime.now().strftime('%Y-%m-%d')} — Initial\n\n"
+                        "**Owner:** SE\n\n"
+                        "**Top 3 Technical Use Cases:**\n1. *Generating...*\n2.\n3.\n\n"
+                        "**3 Challenges We Are Solving:**\n1. *Generating...*\n\n"
+                        "**What Have We Done So Far:**\n"
+                        "SE activities: (0) Discovery, (0) Demo, (0) POC, (0) RFP, (0) Competitive\n\n"
+                        "**Stakeholders:**\nMet: *None yet*\nUpcoming: *Check calendar*\n\n"
+                        "**Outstanding / Next Steps:**\n*From actions.md*\n\n"
+                        "**Technical Gaps/Risks:**\n*MEDDPICC scores too low to assess yet*\n"
+                    ),
+                },
+                "NEXT_STEPS": {
+                    "next_steps.md": (
+                        f"# Next Steps & Email Drafts — {account_name}\n\n"
+                        "*JARVIS generates stage-appropriate email drafts after each interaction.*\n"
+                        "*Updated when deal stage changes or meeting notes are saved.*\n\n"
+                        "---\n\n## Current Stage: New Account\n\n"
+                        "### Suggested Email: Initial Outreach\n*Generating based on company intel...*\n"
+                    ),
+                    "email_drafts.json": json.dumps({
+                        "account": account_name,
+                        "generated_at": datetime.now().isoformat(),
+                        "current_stage": "new_account",
+                        "drafts": []
+                    }, indent=2),
+                },
+                "VALUE_ARCHITECTURE": {
+                    "roi_model.md": (
+                        f"# ROI Model — {account_name}\n\n"
+                        "*JARVIS generates 3 ROI scenarios (conservative/realistic/optimistic)*\n"
+                        "*using metrics extracted from your discovery calls and emails.*\n\n"
+                        "---\n\n*Waiting for discovery data to build ROI model...*\n"
+                    ),
+                    "tco_analysis.md": (
+                        f"# TCO Analysis — {account_name}\n\n"
+                        "*Total Cost of Ownership vs current stack + competitors.*\n"
+                        "*Generated from pricing intel + company size.*\n\n"
+                        "---\n\n*Generating from available intel...*\n"
+                    ),
+                    "value_data.json": json.dumps({
+                        "account": account_name,
+                        "generated_at": datetime.now().isoformat(),
+                        "status": "pending",
+                        "metrics": {},
+                        "roi_scenarios": {"conservative": {}, "realistic": {}, "optimistic": {}},
+                        "tco": {}
+                    }, indent=2),
+                },
+            }
+
+            presales_created = []
+            for section_name, files in presales_sections.items():
+                section_path = account_dir / section_name
+                if not section_path.exists():
+                    section_path.mkdir(parents=True, exist_ok=True)
+                    for fname, content in files.items():
+                        (section_path / fname).write_text(content, encoding="utf-8")
+                    presales_created.append(f"{section_name}/")
+                    created_files.append(f"{section_name}/")
+
+            if presales_created:
+                self.logger.info("Presales sections created", account=account_name, sections=presales_created)
+
             # 2a. Create meddpicc.json
             meddpicc_file = account_dir / "meddpicc.json"
             if not meddpicc_file.exists():
@@ -295,6 +434,15 @@ class AccountAutoInitializer:
                     "timestamp": datetime.now().isoformat()
                 })
                 self.event_bus.publish(init_event)
+
+                # If presales sections were created, fire dedicated event for skill population
+                if presales_created:
+                    sections_event = Event("account.sections.created", "account_initializer", {
+                        "account_name": account_name,
+                        "sections": presales_created,
+                        "timestamp": datetime.now().isoformat()
+                    })
+                    self.event_bus.publish(sections_event)
 
         except Exception as e:
             self.logger.error("Failed to initialize account", account=account_name, error=str(e))

@@ -178,10 +178,10 @@ class Orchestrator:
 
         # Services injected into every task handler
         services = {
-            "knowledge_builder": self.components.get("knowledge_builder"),
-            "html_generator":    self.components.get("html_generator"),
-            "event_bus":         self.event_bus,
-            "config":            self.config,
+            "knowledge_builder":  self.components.get("knowledge_builder"),
+            "html_generator":     self.components.get("html_generator"),
+            "event_bus":          self.event_bus,
+            "config":             self.config,
         }
         pool.set_services(services)
 
@@ -189,11 +189,18 @@ class Orchestrator:
         kb = self.components.get("knowledge_builder")
         hg = self.components.get("html_generator")
         if kb:
-            pool.register("gap_fill",          kb.handle_gap_fill)
-            pool.register("workspace_extract", kb.handle_workspace_extract)
-            pool.register("cross_deal_sync",   kb.handle_cross_deal_sync)
+            pool.register("gap_fill",                kb.handle_gap_fill)
+            pool.register("workspace_extract",       kb.handle_workspace_extract)
+            pool.register("cross_deal_sync",         kb.handle_cross_deal_sync)
+            # Presales intelligence section handlers
+            pool.register("fill_discovery",          kb.handle_fill_discovery)
+            pool.register("fill_battlecard",         kb.handle_fill_battlecard)
+            pool.register("fill_demo_strategy",      kb.handle_fill_demo_strategy)
+            pool.register("fill_risk_report",        kb.handle_fill_risk_report)
+            pool.register("fill_next_steps",         kb.handle_fill_next_steps)
+            pool.register("fill_value_architecture", kb.handle_fill_value_architecture)
         if hg:
-            pool.register("html_refresh",      hg.handle_html_refresh)
+            pool.register("html_refresh",            hg.handle_html_refresh)
 
         await pool.start()
         self.components["worker_pool"] = pool

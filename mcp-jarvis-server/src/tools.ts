@@ -429,6 +429,145 @@ const TOOLS = [
       required: ["account", "title", "doc_type", "content"],
     },
   },
+  // -------------------------------------------------------------------------
+  // Presales Intelligence Tools (AE + SC combined role)
+  // -------------------------------------------------------------------------
+  {
+    name: "jarvis_get_discovery",
+    description:
+      "Get discovery prep questions and final discovery notes for an account. " +
+      "Returns discovery_prep.md (questions JARVIS generated) + final_discovery.md (your notes). " +
+      "Call before any discovery call or when you need to review what's been discovered.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        account: { type: "string" as const, description: "Account folder name" },
+      },
+      required: ["account"],
+    },
+  },
+  {
+    name: "jarvis_update_discovery",
+    description:
+      "Save final discovery notes after a discovery call. " +
+      "Appends to final_discovery.md (never overwrites — full history preserved). " +
+      "Triggers cascade: demo strategy + value architecture auto-refresh.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        account: { type: "string" as const, description: "Account folder name" },
+        notes: { type: "string" as const, description: "Discovery notes to save" },
+        attendees: { type: "string" as const, description: "Attendees at the call (optional)" },
+        pain_points: { type: "string" as const, description: "Pain points confirmed (optional)" },
+        budget_signal: { type: "string" as const, description: "Budget signals mentioned (optional)" },
+        champion: { type: "string" as const, description: "Potential champion identified (optional)" },
+        next_step: { type: "string" as const, description: "Agreed next step (optional)" },
+      },
+      required: ["account", "notes"],
+    },
+  },
+  {
+    name: "jarvis_fill_rfp",
+    description:
+      "Trigger RFP analysis for an account and return the analysis for Claude to complete. " +
+      "Returns rfp_analysis.md (requirements map) and rfp_responses.md (draft responses). " +
+      "Call when user drops an RFP or asks you to fill/respond to an RFP.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        account: { type: "string" as const, description: "Account folder name" },
+      },
+      required: ["account"],
+    },
+  },
+  {
+    name: "jarvis_get_battlecard_full",
+    description:
+      "Get the full battlecard for an account: competitive positioning, differentiators, " +
+      "trap questions, objection responses, win probability. " +
+      "Returns both battlecard.md (readable) and battlecard_data.json (for PPT/Excel creation). " +
+      "Use this before a competitive call or demo.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        account: { type: "string" as const, description: "Account folder name" },
+      },
+      required: ["account"],
+    },
+  },
+  {
+    name: "jarvis_get_demo_strategy",
+    description:
+      "Get the demo strategy and script for an account. " +
+      "Returns demo_strategy.md (flow, use cases, narrative) and demo_script.md (line-by-line). " +
+      "Call before a demo to prepare the narrative and know which use cases to show.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        account: { type: "string" as const, description: "Account folder name" },
+      },
+      required: ["account"],
+    },
+  },
+  {
+    name: "jarvis_get_risk_report",
+    description:
+      "Get the current risk report for a deal. " +
+      "Returns risk_report.md with MEDDPICC gaps, activity counts, stakeholders, and risk signals. " +
+      "Updated weekly automatically. Use for deal reviews or manager check-ins.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        account: { type: "string" as const, description: "Account folder name" },
+      },
+      required: ["account"],
+    },
+  },
+  {
+    name: "jarvis_update_risk_report",
+    description:
+      "Append a weekly update entry to the risk report. " +
+      "Format: [Initials] [Date] — appends to existing file, never overwrites. " +
+      "Call after a deal review meeting or weekly pipeline review.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        account: { type: "string" as const, description: "Account folder name" },
+        update: { type: "string" as const, description: "Weekly update content to append" },
+        initials: { type: "string" as const, description: "Your initials (e.g. SY)" },
+      },
+      required: ["account", "update"],
+    },
+  },
+  {
+    name: "jarvis_get_next_steps",
+    description:
+      "Get email drafts and next step recommendations for the current deal stage. " +
+      "Returns next_steps.md with two email options (direct + consultative) " +
+      "personalized to the account. Use after any meeting or when stuck on follow-up.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        account: { type: "string" as const, description: "Account folder name" },
+      },
+      required: ["account"],
+    },
+  },
+  {
+    name: "jarvis_get_value_architecture",
+    description:
+      "Get the ROI model, TCO analysis, and structured value data for an account. " +
+      "Returns roi_model.md, tco_analysis.md, and value_data.json. " +
+      "Use this to build executive business case, create Excel/PPT value decks. " +
+      "NOTE: When creating Excel/PPT from value_data.json, use claude-haiku or claude-sonnet only.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        account: { type: "string" as const, description: "Account folder name" },
+      },
+      required: ["account"],
+    },
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -1338,6 +1477,161 @@ export function registerTools(server: Server, dataDir: string) {
             text: `Document saved: ACCOUNTS/${account}/DOCUMENTS/${filename}\nJARVIS will extract requirements, budget signals, and stakeholders in the background.`,
           }],
         };
+      }
+
+      // ---------------------------------------------------------------
+      // Presales Intelligence Handlers
+      // ---------------------------------------------------------------
+      case "jarvis_get_discovery": {
+        const { account } = args as { account: string };
+        const discoveryDir = path.join(accountsDir, account, "DISCOVERY");
+        const prep = readFileOrNull(path.join(discoveryDir, "discovery_prep.md"));
+        const final = readFileOrNull(path.join(discoveryDir, "final_discovery.md"));
+        if (!prep && !final) {
+          return { content: [{ type: "text" as const,
+            text: `No DISCOVERY folder found for "${account}". JARVIS may still be initializing it — try again in 30 seconds.` }] };
+        }
+        return { content: [{ type: "text" as const,
+          text: `# Discovery for ${account}\n\n## Discovery Prep (Questions & Intel)\n${prep || "Not generated yet"}\n\n---\n\n## Final Discovery Notes\n${final || "No notes saved yet — use jarvis_update_discovery after your call"}` }] };
+      }
+
+      // ---------------------------------------------------------------
+      case "jarvis_update_discovery": {
+        const { account, notes, attendees, pain_points, budget_signal, champion, next_step } = args as {
+          account: string; notes: string; attendees?: string; pain_points?: string;
+          budget_signal?: string; champion?: string; next_step?: string;
+        };
+        const discoveryDir = path.join(accountsDir, account, "DISCOVERY");
+        ensureDir(discoveryDir);
+        const finalFile = path.join(discoveryDir, "final_discovery.md");
+        const today = dateStr();
+
+        const entry = [
+          `\n\n---\n`,
+          `## ${today} — Discovery Session`,
+          attendees ? `**Attendees:** ${attendees}` : "",
+          `**Notes:**\n${notes}`,
+          pain_points ? `**Pain Points Confirmed:** ${pain_points}` : "",
+          budget_signal ? `**Budget Signal:** ${budget_signal}` : "",
+          champion ? `**Champion:** ${champion}` : "",
+          next_step ? `**Next Step:** ${next_step}` : "",
+        ].filter(Boolean).join("\n");
+
+        const existing = readFileOrNull(finalFile) || `# Final Discovery Notes — ${account}\n\n*Auto-managed by JARVIS*\n`;
+        fs.writeFileSync(finalFile, existing.trimEnd() + entry);
+
+        // Log activity
+        const actFile = path.join(accountsDir, account, "activities.jsonl");
+        fs.appendFileSync(actFile, JSON.stringify({ type: "discovery", date: today, summary: notes.slice(0, 100) }) + "\n");
+
+        return { content: [{ type: "text" as const,
+          text: `Discovery notes saved to ACCOUNTS/${account}/DISCOVERY/final_discovery.md\nJARVIS will auto-refresh: demo strategy + value architecture in the background.` }] };
+      }
+
+      // ---------------------------------------------------------------
+      case "jarvis_fill_rfp": {
+        const { account } = args as { account: string };
+        const rfpDir = path.join(accountsDir, account, "RFP");
+        const analysis = readFileOrNull(path.join(rfpDir, "rfp_analysis.md"));
+        const responses = readFileOrNull(path.join(rfpDir, "rfp_responses.md"));
+        const files = fs.existsSync(rfpDir)
+          ? fs.readdirSync(rfpDir).filter(f => !f.startsWith(".") && f !== "README.md")
+          : [];
+
+        if (files.length === 0) {
+          return { content: [{ type: "text" as const,
+            text: `No RFP files found in ACCOUNTS/${account}/RFP/. Drop the RFP document there first, then JARVIS will auto-process it.` }] };
+        }
+        if (!analysis && !responses) {
+          return { content: [{ type: "text" as const,
+            text: `RFP files found: ${files.join(", ")}\nJARVIS is still processing — check back in 2-3 minutes.\nFiles in RFP/: ${files.join(", ")}` }] };
+        }
+        return { content: [{ type: "text" as const,
+          text: `# RFP Intelligence for ${account}\n\nFiles: ${files.join(", ")}\n\n## Requirements Analysis\n${analysis || "Processing..."}\n\n---\n\n## Draft Responses\n${responses || "Processing..."}` }] };
+      }
+
+      // ---------------------------------------------------------------
+      case "jarvis_get_battlecard_full": {
+        const { account } = args as { account: string };
+        const bcDir = path.join(accountsDir, account, "BATTLECARD");
+        const md = readFileOrNull(path.join(bcDir, "battlecard.md"));
+        const jsonData = readFileOrNull(path.join(bcDir, "battlecard_data.json"));
+        if (!md) {
+          return { content: [{ type: "text" as const,
+            text: `No battlecard found for "${account}" yet. JARVIS is generating it — try again in 1-2 minutes.` }] };
+        }
+        return { content: [{ type: "text" as const,
+          text: `${md}\n\n---\n\n## Structured Data (use for PPT/Excel — Haiku/Sonnet only)\n\`\`\`json\n${jsonData || "{}"}\n\`\`\`` }] };
+      }
+
+      // ---------------------------------------------------------------
+      case "jarvis_get_demo_strategy": {
+        const { account } = args as { account: string };
+        const demoDir = path.join(accountsDir, account, "DEMO_STRATEGY");
+        const strategy = readFileOrNull(path.join(demoDir, "demo_strategy.md"));
+        const script = readFileOrNull(path.join(demoDir, "demo_script.md"));
+        if (!strategy) {
+          return { content: [{ type: "text" as const,
+            text: `No demo strategy found for "${account}" yet. JARVIS generates this after discovery notes are saved. Use jarvis_update_discovery first.` }] };
+        }
+        return { content: [{ type: "text" as const,
+          text: `${strategy}\n\n---\n\n## Demo Script\n${script || "Script not yet generated — save discovery notes first."}` }] };
+      }
+
+      // ---------------------------------------------------------------
+      case "jarvis_get_risk_report": {
+        const { account } = args as { account: string };
+        const riskFile = path.join(accountsDir, account, "RISK_REPORT", "risk_report.md");
+        const report = readFileOrNull(riskFile);
+        if (!report) {
+          return { content: [{ type: "text" as const,
+            text: `No risk report found for "${account}". JARVIS auto-generates this weekly — it may still be initializing.` }] };
+        }
+        return { content: [{ type: "text" as const, text: report }] };
+      }
+
+      // ---------------------------------------------------------------
+      case "jarvis_update_risk_report": {
+        const { account, update, initials } = args as { account: string; update: string; initials?: string };
+        const riskDir = path.join(accountsDir, account, "RISK_REPORT");
+        ensureDir(riskDir);
+        const riskFile = path.join(riskDir, "risk_report.md");
+        const existing = readFileOrNull(riskFile) || `# Risk Report — ${account}\n`;
+        const prefix = initials ? `${initials} ` : "";
+        const entry = `\n\n---\n\n## ${prefix}${dateStr()} — Update\n\n${update}`;
+        fs.writeFileSync(riskFile, existing.trimEnd() + entry);
+        return { content: [{ type: "text" as const,
+          text: `Risk report updated for ${account}. Entry: ${prefix}${dateStr()}` }] };
+      }
+
+      // ---------------------------------------------------------------
+      case "jarvis_get_next_steps": {
+        const { account } = args as { account: string };
+        const nsDir = path.join(accountsDir, account, "NEXT_STEPS");
+        const drafts = readFileOrNull(path.join(nsDir, "next_steps.md"));
+        const jsonData = readFileOrNull(path.join(nsDir, "email_drafts.json"));
+        const stage = jsonData ? (JSON.parse(jsonData).current_stage || "").replace(/_/g, " ") : "";
+        if (!drafts) {
+          return { content: [{ type: "text" as const,
+            text: `No email drafts found for "${account}" yet. JARVIS generates these after each meeting — they should be ready soon.` }] };
+        }
+        return { content: [{ type: "text" as const,
+          text: `# Next Steps for ${account}${stage ? ` (${stage})` : ""}\n\n${drafts}` }] };
+      }
+
+      // ---------------------------------------------------------------
+      case "jarvis_get_value_architecture": {
+        const { account } = args as { account: string };
+        const vaDir = path.join(accountsDir, account, "VALUE_ARCHITECTURE");
+        const roi = readFileOrNull(path.join(vaDir, "roi_model.md"));
+        const tco = readFileOrNull(path.join(vaDir, "tco_analysis.md"));
+        const valueData = readFileOrNull(path.join(vaDir, "value_data.json"));
+        if (!roi) {
+          return { content: [{ type: "text" as const,
+            text: `No value architecture found for "${account}" yet. JARVIS needs discovery data to build the ROI model — save some discovery notes first.` }] };
+        }
+        return { content: [{ type: "text" as const,
+          text: `${roi}\n\n---\n\n${tco || ""}\n\n---\n\n## Structured Value Data (for Excel/PPT — use Haiku or Sonnet to generate)\n\`\`\`json\n${valueData || "{}"}\n\`\`\`` }] };
       }
 
       // ---------------------------------------------------------------

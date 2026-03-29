@@ -130,9 +130,10 @@ llm_models:
     max_tokens: 2048
     context_window: 8192
 
-  # Deep reasoning — complex deal strategy, competitive analysis
+  # Deep reasoning — multi-step competitive analysis, demo strategy, battlecard
+  # Step 3.5 Flash outperforms Nemotron Ultra for structured multi-step reasoning tasks
   reasoning:
-    model: "nvidia/llama-3.1-nemotron-ultra-253b-v1"
+    model: "step/step-3-5-flash"
     temperature: 0.4
     max_tokens: 8192
     context_window: 128000
