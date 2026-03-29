@@ -43,6 +43,8 @@ from jarvis.playbook.automation_engine import PlaybookAutomationEngine
 from jarvis.sync.claude_sync_manager import ClaudeSyncManager
 from jarvis.brain.conversation_extractor import ConversationExtractor
 from jarvis.brain.document_processor import DocumentProcessor
+from jarvis.brain.self_learner import SelfLearner
+from jarvis.brain.knowledge_builder import KnowledgeBuilder
 from jarvis.observers.account_watcher import AccountWatcher
 
 
@@ -95,6 +97,8 @@ class Orchestrator:
         'account_watcher': AccountWatcher,
         'conversation_extractor': ConversationExtractor,
         'document_processor': DocumentProcessor,
+        'self_learner': SelfLearner,
+        'knowledge_builder': KnowledgeBuilder,
     }
 
     def __init__(self, config):
@@ -138,6 +142,7 @@ class Orchestrator:
             'account_watcher',
             'meeting_processor', 'playbook_engine', 'claude_sync',
             'conversation_extractor', 'document_processor',
+            'self_learner', 'knowledge_builder',
             'scanner', 'archiver', 'websocket_server'
         ]
 

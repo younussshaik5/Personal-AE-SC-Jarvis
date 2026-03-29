@@ -3,6 +3,7 @@
 
 import asyncio
 import json
+import os
 from pathlib import Path
 from typing import Set, Dict, Optional, Any
 from watchdog.observers import Observer
@@ -108,8 +109,22 @@ class FileSystemObserver:
                 self.handlers.append(handler)
                 self._workspaces.add(ws)
                 self.logger.debug("Watching workspace", path=str(ws))
+        # Also watch CLAUDE_SPACE directory (where Claude conversations happen)
+        claude_space = Path(os.environ.get(
+            "CLAUDE_SPACE",
+            str(Path.home() / "Documents" / "claude space")
+        )).resolve()
+        if claude_space.exists() and claude_space not in self._workspaces:
+            cs_handler = JarvisFileSystemEventHandler(
+                self.event_bus, claude_space, self._main_loop, self.ignore_patterns
+            )
+            self.observer.schedule(cs_handler, str(claude_space), recursive=True)
+            self.handlers.append(cs_handler)
+            self._workspaces.add(claude_space)
+            self.logger.info("Watching claude space", path=str(claude_space))
+
         self.observer.start()
-        self.logger.info("File system observer started", workspaces_count=len(workspaces))
+        self.logger.info("File system observer started", workspaces_count=len(self._workspaces))
         # Perform initial backfill scan to catch missed changes
         asyncio.create_task(self._initial_scan())
 
