@@ -51,32 +51,17 @@ class AccountAutoInitializer:
 
         path = Path(path_str)
 
-        # Standard account-level folders that are NOT opportunities
-        _STANDARD_FOLDERS = {
-            "MEETINGS", "DOCUMENTS", "EMAILS", "INTEL", "meetings",
-            "deals", "_template", ".processed", "failed",
-        }
-
         try:
             rel_path = path.resolve().relative_to(self.accounts_dir.resolve())
             parts = rel_path.parts
 
             if len(parts) == 1:
-                # Direct child of ACCOUNTS/ → new account folder
+                # Direct child of ACCOUNTS/ — every folder is an account (or opportunity,
+                # JARVIS makes no distinction: user decides what each folder represents)
                 account_name = parts[0]
                 if not account_name.startswith((".", "_")):
                     self.logger.info("Detected new account folder", account=account_name)
                     await self._initialize_account(account_name, account_path=path)
-
-            elif len(parts) == 2 and parts[1] not in _STANDARD_FOLDERS:
-                # ACCOUNTS/{account}/{something}/ where {something} is not a standard folder
-                # → this is a NEW OPPORTUNITY the user just created
-                account_name = parts[0]
-                opp_name     = parts[1]
-                if not opp_name.startswith((".", "_")):
-                    self.logger.info("Detected new opportunity folder",
-                                     account=account_name, opp=opp_name)
-                    await self._initialize_opportunity(account_name, opp_name, path)
 
         except ValueError:
             return
@@ -314,104 +299,3 @@ class AccountAutoInitializer:
         except Exception as e:
             self.logger.error("Failed to initialize account", account=account_name, error=str(e))
 
-    async def _initialize_opportunity(self, account_name: str, opp_name: str, opp_path: Path):
-        """
-        Set up a new opportunity folder at ACCOUNTS/{account}/{opp_name}/.
-
-        You create the folder (e.g. ACCOUNTS/Tata/Tata Sky/).
-        JARVIS detects it and populates it automatically.
-
-        Structure created:
-          opp.json          — opportunity details (title, stage, value, created)
-          meddpicc.json     — opportunity-level MEDDPICC (starts at 0)
-          contacts.json     — contacts specific to this opportunity
-          activities.jsonl  — activity log for this opportunity
-          actions.md        — action items for this opportunity
-          MEETINGS/         — drop recordings for this opportunity
-          DOCUMENTS/        — documents for this opportunity
-          INTEL/            — JARVIS auto-generates intelligence for this opportunity
-        """
-        try:
-            opp_path.mkdir(parents=True, exist_ok=True)
-            created = []
-
-            # opp.json
-            opp_file = opp_path / "opp.json"
-            if not opp_file.exists():
-                opp_file.write_text(json.dumps({
-                    "account":   account_name,
-                    "name":      opp_name,
-                    "stage":     "new",
-                    "value":     0,
-                    "currency":  "USD",
-                    "created":   datetime.now().isoformat(),
-                    "close_date": "",
-                    "notes":     ""
-                }, indent=2))
-                created.append("opp.json")
-
-            # meddpicc.json (opportunity-level)
-            m_file = opp_path / "meddpicc.json"
-            if not m_file.exists():
-                m_file.write_text(json.dumps({
-                    "account": account_name, "opportunity": opp_name,
-                    "score": 0, "max_score": 8,
-                    "last_updated": datetime.now().isoformat(),
-                    "metrics": 0, "economic_buyer": 0, "decision_criteria": 0,
-                    "decision_process": 0, "paper_process": 0, "implicate_pain": 0,
-                    "champion": 0, "competition": 0, "notes": {}
-                }, indent=2))
-                created.append("meddpicc.json")
-
-            # contacts.json
-            c_file = opp_path / "contacts.json"
-            if not c_file.exists():
-                c_file.write_text(json.dumps(
-                    {"account": account_name, "opportunity": opp_name, "contacts": []},
-                    indent=2
-                ))
-                created.append("contacts.json")
-
-            # activities.jsonl
-            act_file = opp_path / "activities.jsonl"
-            if not act_file.exists():
-                act_file.touch()
-                created.append("activities.jsonl")
-
-            # actions.md
-            act_md = opp_path / "actions.md"
-            if not act_md.exists():
-                act_md.write_text(
-                    f"# Action Items — {account_name} / {opp_name}\n\n"
-                    "*Auto-updated by JARVIS from meetings, emails, and conversations.*\n\n"
-                )
-                created.append("actions.md")
-
-            # Subfolders
-            for folder in ("MEETINGS", "DOCUMENTS", "INTEL"):
-                fp = opp_path / folder
-                if not fp.exists():
-                    fp.mkdir()
-                    if folder in ("MEETINGS", "DOCUMENTS"):
-                        (fp / "README.md").write_text(
-                            f"# {folder} — {account_name} / {opp_name}\n\n"
-                            f"Drop files here — JARVIS auto-processes them for this opportunity.\n"
-                        )
-                    created.append(f"{folder}/")
-
-            if created:
-                self.logger.info("Opportunity initialized",
-                                 account=account_name, opp=opp_name, files=created)
-                self.event_bus.publish(Event(
-                    "opportunity.initialized", "account_initializer", {
-                        "account_name": account_name,
-                        "opp_name": opp_name,
-                        "opp_path": str(opp_path),
-                        "files_created": created,
-                        "timestamp": datetime.now().isoformat()
-                    }
-                ))
-
-        except Exception as e:
-            self.logger.error("Failed to initialize opportunity",
-                              account=account_name, opp=opp_name, error=str(e))

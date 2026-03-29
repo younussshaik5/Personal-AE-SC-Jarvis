@@ -80,8 +80,8 @@ class KnowledgeBuilder:
         self.event_bus.subscribe("meddpicc.updated",        self._on_account_event)
         self.event_bus.subscribe("email.added",             self._on_account_event)
         self.event_bus.subscribe("knowledge.intel.updated", self._on_account_event)
-        self.event_bus.subscribe("file.created",            self._on_file_event)
-        self.event_bus.subscribe("file.modified",           self._on_file_event)
+        self.event_bus.subscribe("file.created",             self._on_file_event)
+        self.event_bus.subscribe("file.modified",            self._on_file_event)
 
         # On startup: queue gap-fill for every existing account (LOW priority)
         await self._queue_all_account_gaps()
