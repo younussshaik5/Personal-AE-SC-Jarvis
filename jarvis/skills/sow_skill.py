@@ -24,12 +24,10 @@ class SOWSkill:
         self.accounts_dir = self.workspace_root / "ACCOUNTS"
         self._running = False
         self._queue: Optional[TaskQueue] = None
-        self._main_loop: Optional[asyncio.AbstractEventLoop] = None
 
     async def start(self):
         self.logger.info("Starting SOW skill")
         self._running = True
-        self._main_loop = asyncio.get_running_loop()
         self._queue = TaskQueue(self.workspace_root)
 
         self.event_bus.subscribe("proposal.updated", self._on_proposal_updated)
@@ -46,33 +44,31 @@ class SOWSkill:
     # Event handlers
     # ------------------------------------------------------------------
 
-    def _on_proposal_updated(self, event: Event):
+    async def _on_proposal_updated(self, event: Event):
         account = event.data.get("account") or event.data.get("account_name")
-        if account:
-            self._schedule_task(account, TaskPriority.MEDIUM)
+        if account and self._queue:
+            await self._queue.enqueue(
+                "generate_sow", payload={"account": account},
+                account=account, priority=TaskPriority.MEDIUM,
+                dedup_key=f"generate_sow:{account}",
+            )
 
-    def _on_discovery_updated(self, event: Event):
+    async def _on_discovery_updated(self, event: Event):
         account = event.data.get("account") or event.data.get("account_name")
-        if account:
-            self._schedule_task(account, TaskPriority.MEDIUM)
+        if account and self._queue:
+            await self._queue.enqueue(
+                "generate_sow", payload={"account": account},
+                account=account, priority=TaskPriority.MEDIUM,
+                dedup_key=f"generate_sow:{account}",
+            )
 
-    def _on_value_architecture_updated(self, event: Event):
+    async def _on_value_architecture_updated(self, event: Event):
         account = event.data.get("account") or event.data.get("account_name")
-        if account:
-            self._schedule_task(account, TaskPriority.MEDIUM)
-
-    def _schedule_task(self, account: str, priority: TaskPriority):
-        if self._queue and self._main_loop:
-            self._main_loop.call_soon_threadsafe(
-                lambda: asyncio.create_task(
-                    self._queue.enqueue(
-                        "generate_sow",
-                        payload={"account": account},
-                        account=account,
-                        priority=priority,
-                        dedup_key=f"generate_sow:{account}",
-                    )
-                )
+        if account and self._queue:
+            await self._queue.enqueue(
+                "generate_sow", payload={"account": account},
+                account=account, priority=TaskPriority.MEDIUM,
+                dedup_key=f"generate_sow:{account}",
             )
 
     # ------------------------------------------------------------------

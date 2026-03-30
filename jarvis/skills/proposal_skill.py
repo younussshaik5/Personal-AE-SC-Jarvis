@@ -24,12 +24,10 @@ class ProposalSkill:
         self.accounts_dir = self.workspace_root / "ACCOUNTS"
         self._running = False
         self._queue: Optional[TaskQueue] = None
-        self._main_loop: Optional[asyncio.AbstractEventLoop] = None
 
     async def start(self):
         self.logger.info("Starting proposal skill")
         self._running = True
-        self._main_loop = asyncio.get_running_loop()
         self._queue = TaskQueue(self.workspace_root)
 
         self.event_bus.subscribe("value_architecture.updated", self._on_value_architecture_updated)
@@ -46,33 +44,31 @@ class ProposalSkill:
     # Event handlers
     # ------------------------------------------------------------------
 
-    def _on_value_architecture_updated(self, event: Event):
+    async def _on_value_architecture_updated(self, event: Event):
         account = event.data.get("account") or event.data.get("account_name")
-        if account:
-            self._schedule_task(account, TaskPriority.MEDIUM)
+        if account and self._queue:
+            await self._queue.enqueue(
+                "generate_proposal", payload={"account": account},
+                account=account, priority=TaskPriority.MEDIUM,
+                dedup_key=f"generate_proposal:{account}",
+            )
 
-    def _on_discovery_updated(self, event: Event):
+    async def _on_discovery_updated(self, event: Event):
         account = event.data.get("account") or event.data.get("account_name")
-        if account:
-            self._schedule_task(account, TaskPriority.MEDIUM)
+        if account and self._queue:
+            await self._queue.enqueue(
+                "generate_proposal", payload={"account": account},
+                account=account, priority=TaskPriority.MEDIUM,
+                dedup_key=f"generate_proposal:{account}",
+            )
 
-    def _on_deal_stage_changed(self, event: Event):
+    async def _on_deal_stage_changed(self, event: Event):
         account = event.data.get("account") or event.data.get("account_name")
-        if account:
-            self._schedule_task(account, TaskPriority.HIGH)
-
-    def _schedule_task(self, account: str, priority: TaskPriority):
-        if self._queue and self._main_loop:
-            self._main_loop.call_soon_threadsafe(
-                lambda: asyncio.create_task(
-                    self._queue.enqueue(
-                        "generate_proposal",
-                        payload={"account": account},
-                        account=account,
-                        priority=priority,
-                        dedup_key=f"generate_proposal:{account}",
-                    )
-                )
+        if account and self._queue:
+            await self._queue.enqueue(
+                "generate_proposal", payload={"account": account},
+                account=account, priority=TaskPriority.HIGH,
+                dedup_key=f"generate_proposal:{account}",
             )
 
     # ------------------------------------------------------------------
@@ -262,17 +258,17 @@ def _fallback_proposal_data(account_name: str) -> Dict[str, Any]:
         "generated_at": datetime.now().strftime("%Y-%m-%d"),
         "executive_summary": (
             f"{account_name} is evaluating AI automation to reduce operational costs and improve "
-            "customer experience. Our platform delivers enterprise-grade conversational AI with "
-            "measurable ROI within 90 days."
+            "customer experience. The proposed solution delivers enterprise-grade AI automation "
+            "with measurable ROI within 90 days."
         ),
         "pain_points": [
-            "High volume of repetitive support queries handled manually",
-            "Fragmented customer communication channels",
+            "High volume of repetitive tasks handled manually",
+            "Fragmented communication and workflow channels",
             "Slow response times impacting customer satisfaction",
         ],
         "proposed_solution": (
-            "Unified AI-native platform covering conversational AI, workflow automation, "
-            "and omnichannel inbox — deployed in phases starting with highest-volume use cases."
+            "Intelligent automation platform covering AI workflows, omnichannel engagement, "
+            "and process automation — deployed in phases starting with highest-impact use cases."
         ),
         "key_benefits": [
             "60-80% bot containment rate — reducing agent workload",

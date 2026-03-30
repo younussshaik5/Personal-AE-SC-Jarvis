@@ -24,12 +24,10 @@ class ArchitectureDiagramSkill:
         self.accounts_dir = self.workspace_root / "ACCOUNTS"
         self._running = False
         self._queue: Optional[TaskQueue] = None
-        self._main_loop: Optional[asyncio.AbstractEventLoop] = None
 
     async def start(self):
         self.logger.info("Starting architecture diagram skill")
         self._running = True
-        self._main_loop = asyncio.get_running_loop()
         self._queue = TaskQueue(self.workspace_root)
 
         self.event_bus.subscribe("discovery.updated", self._on_discovery_updated)
@@ -48,43 +46,49 @@ class ArchitectureDiagramSkill:
     # Event handlers
     # ------------------------------------------------------------------
 
-    def _on_discovery_updated(self, event: Event):
+    async def _on_discovery_updated(self, event: Event):
         account = event.data.get("account") or event.data.get("account_name")
-        if account:
-            self._schedule_task(account, TaskPriority.MEDIUM)
+        if account and self._queue:
+            await self._queue.enqueue(
+                "generate_diagram", payload={"account": account},
+                account=account, priority=TaskPriority.MEDIUM,
+                dedup_key=f"generate_diagram:{account}",
+            )
 
-    def _on_meddpicc_updated(self, event: Event):
+    async def _on_meddpicc_updated(self, event: Event):
         account = event.data.get("account") or event.data.get("account_name")
-        if account:
-            self._schedule_task(account, TaskPriority.MEDIUM)
+        if account and self._queue:
+            await self._queue.enqueue(
+                "generate_diagram", payload={"account": account},
+                account=account, priority=TaskPriority.MEDIUM,
+                dedup_key=f"generate_diagram:{account}",
+            )
 
-    def _on_intel_updated(self, event: Event):
+    async def _on_intel_updated(self, event: Event):
         account = event.data.get("account") or event.data.get("account_name")
-        if account:
-            self._schedule_task(account, TaskPriority.MEDIUM)
+        if account and self._queue:
+            await self._queue.enqueue(
+                "generate_diagram", payload={"account": account},
+                account=account, priority=TaskPriority.MEDIUM,
+                dedup_key=f"generate_diagram:{account}",
+            )
 
-    def _on_sections_created(self, event: Event):
+    async def _on_sections_created(self, event: Event):
         account = event.data.get("account") or event.data.get("account_name")
-        if account:
-            self._schedule_task(account, TaskPriority.LOW)
+        if account and self._queue:
+            await self._queue.enqueue(
+                "generate_diagram", payload={"account": account},
+                account=account, priority=TaskPriority.LOW,
+                dedup_key=f"generate_diagram:{account}",
+            )
 
-    def _on_meeting_summary_ready(self, event: Event):
+    async def _on_meeting_summary_ready(self, event: Event):
         account = event.data.get("account") or event.data.get("account_name")
-        if account:
-            self._schedule_task(account, TaskPriority.MEDIUM)
-
-    def _schedule_task(self, account: str, priority: TaskPriority):
-        if self._queue and self._main_loop:
-            self._main_loop.call_soon_threadsafe(
-                lambda: asyncio.create_task(
-                    self._queue.enqueue(
-                        "generate_architecture_diagram",
-                        payload={"account": account},
-                        account=account,
-                        priority=priority,
-                        dedup_key=f"generate_architecture_diagram:{account}",
-                    )
-                )
+        if account and self._queue:
+            await self._queue.enqueue(
+                "generate_diagram", payload={"account": account},
+                account=account, priority=TaskPriority.MEDIUM,
+                dedup_key=f"generate_diagram:{account}",
             )
 
     # ------------------------------------------------------------------
@@ -243,9 +247,6 @@ def _build_diagram_prompt(account_name: str, ctx: Dict[str, Any]) -> str:
         decision_process = meddpicc.get("decision_process", meddpicc.get("D", ""))
 
     solution_name = "AI Platform"
-    intel = ctx.get("company_research", "")
-    if "yellow.ai" in intel.lower():
-        solution_name = "yellow.ai AI Platform"
 
     return f"""Generate a Mermaid.js solution architecture diagram for account: {account_name}
 

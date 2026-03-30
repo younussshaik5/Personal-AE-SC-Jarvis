@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "servers": [
+    {
+      "name": "JARVIS MCP Server",
+      "type": "mcp",
+      "command": "node",
+      "args": ["dist/index.js"],
+      "cwd": "${workspaceRoot}/mcp-jarvis-server",
+      "env": {
+        "JARVIS_DATA_DIR": "${env:JARVIS_HOME}"
+      },
+      "transport": "stdio",
+      "description": "Core MCP tool server — exposes jarvis_get_account, jarvis_fill_rfi, jarvis_get_proposal, etc."
+    },
+    {
+      "name": "OpenCode Observer",
+      "type": "mcp",
+      "command": "node",
+      "args": ["dist/index.js"],
+      "cwd": "${workspaceRoot}/mcp-opencode-observer",
+      "env": {
+        "OPENCODE_OBSERVER_PORT": "3000",
+        "OPENCODE_OBSERVER_WS_PORT": "3001"
+      },
+      "transport": "stdio",
+      "description": "Watches OpenCode conversations and broadcasts to JARVIS event bus (HTTP:3000, WS:3001)"
+    },
+    {
+      "name": "JARVIS Orchestrator",
+      "type": "python",
+      "command": "python3",
+      "args": ["-m", "jarvis.core.orchestrator"],
+      "cwd": "${workspaceRoot}",
+      "description": "Core orchestrator — starts all skills, event bus, worker pool"
+    },
+    {
+      "name": "JARVIS Dashboard",
+      "type": "python",
+      "command": "python3",
+      "args": ["-m", "jarvis.ui.server"],
+      "cwd": "${workspaceRoot}",
+      "port": 8080,
+      "description": "Web dashboard at http://localhost:8080 (WS: 8081)"
+    },
+    {
+      "name": "All (start_jarvis.sh)",
+      "type": "shell",
+      "command": "./start_jarvis.sh",
+      "cwd": "${workspaceRoot}",
+      "description": "Recommended: launches all services together (Observer + Orchestrator + Dashboard)"
+    }
+  ]
+}
