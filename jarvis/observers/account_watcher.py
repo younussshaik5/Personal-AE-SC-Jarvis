@@ -21,9 +21,11 @@ Routing map:
 """
 
 import asyncio
+import json
 import re
+from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Dict
 
 from jarvis.utils.logger import JARVISLogger
 from jarvis.utils.event_bus import Event, EventBus
@@ -185,7 +187,7 @@ class AccountWatcher:
         if (sub == "EMAILS"
                 and not is_dir
                 and evt_type == "file.created"
-                and path.suffix.lower() in {".md", ".txt"}
+                and path.suffix.lower() in {".md", ".txt", ".eml", ".msg"}
                 and path.name not in IGNORE_NAMES):
             self.event_bus.publish(Event(
                 type="email.added",
@@ -305,3 +307,5 @@ class AccountWatcher:
         if path.suffix in (".tmp", ".part", ".swp"):
             return True
         return False
+
+

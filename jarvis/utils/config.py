@@ -111,13 +111,13 @@ class JarvisConfig:
     # LLM configuration for natural conversation
     llm: Dict[str, Any] = field(default_factory=lambda: {
         "provider": "openai",  # openai, anthropic, nvidia, local, mock
-        "api_key": "YOUR_API_KEY_HERE",
-        "base_url": "https://api.openai.com/v1",
-        "model": "stepfun-ai/step-3.5-flash",
-        "temperature": 1,
+        "api_key": "",  # Read from NVIDIA_API_KEY or OPENAI_API_KEY env var
+        "base_url": "https://integrate.api.nvidia.com/v1",
+        "model": "stepfun-ai/step-3-5-flash",
+        "temperature": 0.7,
         "top_p": 0.9,
-        "max_tokens": 16384,
-        "context_window": 32768,
+        "max_tokens": 8192,
+        "context_window": 131072,
         "extra_body": None,
         "stream": False
     })
@@ -221,6 +221,13 @@ class ConfigManager:
                     print(f"[Config] OpenCode config has no 'llm' section, using default")
             else:
                 print(f"[Config] opencode_ai enabled but config not found at {oc_cfg_path}, using default")
+
+        # Allow environment overrides for LLM API keys if not set in config
+        if not self.config.llm.get('api_key'):
+            env_key = os.getenv('NVIDIA_API_KEY') or os.getenv('OPENAI_API_KEY')
+            if env_key:
+                self.config.llm['api_key'] = env_key
+                print("[Config] LLM api_key set from environment (NVIDIA_API_KEY or OPENAI_API_KEY)")
 
         # Log final LLM configuration
         llm_cfg = getattr(self.config, 'llm', {})

@@ -46,10 +46,12 @@ from jarvis.brain.document_processor import DocumentProcessor
 from jarvis.brain.self_learner import SelfLearner
 from jarvis.brain.knowledge_builder import KnowledgeBuilder
 from jarvis.observers.account_watcher import AccountWatcher
+from jarvis.observers.opencode_conversation_saver import OpenCodeConversationSaver
 from jarvis.skills.html_generator_skill import HTMLGeneratorSkill
 from jarvis.skills.architecture_diagram_skill import ArchitectureDiagramSkill
 from jarvis.skills.proposal_skill import ProposalSkill
 from jarvis.skills.sow_skill import SOWSkill
+from jarvis.skills.summary_refresh_skill import SummaryRefreshSkill
 from jarvis.queue.task_queue import TaskQueue
 from jarvis.queue.worker_pool import WorkerPool
 
@@ -101,6 +103,7 @@ class Orchestrator:
         'claude_sync': ClaudeSyncManager,
         # Brain — interlinking reactive layer
         'account_watcher': AccountWatcher,
+        'opencode_conversation_saver': OpenCodeConversationSaver,
         'conversation_extractor': ConversationExtractor,
         'document_processor': DocumentProcessor,
         'self_learner': SelfLearner,
@@ -109,6 +112,7 @@ class Orchestrator:
         'architecture_diagram': ArchitectureDiagramSkill,
         'proposal': ProposalSkill,
         'sow': SOWSkill,
+        'summary_refresh': SummaryRefreshSkill,
     }
 
     def __init__(self, config):
@@ -139,7 +143,9 @@ class Orchestrator:
         # Initialize components in dependency order
         init_order = [
             'safety_guard', 'persona_manager', 'context_engine',
-            'file_system', 'conversations', 'pattern_learner', 'conversation_learner',
+            # Ensure conversation saver is ready BEFORE conversation observer starts backfill
+            'opencode_conversation_saver',
+            'conversations', 'pattern_learner', 'conversation_learner',
             'conversation_summarizer', 'competitive_intelligence', 'documentation',
             'technical_risk_assessment', 'discovery_management',
             'meddpicc', 'tech_utilities', 'battlecards', 'value_architecture', 'risk_report', 'demo_strategy',
@@ -148,13 +154,14 @@ class Orchestrator:
             # v2 components
             'meeting_summary', 'meeting_prep', 'proposal_generator',
             'followup_email', 'deal_stage_tracker',
-            # account_watcher must start before brain components
             'account_watcher',
             'meeting_processor', 'playbook_engine', 'claude_sync',
             'conversation_extractor', 'document_processor',
-            'self_learner', 'knowledge_builder', 'html_generator',
-            'architecture_diagram', 'proposal', 'sow',
-            'scanner', 'archiver', 'websocket_server'
+            'self_learner', 'knowledge_builder', 'summary_refresh',
+            'html_generator', 'architecture_diagram', 'proposal', 'sow',
+            'scanner', 'archiver', 'websocket_server',
+            # FileSystemObserver MUST be last so all other components are subscribed before backfill
+            'file_system'
         ]
 
         for name in init_order:

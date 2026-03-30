@@ -63,18 +63,22 @@ def get_professional_identity(config_manager: Optional[ConfigManager] = None) ->
 
 def format_identity_signature(date: Optional[str] = None, include_title: bool = True) -> str:
     """Get a formatted professional signature for file headers.
-    
+
     Args:
         date: Optional date string. If None, uses current date.
         include_title: Whether to include the title.
-    
+
     Returns:
         Formatted signature string.
     """
     from datetime import datetime
     identity = get_professional_identity()
     date_str = date or datetime.now().strftime("%Y-%m-%d")
-    
+
     if include_title:
         return f"{identity.initials} {identity.name} | {identity.title} | {date_str}"
     return f"{identity.initials} {identity.name} | {date_str}"
+
+
+# Backward compatibility alias
+get_se_identity = get_professional_identity

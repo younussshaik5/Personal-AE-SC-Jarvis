@@ -503,22 +503,14 @@ class DocumentProcessor:
     # ------------------------------------------------------------------
 
     def _trigger_skills(self, account_name: str, doc_type: str, extracted: Dict):
-        """Fire skill-trigger events based on what was found in the document."""
-        if doc_type == "rfp":
-            self.event_bus.publish(Event(
-                type="skill.trigger.request",
-                source="brain.documents",
-                data={"skill": "proposal_generator", "account": account_name,
-                      "reason": "RFP detected in DOCUMENTS/"}
-            ))
-        if extracted.get("competitors"):
-            self.event_bus.publish(Event(
-                type="skill.trigger.request",
-                source="brain.documents",
-                data={"skill": "battlecards", "account": account_name,
-                      "competitors": extracted["competitors"],
-                      "reason": "Competitors mentioned in document"}
-            ))
+        """Publish document.processed event for downstream consumers.
+
+        Note:
+        - BattlecardsSkill listens to file.modified events, which are triggered when INTEL files
+          are written, so no explicit trigger needed.
+        - ProposalGeneratorSkill listens to playbook.generate_proposal (currently on-demand only).
+        """
+        # Just publish document.processed; KnowledgeBuilder will enqueue gap_fill and presales refreshes.
         self.event_bus.publish(Event(
             type="document.processed",
             source="brain.documents",

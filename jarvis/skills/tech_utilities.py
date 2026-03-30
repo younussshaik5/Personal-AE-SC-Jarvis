@@ -119,14 +119,13 @@ class TechUtilitiesSkill:
             return False
 
     def _extract_account_name(self, path: Path) -> Optional[str]:
+        """Extract account name from any path under ACCOUNTS/.
+        The first component after ACCOUNTS/ is the account folder name."""
         try:
             rel = path.resolve().relative_to(self.accounts_dir.resolve())
-            parts = rel.parts
-            if len(parts) >= 2:
-                return parts[-2] if parts[-1] in ('index.json', 'notes.json', 'activities.jsonl', 'summary.md', 'deals', 'discovery', 'tech_utilities') else parts[-1]
-            elif len(parts) == 1:
-                return parts[0]
-        except:
+            if rel.parts:
+                return rel.parts[0]
+        except ValueError:
             pass
         return None
 
@@ -274,7 +273,7 @@ class TechUtilitiesSkill:
                 data['competitors_research'][competitor] = comp_data
 
             # Get company product pricing
-            company_name = self.config_manager.config.get("identity", {}).get("company", "Your Company")
+            company_name = getattr(self.config_manager.config, 'identity', {}).get("company", "Your Company")
             product = data['deals'][0].get('product') if data['deals'] else company_name
             company_pricing = await self.research_service.get_company_capabilities(product)
             data['company_pricing'] = company_pricing
@@ -300,13 +299,16 @@ class TechUtilitiesSkill:
         research = data.get('research', {})
         comp_research = data.get('competitors_research', {})
 
+        company_name = getattr(self.config_manager.config, 'identity', {}).get("company", "Your Company")
+
         context_prompt = f"""
-Account: {account_name}
-Industry: {research.get('industry', 'Unknown')}
-Company Priorities: {', '.join(research.get('priorities', [])[:3])}
-Current Tool: {data['deals'][0].get('current_systems', {}).get('ticket_system', 'Unknown') if data['deals'] else 'Unknown'}
-Competitors: {', '.join(data['competitors'])}
-Deal Stage: {data['deals'][0].get('stage', 'Unknown') if data['deals'] else 'Unknown'}
+ Account: {account_name}
+ Industry: {research.get('industry', 'Unknown')}
+ Company: {company_name}
+ Company Priorities: {', '.join(research.get('priorities', [])[:3])}
+ Current Tool: {data['deals'][0].get('current_systems', {}).get('ticket_system', 'Unknown') if data['deals'] else 'Unknown'}
+ Competitors: {', '.join(data['competitors'])}
+ Deal Stage: {data['deals'][0].get('stage', 'Unknown') if data['deals'] else 'Unknown'}
 
 Recent Conversations:
 {chr(10).join([c.get('insights', {}).get('summary', '')[:200] for c in data['conversations'][:3]])}
@@ -318,7 +320,7 @@ Risk Assessment Summary:
         if self.llm:
             try:
                 response = await self.llm.generate([
-                    Message(role="system", content=f"""You are {identity.full_display}, a Solution Engineer at {self.config_manager.config.get("identity", {}).get("company", "Your Company")}.
+                     Message(role="system", content=f"""You are {identity.full_display}, a Solution Engineer at {getattr(self.config_manager.config, 'identity', {}).get("company", "Your Company")}.
 Generate email templates for technical communication. Include real-time research context.
 
 Output JSON with:
@@ -442,7 +444,7 @@ Output JSON with:
         today = datetime.now().strftime("%Y-%m-%d")
         identity = get_se_identity(self.config_manager)
         research = data.get('research', {})
-        company_name = self.config_manager.config.get("identity", {}).get("company", "Your Company")
+        company_name = getattr(self.config_manager.config, 'identity', {}).get("company", "Your Company")
         company_pricing = data.get('company_pricing', {})
 
         # Extract likely RFP questions from gaps and discovery

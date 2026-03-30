@@ -161,13 +161,13 @@ const TOOLS = [
   {
     name: "jarvis_get_account",
     description:
-      "Get the full deal dossier for a specific account. Reads all .md and .json files recursively and returns concatenated content.",
+      "Get the full deal dossier for a specific account. If no name is provided, attempts to infer the current account from the workspace directory (must be inside ACCOUNTS/<account>/). Reads all .md and .json files recursively and returns concatenated content.",
     inputSchema: {
       type: "object" as const,
       properties: {
-        name: { type: "string" as const, description: "Account folder name" },
+        name: { type: "string" as const, description: "Account folder name (optional if called from within an account folder)" },
       },
-      required: ["name"],
+      required: [],  // name is optional
     },
   },
   {
@@ -911,7 +911,40 @@ export function registerTools(server: Server, dataDir: string) {
 
       // ---------------------------------------------------------------
       case "jarvis_get_account": {
-        const accountName = (args as { name: string }).name;
+        let accountName = (args as { name?: string }).name;
+        // If no name provided, try to infer from current workspace stored in context.json
+        if (!accountName) {
+          try {
+            const contextPath = path.join(dataDir, "cache", "context.json");
+            if (fs.existsSync(contextPath)) {
+              const ctx = JSON.parse(fs.readFileSync(contextPath, "utf-8"));
+              const workspace = ctx.current_workspace || "";
+              // If workspace is under ACCOUNTS/<account>, extract account name
+              const accountsAbs = path.resolve(accountsDir);
+              const workspaceAbs = path.resolve(workspace);
+              if (workspaceAbs.startsWith(accountsAbs + path.sep) || workspaceAbs === accountsAbs) {
+                const rel = path.relative(accountsAbs, workspaceAbs);
+                const firstSegment = rel.split(path.sep)[0];
+                // Verify it's an existing account folder
+                if (fs.existsSync(path.join(accountsDir, firstSegment))) {
+                  accountName = firstSegment;
+                }
+              }
+            }
+          } catch (e) {
+            // ignore and fall back to error message
+          }
+        }
+        if (!accountName) {
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: `No account name provided and current workspace is not inside an ACCOUNTS/ folder. Available accounts: ${listDirs(accountsDir).join(", ") || "none"}`,
+              },
+            ],
+          };
+        }
         const accountPath = path.join(accountsDir, accountName);
         if (!fs.existsSync(accountPath)) {
           return {
@@ -1126,7 +1159,7 @@ export function registerTools(server: Server, dataDir: string) {
           subject: string;
           body: string;
         };
-        const emailsDir = path.join(accountsDir, account, "emails");
+        const emailsDir = path.join(accountsDir, account, "EMAILS");
         ensureDir(emailsDir);
 
         const date = dateStr();
@@ -1139,7 +1172,7 @@ export function registerTools(server: Server, dataDir: string) {
           content: [
             {
               type: "text" as const,
-              text: `Email saved: ACCOUNTS/${account}/emails/${filename}`,
+              text: `Email saved: ACCOUNTS/${account}/EMAILS/${filename}`,
             },
           ],
         };

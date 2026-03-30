@@ -94,7 +94,7 @@ class ConversationLearner:
         }
         self._add_experience(experience)
 
-    async def _handle_opencode_conversation(self, event: Event):
+    async def _handle_conversation(self, event: Event):
         """Process OpenCode and Claude conversation message (from ConversationObserver)."""
         data = event.data
         experience = {

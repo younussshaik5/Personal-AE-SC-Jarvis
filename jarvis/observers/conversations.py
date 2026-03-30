@@ -101,13 +101,21 @@ class ConversationObserver:
                 ORDER BY m.time_created ASC
             """, (self._last_seen, f"{self._allowed_workspace_prefix}%"))
             rows = cur.fetchall()
-            conn.close()
 
+            self.logger.debug("Poll query completed", last_seen=self._last_seen, found_count=len(rows), workspace_prefix=self._allowed_workspace_prefix)
+
+            # Keep connection open to fetch parts for each message
             for row in rows:
-                await self._process_message(row)
+                # Fetch parts for this message (text content)
+                parts_text = await self._fetch_message_parts_text(conn, row['id'])
+                await self._process_message(row, parts_text)
                 if row['time_created'] > self._last_seen:
                     self._last_seen = row['time_created']
 
+            conn.close()
+
+            if rows:
+                self.logger.info("Found new conversation messages", count=len(rows), last_seen=self._last_seen)
             # Save state after successful poll
             await self._save_state()
 
@@ -117,15 +125,40 @@ class ConversationObserver:
         except Exception as e:
             self.logger.error("DB query error", error=str(e))
 
-    async def _process_message(self, row: sqlite3.Row):
-        """Process a message row and emit event."""
+    async def _fetch_message_parts_text(self, conn, message_id: str) -> str:
+        """Fetch all text parts for a message and concatenate."""
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT data FROM part
+            WHERE message_id = ?
+            ORDER BY time_created ASC
+        """, (message_id,))
+        part_rows = cur.fetchall()
+        text_parts = []
+        for pr in part_rows:
+            part_data = json.loads(pr['data']) if isinstance(pr['data'], str) else pr['data']
+            if part_data.get('type') == 'text':
+                txt = part_data.get('text', '').strip()
+                if txt:
+                    text_parts.append(txt)
+        return "\n\n".join(text_parts)
+
+    async def _process_message(self, row: sqlite3.Row, content: str = ""):
+        """Process a message row and emit event.
+        Args:
+            row: The message row from the DB.
+            content: The full text content (from parts) to use.
+        """
         try:
             data = json.loads(row['data']) if isinstance(row['data'], str) else row['data']
-            content = data.get('content') or data.get('text') or ''
+            # Use provided content if non-empty; fallback to data fields (for compatibility)
+            if not content:
+                content = data.get('content') or data.get('text') or ''
             role = data.get('role', 'user')
             model = data.get('model', {}).get('modelID', 'unknown')
-            # Also include workspace info
             session_dir = row['session_dir'] if 'session_dir' in row.keys() else None
+
+            self.logger.debug("Publishing conversation.message", session_dir=session_dir, role=role, content_preview=content[:100])
 
             event = Event("conversation.message", "conversations", {
                 "message_id": row['id'],
@@ -134,7 +167,7 @@ class ConversationObserver:
                 "role": role,
                 "content": content,
                 "model": model,
-                "workspace_dir": session_dir  # Include workspace for downstream filtering
+                "workspace_dir": session_dir
             })
             self.event_bus.publish(event)
         except Exception as e:
