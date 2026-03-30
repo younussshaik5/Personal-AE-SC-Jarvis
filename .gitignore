@@ -5,10 +5,12 @@
 google_token.json
 credentials.json
 
-# Generated configs (machine-specific, created by setup.sh)
+# Generated configs (machine-specific, created by setup.sh / start_jarvis.sh)
 config/mcp-observer.json
 mcp-opencode-observer/.env
 jarvis/config/jarvis.yaml
+# Claude Code MCP settings — machine-specific absolute paths, regenerated on every start
+.claude/settings.json
 
 # Runtime data (lives in JARVIS_HOME, not repo)
 # JARVIS_HOME/ is the portable template — keep structure, ignore real data
