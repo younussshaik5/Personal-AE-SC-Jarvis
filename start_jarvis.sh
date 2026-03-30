@@ -15,9 +15,9 @@ fi
 # Load environment from .env
 if [ -f .env ]; then
   set -a
-  . .env
-  set +a
-fi
+   . .env
+   set +a
+ fi
 
 # JARVIS_HOME must be set (by .env or environment)
 if [ -z "$JARVIS_HOME" ]; then
@@ -67,14 +67,14 @@ fi
 # Start JARVIS Core Orchestrator
 echo ""
 echo "[2] Starting JARVIS Core..."
-python3 -m jarvis.core.orchestrator > "$JARVIS_HOME/logs/orchestrator.log" 2>&1 &
+/Library/Frameworks/Python.framework/Versions/3.13/bin/python3 -m jarvis.core.orchestrator > "$JARVIS_HOME/logs/orchestrator.log" 2>&1 &
 echo $! > .jarvis.pid
 echo "    PID: $(cat .jarvis.pid)"
 
 # Start Dashboard UI
 echo ""
 echo "[3] Starting Dashboard..."
-python3 -m jarvis.ui.server > "$JARVIS_HOME/logs/dashboard.log" 2>&1 &
+/Library/Frameworks/Python.framework/Versions/3.13/bin/python3 -m jarvis.ui.server > "$JARVIS_HOME/logs/dashboard.log" 2>&1 &
 echo $! > .ui.pid
 echo "    PID: $(cat .ui.pid)"
 
