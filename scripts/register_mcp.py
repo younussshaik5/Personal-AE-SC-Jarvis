@@ -1,64 +1,68 @@
 #!/usr/bin/env python3
 """
-Register JARVIS MCP servers with Claude Code (CLI) and Claude Desktop.
-Runs on every `start_jarvis.sh` call — fully idempotent.
+Register JARVIS MCP servers across ALL Claude interfaces.
+Runs on every `start_jarvis.sh` — fully idempotent.
 
-Writes to:
-  1. ~/.claude/settings.json          — Claude Code global (all directories)
-  2. <repo>/.claude/settings.json     — Claude Code project-level (this repo)
-  3. Claude Desktop claude_desktop_config.json  — Claude Desktop app (macOS/Linux/Win)
+Targets:
+  1. ~/.claude/settings.json                     — Claude Code CLI (global, any directory)
+  2. <repo>/.claude/settings.json                — Claude Code project-level
+  3. Claude Desktop claude_desktop_config.json   — Claude Desktop app + CoWork
+  4. ~/.config/opencode/opencode.jsonc           — OpenCode (different format)
 """
 
 import json
 import os
+import re
 import shutil
 import sys
 from pathlib import Path
 
 
-# ── Helpers ──────────────────────────────────────────────────────────────────
+# ── Node detection ────────────────────────────────────────────────────────────
 
 def find_node() -> str:
-    """Return the full path to a node binary ≥18, or 'node' as fallback."""
-    # 1. NODE_BIN env var set by start_jarvis.sh
-    env_node = os.environ.get("NODE_BIN", "")
-    if env_node and Path(env_node).exists():
-        return env_node
-
-    # 2. node in PATH
+    """Return the full path to a usable node binary."""
+    # 1. Passed in by start_jarvis.sh
+    env = os.environ.get("NODE_BIN", "")
+    if env and Path(env).exists():
+        return env
+    # 2. In PATH
     found = shutil.which("node")
     if found:
         return found
-
     # 3. Common fixed locations
-    candidates = [
-        "/opt/homebrew/bin/node",
-        "/usr/local/bin/node",
-        "/usr/bin/node",
-    ]
-    for c in candidates:
+    for c in ["/opt/homebrew/bin/node", "/usr/local/bin/node", "/usr/bin/node"]:
         if Path(c).exists():
             return c
-
-    # 4. nvm — highest version
-    nvm_root = Path.home() / ".nvm" / "versions" / "node"
-    if nvm_root.is_dir():
-        versions = sorted(nvm_root.iterdir(), key=lambda p: p.name)
-        for v in reversed(versions):
+    # 4. nvm highest version
+    nvm = Path.home() / ".nvm" / "versions" / "node"
+    if nvm.is_dir():
+        for v in sorted(nvm.iterdir(), key=lambda p: p.name, reverse=True):
             node = v / "bin" / "node"
             if node.exists():
                 return str(node)
+    return "node"
 
-    return "node"  # last-resort bare name
+
+# ── JSON / JSONC helpers ──────────────────────────────────────────────────────
+
+def strip_jsonc_comments(text: str) -> str:
+    """Strip // and /* */ comments from JSONC so json.loads can parse it."""
+    # Remove block comments
+    text = re.sub(r'/\*.*?\*/', '', text, flags=re.DOTALL)
+    # Remove line comments (but not URLs like https://)
+    text = re.sub(r'(?<!:)//[^\n]*', '', text)
+    return text
 
 
 def read_json(path: Path) -> dict:
-    if path.exists():
-        try:
-            return json.loads(path.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, IOError):
-            pass
-    return {}
+    if not path.exists():
+        return {}
+    try:
+        raw = path.read_text(encoding="utf-8")
+        return json.loads(strip_jsonc_comments(raw))
+    except (json.JSONDecodeError, IOError):
+        return {}
 
 
 def write_json(path: Path, data: dict):
@@ -66,36 +70,71 @@ def write_json(path: Path, data: dict):
     path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
-def merge_mcp_servers(config: dict, servers: dict) -> bool:
-    """Merge servers into config['mcpServers']. Returns True if config changed."""
+# ── Claude Code / Desktop format ──────────────────────────────────────────────
+# Format: { "mcpServers": { "name": { "command": "node", "args": [...], "env": {...} } } }
+
+def claude_servers(mcp_path: Path, observer_path: Path,
+                   node: str, jarvis_home: str) -> dict:
+    return {
+        "jarvis": {
+            "command": node,
+            "args": [str(mcp_path)],
+            "env": {"JARVIS_DATA_DIR": jarvis_home},
+        },
+        **({"jarvis-opencode-observer": {
+            "command": node,
+            "args": [str(observer_path)],
+            "env": {
+                "JARVIS_DATA_DIR": jarvis_home,
+                "OPENCODE_OBSERVER_PORT": "3000",
+                "OPENCODE_OBSERVER_WS_PORT": "3001",
+            },
+        }} if observer_path.exists() else {}),
+    }
+
+
+def register_claude_settings(path: Path, servers: dict) -> bool:
+    config = read_json(path)
     existing = config.get("mcpServers", {})
-    changed = False
-    for name, entry in servers.items():
-        if existing.get(name) != entry:
-            existing[name] = entry
-            changed = True
+    changed = any(existing.get(k) != v for k, v in servers.items())
     if changed:
-        config["mcpServers"] = existing
+        config["mcpServers"] = {**existing, **servers}
+        write_json(path, config)
     return changed
 
 
-# ── Build server entries ──────────────────────────────────────────────────────
+def register_claude_desktop(servers: dict) -> bool:
+    if sys.platform == "darwin":
+        path = Path.home() / "Library" / "Application Support" / "Claude" / "claude_desktop_config.json"
+    elif sys.platform == "linux":
+        path = Path.home() / ".config" / "claude" / "claude_desktop_config.json"
+    elif sys.platform == "win32":
+        path = Path(os.environ.get("APPDATA", "")) / "Claude" / "claude_desktop_config.json"
+    else:
+        return False
+    return register_claude_settings(path, servers)
 
-def build_server_entries(repo_root: Path, jarvis_home: str, node_bin: str) -> dict:
-    mcp_server = repo_root / "mcp-jarvis-server" / "dist" / "index.js"
-    observer   = repo_root / "mcp-opencode-observer" / "dist" / "index.js"
 
+# ── OpenCode format ───────────────────────────────────────────────────────────
+# Format: { "mcp": { "name": { "type": "local", "command": ["node", "path"], "enabled": true } } }
+
+def opencode_servers(mcp_path: Path, observer_path: Path,
+                     node: str, jarvis_home: str) -> dict:
     servers = {
         "jarvis": {
-            "command": node_bin,
-            "args": [str(mcp_server)],
+            "type": "local",
+            "command": [node, str(mcp_path)],
+            "enabled": True,
+            "timeout": 30000,
             "env": {"JARVIS_DATA_DIR": jarvis_home},
         }
     }
-    if observer.exists():
+    if observer_path.exists():
         servers["jarvis-opencode-observer"] = {
-            "command": node_bin,
-            "args": [str(observer)],
+            "type": "local",
+            "command": [node, str(observer_path)],
+            "enabled": True,
+            "timeout": 30000,
             "env": {
                 "JARVIS_DATA_DIR": jarvis_home,
                 "OPENCODE_OBSERVER_PORT": "3000",
@@ -105,45 +144,22 @@ def build_server_entries(repo_root: Path, jarvis_home: str, node_bin: str) -> di
     return servers
 
 
-# ── Registration targets ──────────────────────────────────────────────────────
-
-def register_claude_code_global(servers: dict) -> bool:
-    """Register in ~/.claude/settings.json (Claude Code global)."""
-    path = Path.home() / ".claude" / "settings.json"
-    config = read_json(path)
-    changed = merge_mcp_servers(config, servers)
-    if changed:
-        write_json(path, config)
-    return changed
-
-
-def register_claude_code_project(repo_root: Path, servers: dict) -> bool:
-    """Register in <repo>/.claude/settings.json (project-level)."""
-    path = repo_root / ".claude" / "settings.json"
-    config = read_json(path)
-    changed = merge_mcp_servers(config, servers)
-    if changed:
-        write_json(path, config)
-    return changed
-
-
-def register_claude_desktop(servers: dict) -> bool:
-    """Register in Claude Desktop claude_desktop_config.json."""
-    platform = sys.platform
-    if platform == "darwin":
-        path = Path.home() / "Library" / "Application Support" / "Claude" / "claude_desktop_config.json"
-    elif platform == "linux":
-        path = Path.home() / ".config" / "claude" / "claude_desktop_config.json"
-    elif platform == "win32":
-        appdata = os.environ.get("APPDATA", "")
-        path = Path(appdata) / "Claude" / "claude_desktop_config.json"
-    else:
-        return False
+def register_opencode(servers: dict) -> bool:
+    path = Path.home() / ".config" / "opencode" / "opencode.jsonc"
+    if not path.exists():
+        # Also check alternate location
+        alt = Path.home() / ".opencode" / "config.json"
+        if not alt.exists():
+            return False
+        path = alt
 
     config = read_json(path)
-    changed = merge_mcp_servers(config, servers)
+    existing_mcp = config.get("mcp", {})
+    changed = any(existing_mcp.get(k) != v for k, v in servers.items())
     if changed:
-        write_json(path, config)
+        config["mcp"] = {**existing_mcp, **servers}
+        # Write as JSONC (plain JSON is valid JSONC)
+        path.write_text(json.dumps(config, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     return changed
 
 
@@ -154,26 +170,33 @@ def main():
     jarvis_home = os.environ.get("JARVIS_DATA_DIR",
                   os.environ.get("JARVIS_HOME",
                   str(Path.home() / "JARVIS")))
-    node_bin    = find_node()
-    servers     = build_server_entries(repo_root, jarvis_home, node_bin)
+    node        = find_node()
 
-    changed_global  = register_claude_code_global(servers)
-    changed_project = register_claude_code_project(repo_root, servers)
-    changed_desktop = register_claude_desktop(servers)
+    mcp_path      = repo_root / "mcp-jarvis-server" / "dist" / "index.js"
+    observer_path = repo_root / "mcp-opencode-observer" / "dist" / "index.js"
 
-    any_changed = changed_global or changed_project or changed_desktop
+    # Claude Code / Desktop format
+    cc_servers = claude_servers(mcp_path, observer_path, node, jarvis_home)
+    # OpenCode format
+    oc_servers = opencode_servers(mcp_path, observer_path, node, jarvis_home)
 
-    if any_changed:
-        targets = []
-        if changed_global:  targets.append("~/.claude/settings.json")
-        if changed_project: targets.append(".claude/settings.json")
-        if changed_desktop: targets.append("Claude Desktop config")
-        print(f"UPDATED: {', '.join(targets)}")
-        print(f"  node: {node_bin}")
-        print(f"  data: {jarvis_home}")
-        print(f"  servers: {', '.join(servers.keys())}")
+    results = {
+        "~/.claude/settings.json":    register_claude_settings(Path.home() / ".claude" / "settings.json", cc_servers),
+        ".claude/settings.json":      register_claude_settings(repo_root / ".claude" / "settings.json", cc_servers),
+        "Claude Desktop":             register_claude_desktop(cc_servers),
+        "OpenCode":                   register_opencode(oc_servers),
+    }
+
+    updated = [k for k, v in results.items() if v]
+    if updated:
+        print(f"UPDATED: {', '.join(updated)}")
     else:
-        print(f"already registered — node: {node_bin}, data: {jarvis_home}")
+        print("already registered")
+
+    print(f"  node: {node}")
+    print(f"  data: {jarvis_home}")
+    servers_list = list(cc_servers.keys())
+    print(f"  servers: {', '.join(servers_list)}")
 
 
 if __name__ == "__main__":
