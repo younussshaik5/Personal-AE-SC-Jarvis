@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
@@ -8,7 +8,6 @@
 </head>
 <body>
 
-<!-- ── Sidebar ──────────────────────────────────────────── -->
 <nav class="sidebar">
   <div class="sidebar-header">
     <div class="logo">
@@ -18,66 +17,54 @@
         <div class="logo-sub">Sales Intelligence</div>
       </div>
     </div>
-    <div class="status-pill" id="statusPill">
-      <span class="status-dot" id="statusDot"></span>
-      <span id="statusLabel">—</span>
-    </div>
+    <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Toggle theme">🌙</button>
+  </div>
+
+  <div class="status-bar" id="statusBar">
+    <span class="status-dot" id="statusDot"></span>
+    <span id="statusLabel">Connecting…</span>
+    <span class="status-home" id="statusHome"></span>
   </div>
 
   <nav class="nav-links">
-    <div class="nav-group-label">OVERVIEW</div>
-    <a class="nav-item active" data-view="pipeline" onclick="showView('pipeline',this)">
-      <span>🎯</span> Pipeline
-    </a>
-    <a class="nav-item" data-view="accounts" onclick="showView('accounts',this)">
-      <span>🏢</span> Accounts
-    </a>
-    <a class="nav-item" data-view="activity" onclick="showView('activity',this)">
-      <span>⚡</span> Activity Feed
-    </a>
-    <div class="nav-group-label" style="margin-top:1.5rem">SYSTEM</div>
-    <a class="nav-item" data-view="logs" onclick="showView('logs',this)">
-      <span>📋</span> Live Logs
-    </a>
+    <div class="nav-group">OVERVIEW</div>
+    <a class="nav-item active" data-view="pipeline" onclick="showView('pipeline',this)"><span class="ni">🎯</span>Pipeline</a>
+    <a class="nav-item" data-view="accounts" onclick="showView('accounts',this)"><span class="ni">🏢</span>Accounts</a>
+    <a class="nav-item" data-view="activity" onclick="showView('activity',this)"><span class="ni">⚡</span>Activity</a>
+    <div class="nav-group">SYSTEM</div>
+    <a class="nav-item" data-view="logs" onclick="showView('logs',this)"><span class="ni">📋</span>Live Logs</a>
   </nav>
 
   <div class="sidebar-footer">
-    <div class="footer-label">JARVIS HOME</div>
-    <div class="footer-path" id="jarvisHomePath">—</div>
-    <div class="footer-label" style="margin-top:.75rem">LAST REFRESH</div>
-    <div class="footer-path" id="lastRefresh">—</div>
-    <button class="refresh-btn" onclick="refreshAll()">↻  Refresh Now</button>
+    <div class="footer-row"><span>Last refresh</span><span id="lastRefresh">—</span></div>
+    <div class="footer-row"><span>Accounts</span><span id="sideAccounts">—</span></div>
+    <button class="refresh-btn" onclick="refreshAll()">↻ Refresh</button>
   </div>
 </nav>
 
-<!-- ── Main ────────────────────────────────────────────── -->
 <main class="main">
-
-  <!-- Top bar stats -->
   <header class="topbar">
-    <div>
+    <div class="topbar-left">
       <div class="page-title" id="pageTitle">Pipeline</div>
       <div class="page-sub" id="pageSub">All active deals</div>
     </div>
     <div class="topbar-chips">
-      <div class="chip" id="chipAccounts"><span class="chip-val" id="totalAccounts">—</span><span class="chip-lbl">accounts</span></div>
-      <div class="chip chip-warn" id="chipStale"><span class="chip-val" id="staleDeals">—</span><span class="chip-lbl">stale &gt;7d</span></div>
-      <div class="chip chip-blue"><span class="chip-val" id="avgMeddpicc">—</span><span class="chip-lbl">avg MEDDPICC</span></div>
+      <div class="chip"><span class="cv" id="totalAccounts">—</span><span class="cl">accounts</span></div>
+      <div class="chip chip-warn"><span class="cv" id="staleDeals">—</span><span class="cl">stale &gt;7d</span></div>
+      <div class="chip chip-blue"><span class="cv" id="avgMeddpicc">—</span><span class="cl">avg MEDDPICC</span></div>
     </div>
   </header>
 
-  <!-- ╔═ View: Pipeline ══════════════════════════════════╗ -->
+  <!-- Pipeline -->
   <section class="view active" id="view-pipeline">
-    <div class="pipeline-board" id="pipelineBoard">
-      <div class="loading-msg">Loading pipeline...</div>
-    </div>
+    <div class="pipeline-board" id="pipelineBoard"><div class="empty-state">Loading pipeline…</div></div>
   </section>
 
-  <!-- ╔═ View: Accounts ══════════════════════════════════╗ -->
+  <!-- Accounts -->
   <section class="view" id="view-accounts">
     <div class="toolbar">
       <input class="search-box" id="acctSearch" placeholder="🔍  Search accounts…" oninput="filterTable()"/>
-      <select class="stage-sel" id="stageSel" onchange="filterTable()">
+      <select class="sel" id="stageSel" onchange="filterTable()">
         <option value="">All stages</option>
         <option value="new_account">New</option>
         <option value="discovery">Discovery</option>
@@ -89,162 +76,141 @@
       </select>
     </div>
     <div class="table-wrap">
-      <table class="acct-table">
-        <thead>
-          <tr>
-            <th>Account</th>
-            <th>Stage</th>
-            <th>MEDDPICC</th>
-            <th>Win %</th>
-            <th>Last Activity</th>
-            <th>Contacts</th>
-            <th>Discovery</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody id="acctTbody">
-          <tr><td colspan="8" class="loading-cell">Loading…</td></tr>
-        </tbody>
+      <table class="data-table">
+        <thead><tr>
+          <th>Account</th><th>Stage</th><th>MEDDPICC</th><th>Win %</th>
+          <th>Last Activity</th><th>Contacts</th><th>Intel</th><th>Discovery</th><th></th>
+        </tr></thead>
+        <tbody id="acctTbody"><tr><td colspan="9" class="empty-cell">Loading…</td></tr></tbody>
       </table>
     </div>
   </section>
 
-  <!-- ╔═ View: Activity ══════════════════════════════════╗ -->
+  <!-- Activity -->
   <section class="view" id="view-activity">
-    <div class="activity-list" id="activityList">
-      <div class="loading-msg">Loading activity…</div>
-    </div>
+    <div class="activity-list" id="activityList"><div class="empty-state">Loading…</div></div>
   </section>
 
-  <!-- ╔═ View: Logs ══════════════════════════════════════╗ -->
+  <!-- Logs -->
   <section class="view" id="view-logs">
     <div class="toolbar">
-      <span class="logs-title">Orchestrator — live log</span>
-      <label class="toggle">
-        <input type="checkbox" id="autoRefreshCheck" onchange="toggleAutoLogs()"/>
-        Auto-refresh every 5s
-      </label>
-      <button class="btn-sm" onclick="loadLogs()">↻ Refresh</button>
+      <span class="toolbar-title">Orchestrator — live</span>
+      <label class="toggle-label"><input type="checkbox" id="autoLogCheck" onchange="toggleAutoLogs()"/> Auto 5s</label>
+      <button class="btn-sm" onclick="loadLogs()">↻</button>
     </div>
     <pre class="log-pre" id="logPre">Loading…</pre>
   </section>
 
-  <!-- ╔═ View: Account Detail ════════════════════════════╗ -->
+  <!-- Account Detail -->
   <section class="view" id="view-detail">
     <div class="detail-header">
       <button class="btn-back" onclick="showView('accounts', document.querySelector('[data-view=accounts]'))">← Accounts</button>
-      <div>
-        <div class="detail-name" id="detailName"></div>
-        <span class="badge" id="detailBadge"></span>
-        <span class="badge badge-grey" id="detailMeddpiccBadge"></span>
+      <div class="detail-title-group">
+        <span class="detail-name" id="detailName"></span>
+        <span class="badge" id="detailStageBadge"></span>
+        <span class="badge badge-neutral" id="detailMeddBadge"></span>
       </div>
-      <div class="detail-chips" id="detailChips"></div>
+      <div class="detail-meta-chips" id="detailMetaChips"></div>
     </div>
 
-    <div class="tab-bar" id="tabBar">
-      <button class="tab active" data-tab="overview"   onclick="showTab('overview',this)">Overview</button>
-      <button class="tab"         data-tab="discovery" onclick="showTab('discovery',this)">Discovery</button>
+    <div class="tab-bar">
+      <button class="tab active" data-tab="overview"    onclick="showTab('overview',this)">Overview</button>
+      <button class="tab"         data-tab="intel"      onclick="showTab('intel',this)">Intel <span class="tab-count" id="intelCount"></span></button>
+      <button class="tab"         data-tab="discovery"  onclick="showTab('discovery',this)">Discovery</button>
       <button class="tab"         data-tab="battlecard" onclick="showTab('battlecard',this)">Battlecard</button>
       <button class="tab"         data-tab="demo"       onclick="showTab('demo',this)">Demo</button>
       <button class="tab"         data-tab="value"      onclick="showTab('value',this)">ROI / Value</button>
       <button class="tab"         data-tab="proposal"   onclick="showTab('proposal',this)">Proposal</button>
-      <button class="tab"         data-tab="risk"       onclick="showTab('risk',this)">Risk Report</button>
+      <button class="tab"         data-tab="risk"       onclick="showTab('risk',this)">Risk</button>
       <button class="tab"         data-tab="contacts"   onclick="showTab('contacts',this)">Contacts</button>
     </div>
 
-    <!-- Overview tab -->
+    <!-- Overview -->
     <div class="tab-pane active" id="tab-overview">
-      <div class="overview-row" id="overviewCards"></div>
-      <div class="medd-dims" id="meddDims"></div>
+      <div class="ov-grid" id="ovCards"></div>
+      <div class="medd-grid" id="meddGrid"></div>
       <div class="two-col">
         <div>
-          <div class="section-title">Summary</div>
-          <div class="md-render" id="overviewSummary"></div>
+          <div class="sec-title">Summary</div>
+          <div class="md-box" id="ovSummary"></div>
         </div>
         <div>
-          <div class="section-title">Recent Activities</div>
-          <div id="overviewActivities"></div>
+          <div class="sec-title">Conversation Activity</div>
+          <div id="ovActivity"></div>
+          <div class="sec-title" style="margin-top:1.25rem">Actions</div>
+          <div class="md-box" id="ovActions"></div>
         </div>
       </div>
     </div>
 
-    <!-- Discovery tab -->
+    <!-- Intel -->
+    <div class="tab-pane" id="tab-intel">
+      <div class="intel-toolbar">
+        <input class="search-box" id="intelSearch" placeholder="🔍 Search intel files…" oninput="filterIntel()" style="max-width:320px"/>
+      </div>
+      <div class="intel-grid" id="intelGrid"></div>
+    </div>
+
+    <!-- Discovery -->
     <div class="tab-pane" id="tab-discovery">
       <div class="split">
-        <div class="split-col">
-          <div class="section-title">JARVIS — Discovery Prep Questions</div>
-          <div class="md-render" id="discPrep"></div>
-        </div>
-        <div class="split-col">
-          <div class="section-title">Your Discovery Notes</div>
-          <div class="md-render" id="discNotes"></div>
-        </div>
+        <div><div class="sec-title">JARVIS Discovery Prep <span class="sec-time" id="discPrepTime"></span></div><div class="md-box" id="discPrep"></div></div>
+        <div><div class="sec-title">Your Discovery Notes <span class="sec-time" id="discNotesTime"></span></div><div class="md-box" id="discNotes"></div></div>
       </div>
     </div>
 
-    <!-- Battlecard tab -->
+    <!-- Battlecard -->
     <div class="tab-pane" id="tab-battlecard">
       <div class="bc-layout">
-        <div class="bc-main">
-          <div class="section-title">Battlecard</div>
-          <div class="md-render" id="bcMd"></div>
+        <div>
+          <div class="sec-title">Battlecard <span class="sec-time" id="bcTime"></span></div>
+          <div class="md-box" id="bcMd"></div>
         </div>
-        <div class="bc-right">
-          <div class="section-title">Competitors</div>
-          <div id="bcCompetitors"></div>
-          <div class="section-title" style="margin-top:2rem">Win Probability</div>
-          <div class="win-ring" id="winRing"></div>
+        <div class="bc-sidebar">
+          <div class="sec-title">Competitors</div>
+          <div id="bcComps"></div>
+          <div class="sec-title" style="margin-top:1.5rem">Win Probability</div>
+          <div class="win-display" id="winDisplay"></div>
+          <div class="sec-title" style="margin-top:1.5rem">Battlecard Data</div>
+          <div id="bcRaw"></div>
         </div>
       </div>
     </div>
 
-    <!-- Demo tab -->
+    <!-- Demo -->
     <div class="tab-pane" id="tab-demo">
       <div class="split">
-        <div class="split-col">
-          <div class="section-title">Demo Strategy</div>
-          <div class="md-render" id="demoStrat"></div>
-        </div>
-        <div class="split-col">
-          <div class="section-title">Demo Script</div>
-          <div class="md-render" id="demoScript"></div>
-        </div>
+        <div><div class="sec-title">Demo Strategy <span class="sec-time" id="demoStratTime"></span></div><div class="md-box" id="demoStrat"></div></div>
+        <div><div class="sec-title">Demo Script <span class="sec-time" id="demoScriptTime"></span></div><div class="md-box" id="demoScript"></div></div>
       </div>
     </div>
 
-    <!-- Value / ROI tab -->
+    <!-- Value -->
     <div class="tab-pane" id="tab-value">
       <div class="split">
-        <div class="split-col">
-          <div class="section-title">ROI Model — 3 Scenarios</div>
-          <div class="md-render" id="roiModel"></div>
-        </div>
-        <div class="split-col">
-          <div class="section-title">TCO Analysis</div>
-          <div class="md-render" id="tcoModel"></div>
-        </div>
+        <div><div class="sec-title">ROI Model <span class="sec-time" id="roiTime"></span></div><div class="md-box" id="roiMd"></div></div>
+        <div><div class="sec-title">TCO Analysis</div><div class="md-box" id="tcoMd"></div></div>
       </div>
     </div>
 
-    <!-- Proposal tab -->
+    <!-- Proposal -->
     <div class="tab-pane" id="tab-proposal">
-      <div class="proposal-wrap" id="proposalWrap"></div>
-      <div class="md-render" id="proposalMd"></div>
+      <div id="propBanner"></div>
+      <div class="md-box" id="propMd"></div>
     </div>
 
-    <!-- Risk Report tab -->
+    <!-- Risk -->
     <div class="tab-pane" id="tab-risk">
-      <div class="section-title">Risk Report — append-only deal log</div>
-      <div class="md-render" id="riskMd"></div>
+      <div class="sec-title">Risk Report — append-only deal log <span class="sec-time" id="riskTime"></span></div>
+      <div class="md-box" id="riskMd"></div>
     </div>
 
-    <!-- Contacts tab -->
+    <!-- Contacts -->
     <div class="tab-pane" id="tab-contacts">
       <div class="contacts-grid" id="contactsGrid"></div>
     </div>
 
   </section>
-
 </main>
 
 <script src="app.js"></script>

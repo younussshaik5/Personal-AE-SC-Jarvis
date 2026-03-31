@@ -1,353 +1,377 @@
 /* ── JARVIS Dashboard ────────────────────────────────────────── */
+let _accounts  = [];
+let _logTimer  = null;
+let _pollTimer = null;
+let _currentAccount = null;
+let _intelFiles = [];
 
-const API = '';   // same origin
-let _accounts = [];
-let _logsTimer = null;
-let _statsTimer = null;
+const STAGE_ORDER  = ['new_account','discovery','demo','proposal','negotiation','closed_won','closed_won_expansion','closed_lost'];
+const STAGE_LABELS = { new_account:'New', discovery:'Discovery', demo:'Demo', proposal:'Proposal', negotiation:'Negotiation', closed_won:'Won ✓', closed_won_expansion:'Expansion', closed_lost:'Lost ✗' };
+const ACT_ICONS    = { discovery:'🔍', demo:'🎬', email:'📧', meeting:'📅', document:'📄', meddpicc:'📊', proposal:'📝', conversation:'💬', opencode_conversation:'💬', document_processor:'📄', default:'⚡' };
 
 // ── Boot ─────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
+  applyTheme(localStorage.getItem('theme') || 'dark');
   refreshAll();
-  _statsTimer = setInterval(refreshStats, 30_000);
+  setInterval(refreshStats, 15_000);
+  setInterval(refreshAccountsBackground, 20_000);
 });
 
 async function refreshAll() {
   await Promise.all([loadStatus(), loadStats(), loadAccounts()]);
-  const active = document.querySelector('.view.active');
-  if (active?.id === 'view-pipeline')  renderPipeline();
-  if (active?.id === 'view-accounts')  renderAccountsTable();
-  if (active?.id === 'view-activity')  loadActivity();
-  if (active?.id === 'view-logs')      loadLogs();
+  const v = document.querySelector('.view.active');
+  if (v?.id === 'view-pipeline') renderPipeline();
+  if (v?.id === 'view-accounts') renderTable(_accounts);
+  if (v?.id === 'view-activity') loadActivity();
+  if (v?.id === 'view-logs')     loadLogs();
   document.getElementById('lastRefresh').textContent = new Date().toLocaleTimeString();
 }
 
-// ── Status ───────────────────────────────────────────────────
-async function loadStatus() {
-  try {
-    const d = await apiFetch('/api/status');
-    const dot   = document.getElementById('statusDot');
-    const label = document.getElementById('statusLabel');
-    dot.className   = 'status-dot ' + (d.running ? 'live' : 'offline');
-    label.textContent = d.running ? 'Live' : 'Stopped';
-    document.getElementById('jarvisHomePath').textContent = d.jarvis_home || '—';
-  } catch { /* ignore */ }
+async function refreshAccountsBackground() {
+  const old = _accounts.length;
+  await loadAccounts();
+  if (_accounts.length !== old) refreshAll();
+  else {
+    const v = document.querySelector('.view.active');
+    if (v?.id === 'view-pipeline') renderPipeline();
+    if (v?.id === 'view-accounts') renderTable(_accounts);
+  }
 }
 
-// ── Stats ────────────────────────────────────────────────────
+// ── Status ────────────────────────────────────────────────────
+async function loadStatus() {
+  try {
+    const d = await get('/api/status');
+    const dot = document.getElementById('statusDot');
+    dot.className = 'status-dot ' + (d.running ? 'live' : 'offline');
+    document.getElementById('statusLabel').textContent = d.running ? 'Live' : 'Stopped';
+    document.getElementById('statusHome').textContent  = d.jarvis_home?.split('/').slice(-2).join('/') || '';
+  } catch {}
+}
+
+// ── Stats ─────────────────────────────────────────────────────
 async function refreshStats() {
   try {
-    const d = await apiFetch('/api/stats');
+    const d = await get('/api/stats');
     document.getElementById('totalAccounts').textContent = d.total_accounts ?? '—';
     document.getElementById('staleDeals').textContent    = d.stale_deals ?? '—';
     document.getElementById('avgMeddpicc').textContent   = d.avg_meddpicc_pct != null ? d.avg_meddpicc_pct + '%' : '—';
-  } catch { /* ignore */ }
+    document.getElementById('sideAccounts').textContent  = d.total_accounts ?? '—';
+  } catch {}
 }
 async function loadStats() { return refreshStats(); }
 
-// ── Accounts ─────────────────────────────────────────────────
+// ── Accounts ──────────────────────────────────────────────────
 async function loadAccounts() {
-  try { _accounts = await apiFetch('/api/accounts'); } catch { _accounts = []; }
+  try { _accounts = await get('/api/accounts'); } catch { _accounts = []; }
 }
 
 // ── Views ─────────────────────────────────────────────────────
 function showView(name, el) {
+  if (_pollTimer) { clearInterval(_pollTimer); _pollTimer = null; }
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-  const view = document.getElementById('view-' + name);
-  if (view) view.classList.add('active');
-  if (el) el.classList.add('active');
-  const titles = {
-    pipeline: ['Pipeline', 'All active deals'],
-    accounts: ['Accounts', 'Full account list'],
-    activity: ['Activity Feed', 'Recent JARVIS events'],
-    logs:     ['Live Logs',  'Orchestrator output'],
-    detail:   ['Account Detail', ''],
-  };
-  const [title, sub] = titles[name] || [name, ''];
-  document.getElementById('pageTitle').textContent = title;
-  document.getElementById('pageSub').textContent   = sub;
-
+  document.getElementById('view-' + name)?.classList.add('active');
+  el?.classList.add('active');
+  const titles = { pipeline:['Pipeline','All active deals'], accounts:['Accounts','Full list'], activity:['Activity','Recent events'], logs:['Live Logs','Orchestrator output'], detail:['Account Detail',''] };
+  const [t, s] = titles[name] || [name, ''];
+  document.getElementById('pageTitle').textContent = t;
+  document.getElementById('pageSub').textContent   = s;
   if (name === 'pipeline')  renderPipeline();
-  if (name === 'accounts')  renderAccountsTable();
+  if (name === 'accounts')  renderTable(_accounts);
   if (name === 'activity')  loadActivity();
   if (name === 'logs')      loadLogs();
-  if (name !== 'logs' && _logsTimer) { clearInterval(_logsTimer); _logsTimer = null; }
+  if (name !== 'logs' && _logTimer) { clearInterval(_logTimer); _logTimer = null; document.getElementById('autoLogCheck').checked = false; }
 }
 
-// ── Pipeline ─────────────────────────────────────────────────
-const STAGE_ORDER = ['new_account','discovery','demo','proposal','negotiation','closed_won','closed_lost'];
-const STAGE_LABELS = {
-  new_account:'New', discovery:'Discovery', demo:'Demo',
-  proposal:'Proposal', negotiation:'Negotiation',
-  closed_won:'Won ✓', closed_lost:'Lost ✗',
-};
-
+// ── Pipeline ──────────────────────────────────────────────────
 function renderPipeline() {
   const board = document.getElementById('pipelineBoard');
-  if (!_accounts.length) { board.innerHTML = '<div class="loading-msg">No accounts found in JARVIS_HOME/ACCOUNTS/</div>'; return; }
-  const byStage = {};
-  STAGE_ORDER.forEach(s => byStage[s] = []);
-  _accounts.forEach(a => { const s = a.stage || 'new_account'; (byStage[s] = byStage[s] || []).push(a); });
-
-  board.innerHTML = STAGE_ORDER.map(stage => {
-    const cards = (byStage[stage] || []);
-    const cardsHtml = cards.length
-      ? cards.map(a => dealCard(a)).join('')
-      : '<div style="color:var(--text3);font-size:.75rem;padding:.4rem .2rem">—</div>';
+  if (!_accounts.length) { board.innerHTML = '<div class="empty-state">No accounts found in JARVIS_HOME/ACCOUNTS/</div>'; return; }
+  const grouped = {};
+  STAGE_ORDER.forEach(s => grouped[s] = []);
+  _accounts.forEach(a => { const s = a.stage || 'new_account'; (grouped[s] = grouped[s] || []).push(a); });
+  const visibleStages = STAGE_ORDER.filter(s => (grouped[s]||[]).length > 0 || ['new_account','discovery','demo','proposal'].includes(s));
+  board.innerHTML = visibleStages.map(stage => {
+    const cards = grouped[stage] || [];
     return `<div class="stage-col">
       <div class="stage-col-header">
-        <span class="stage-col-name">${STAGE_LABELS[stage]}</span>
+        <span class="stage-col-name">${STAGE_LABELS[stage] || stage}</span>
         <span class="stage-col-count">${cards.length}</span>
       </div>
-      <div class="stage-cards">${cardsHtml}</div>
+      <div class="stage-cards">${cards.length ? cards.map(dealCard).join('') : '<div style="color:var(--text3);font-size:.72rem;padding:.35rem .2rem">Empty</div>'}</div>
     </div>`;
   }).join('');
-
-  board.querySelectorAll('.deal-card').forEach(card => {
-    card.addEventListener('click', () => openAccount(card.dataset.name));
-  });
+  board.querySelectorAll('.deal-card').forEach(c => c.addEventListener('click', () => openAccount(c.dataset.name)));
 }
 
 function dealCard(a) {
-  const dims = a.meddpicc_dimensions || {};
-  const dots = Object.values(dims).map(v => `<div class="medd-mini-dot${v > 0 ? ' filled' : ''}"></div>`).join('');
-  const stale = a.days_stale != null && a.days_stale > 7
-    ? `<div class="stale-flag">⚠ ${a.days_stale}d stale</div>` : '';
+  const dims = Object.values(a.meddpicc_dimensions || {});
+  const dots = dims.map(v => `<div class="medd-dot${v > 0 ? ' on' : ''}"></div>`).join('');
+  const stale = a.days_stale > 7 ? `<span class="stale-pill">⚠ ${a.days_stale}d</span>` : '';
+  const intel = a.intel_count > 0 ? `<span class="intel-pill">📄 ${a.intel_count}</span>` : '';
   return `<div class="deal-card" data-name="${esc(a.name)}">
     <div class="deal-card-name">${esc(a.name)}</div>
-    <div class="deal-card-meta">
-      <span class="deal-card-medd">MEDD ${a.meddpicc_pct ?? 0}%</span>
-      <div class="medd-mini">${dots}</div>
+    <div class="deal-card-bottom">
+      <span class="deal-card-pct">${a.meddpicc_pct ?? 0}%</span>
+      <div class="medd-dots">${dots}</div>
     </div>
-    ${stale}
+    <div>${stale}${intel}</div>
   </div>`;
 }
 
-// ── Accounts Table ───────────────────────────────────────────
-function renderAccountsTable() {
-  renderTableRows(_accounts);
-}
-
+// ── Accounts Table ────────────────────────────────────────────
 function filterTable() {
-  const q = document.getElementById('acctSearch').value.toLowerCase();
+  const q = (document.getElementById('acctSearch').value || '').toLowerCase();
   const s = document.getElementById('stageSel').value;
-  const filtered = _accounts.filter(a => {
-    const matchName  = !q || a.name.toLowerCase().includes(q);
-    const matchStage = !s || a.stage === s;
-    return matchName && matchStage;
-  });
-  renderTableRows(filtered);
+  renderTable(_accounts.filter(a => (!q || a.name.toLowerCase().includes(q)) && (!s || a.stage === s)));
 }
-
-function renderTableRows(list) {
+function renderTable(list) {
   const tbody = document.getElementById('acctTbody');
-  if (!list.length) {
-    tbody.innerHTML = '<tr><td colspan="8" class="loading-cell">No accounts found</td></tr>';
-    return;
-  }
+  if (!list.length) { tbody.innerHTML = '<tr><td colspan="9" class="empty-cell">No accounts</td></tr>'; return; }
   tbody.innerHTML = list.map(a => {
-    const stageBadge = `<span class="badge badge-${a.stage || 'new_account'}">${STAGE_LABELS[a.stage] || a.stage}</span>`;
-    const meddBar = `<div class="medd-bar-wrap">
-      <div class="medd-bar-track"><div class="medd-bar-fill" style="width:${a.meddpicc_pct ?? 0}%"></div></div>
-      <span class="medd-bar-pct">${a.meddpicc_pct ?? 0}%</span>
-    </div>`;
-    const winPct = a.win_probability != null
-      ? `<span class="win-pct ${winClass(a.win_probability)}">${a.win_probability}%</span>`
-      : '<span style="color:var(--text3)">—</span>';
-    const lastAct = a.last_activity
-      ? `${a.last_activity}${a.days_stale != null ? ` <span style="color:var(--text3);font-size:.68rem">(${a.days_stale}d)</span>` : ''}`
-      : '<span style="color:var(--text3)">Never</span>';
-    const disc = a.has_discovery
-      ? '<span class="disc-check">✓</span>'
-      : '<span class="disc-empty">—</span>';
+    const sb  = `<span class="badge badge-${a.stage||'new_account'}">${STAGE_LABELS[a.stage]||a.stage}</span>`;
+    const mb  = `<div class="medd-bar"><div class="medd-track"><div class="medd-fill" style="width:${a.meddpicc_pct??0}%"></div></div><span class="medd-pct">${a.meddpicc_pct??0}%</span></div>`;
+    const wp  = a.win_probability != null ? `<span class="win-pct ${winCls(a.win_probability)}">${a.win_probability}%</span>` : '<span style="color:var(--text3)">—</span>';
+    const la  = a.last_activity ? `${a.last_activity.slice(0,10)} ${a.days_stale!=null?`<span style="color:var(--text3);font-size:.68rem">(${a.days_stale}d)</span>`:''}` : '<span style="color:var(--text3)">—</span>';
+    const ic  = a.intel_count > 0 ? `<span class="intel-badge">📄 ${a.intel_count}</span>` : '<span style="color:var(--text3)">—</span>';
+    const dc  = a.has_discovery ? '<span class="disc-yes">✓</span>' : '<span class="disc-no">—</span>';
     return `<tr onclick="openAccount('${esc(a.name)}')">
-      <td><strong>${esc(a.name)}</strong></td>
-      <td>${stageBadge}</td>
-      <td>${meddBar}</td>
-      <td>${winPct}</td>
-      <td>${lastAct}</td>
-      <td>${a.contacts_count ?? 0}</td>
-      <td>${disc}</td>
-      <td><button class="open-btn" onclick="event.stopPropagation();openAccount('${esc(a.name)}')">Open →</button></td>
+      <td><strong>${esc(a.name)}</strong></td><td>${sb}</td><td>${mb}</td><td>${wp}</td>
+      <td>${la}</td><td>${a.contacts_count??0}</td><td>${ic}</td><td>${dc}</td>
+      <td><button class="btn-open" onclick="event.stopPropagation();openAccount('${esc(a.name)}')">Open →</button></td>
     </tr>`;
   }).join('');
 }
 
-// ── Account Detail ───────────────────────────────────────────
+// ── Account Detail ────────────────────────────────────────────
 async function openAccount(name) {
+  _currentAccount = name;
   showView('detail', null);
   document.getElementById('pageTitle').textContent = name;
   document.getElementById('pageSub').textContent   = 'Account intelligence';
   document.getElementById('detailName').textContent = name;
-
-  // reset tabs
+  // Reset tabs
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
   document.querySelector('.tab[data-tab="overview"]').classList.add('active');
   document.getElementById('tab-overview').classList.add('active');
-
+  document.getElementById('intelCount').textContent = '';
   try {
-    const d = await apiFetch(`/api/accounts/${encodeURIComponent(name)}`);
-    renderAccountDetail(d);
+    const d = await get(`/api/accounts/${encodeURIComponent(name)}`);
+    renderDetail(d);
+    // Poll for updates every 12s while on this account
+    if (_pollTimer) clearInterval(_pollTimer);
+    _pollTimer = setInterval(async () => {
+      if (_currentAccount !== name) return;
+      const fresh = await get(`/api/accounts/${encodeURIComponent(name)}`);
+      renderDetail(fresh);
+    }, 12_000);
   } catch (e) {
-    document.getElementById('detailName').textContent = name + ' — Error loading';
+    document.getElementById('detailName').textContent = name + ' — failed to load';
   }
 }
 
-function renderAccountDetail(d) {
-  // Header badges
-  document.getElementById('detailBadge').className = `badge badge-${d.stage || 'new_account'}`;
-  document.getElementById('detailBadge').textContent = STAGE_LABELS[d.stage] || d.stage;
-  document.getElementById('detailMeddpiccBadge').className = 'badge badge-grey';
-  document.getElementById('detailMeddpiccBadge').textContent = `MEDDPICC ${d.meddpicc_pct ?? 0}%`;
+function renderDetail(d) {
+  // Header
+  document.getElementById('detailStageBadge').className   = `badge badge-${d.stage||'new_account'}`;
+  document.getElementById('detailStageBadge').textContent  = STAGE_LABELS[d.stage] || d.stage;
+  document.getElementById('detailMeddBadge').textContent   = `MEDDPICC ${d.meddpicc_pct??0}%`;
 
-  // Win chip
-  const chips = document.getElementById('detailChips');
-  chips.innerHTML = d.win_probability != null
-    ? `<span class="chip"><span class="chip-val ${winClass(d.win_probability)}">${d.win_probability}%</span><span class="chip-lbl">win</span></span>`
-    : '';
-  if (d.days_stale != null && d.days_stale > 7) {
-    chips.innerHTML += `<span class="chip chip-warn"><span class="chip-val">${d.days_stale}d</span><span class="chip-lbl">stale</span></span>`;
-  }
+  // Meta chips
+  let chips = '';
+  if (d.win_probability != null) chips += `<div class="chip"><span class="cv ${winCls(d.win_probability)}">${d.win_probability}%</span><span class="cl">win</span></div>`;
+  if (d.days_stale > 7) chips += `<div class="chip chip-warn"><span class="cv">${d.days_stale}d</span><span class="cl">stale</span></div>`;
+  if (d.arr) chips += `<div class="chip chip-blue"><span class="cv">${d.arr}</span><span class="cl">ARR</span></div>`;
+  if (d.intel_count > 0) chips += `<div class="chip"><span class="cv" style="color:var(--cyan)">${d.intel_count}</span><span class="cl">intel files</span></div>`;
+  document.getElementById('detailMetaChips').innerHTML = chips;
 
-  // ── Overview tab ──
-  const dims = d.meddpicc_dimensions || {};
-  const dimNames = { metrics:'Metrics', economic_buyer:'Econ Buyer', decision_criteria:'Dec Criteria',
-    decision_process:'Dec Process', paper_process:'Paper Proc', implicate_pain:'Imp Pain',
-    champion:'Champion', competition:'Competition' };
+  // Intel tab count
+  const ic = d.intel_files?.length || 0;
+  document.getElementById('intelCount').textContent = ic > 0 ? ic : '';
 
-  document.getElementById('overviewCards').innerHTML = [
-    { label: 'MEDDPICC', val: `${d.meddpicc_pct ?? 0}%`, sub: `${d.meddpicc_score ?? 0}/${d.meddpicc_max ?? 8}` },
-    { label: 'Win Probability', val: d.win_probability != null ? d.win_probability + '%' : '—', cls: d.win_probability != null ? winClass(d.win_probability) : '' },
-    { label: 'Last Activity', val: d.last_activity || '—', sub: d.days_stale != null ? `${d.days_stale} days ago` : '' },
-    { label: 'Contacts', val: d.contacts_count ?? 0 },
-  ].map(c => `<div class="ov-card">
-    <div class="ov-card-label">${c.label}</div>
-    <div class="ov-card-val ${c.cls || ''}">${c.val}</div>
-    ${c.sub ? `<div class="ov-card-sub">${c.sub}</div>` : ''}
-  </div>`).join('');
+  // ── Overview ──
+  const dimNames = {metrics:'Metrics',economic_buyer:'Econ Buyer',decision_criteria:'Dec Criteria',decision_process:'Dec Process',paper_process:'Paper Proc',implicate_pain:'Imp Pain',champion:'Champion',competition:'Competition'};
+  document.getElementById('ovCards').innerHTML = [
+    { label:'MEDDPICC', val:`${d.meddpicc_pct??0}%`, sub:`${d.meddpicc_score??0}/${d.meddpicc_max??8}` },
+    { label:'Win Probability', val:d.win_probability!=null?d.win_probability+'%':'—', cls:d.win_probability!=null?winCls(d.win_probability):'' },
+    { label:'Last Activity', val:d.last_activity?.slice(0,10)||'—', sub:d.days_stale!=null?`${d.days_stale}d ago`:'' },
+    { label:'Contacts', val:d.contacts_count??0 },
+    { label:'Intel Files', val:d.intel_count||0, sub:'JARVIS researched' },
+    { label:'Stage', val:STAGE_LABELS[d.stage]||d.stage||'—' },
+  ].map(c => `<div class="ov-card"><div class="ov-label">${c.label}</div><div class="ov-val ${c.cls||''}">${c.val}</div>${c.sub?`<div class="ov-sub">${c.sub}</div>`:''}</div>`).join('');
 
-  document.getElementById('meddDims').innerHTML = Object.entries(dimNames).map(([k, label]) => {
-    const v = dims[k] ?? 0;
-    const cls = v === 0 ? 'zero' : v < 1 ? 'low' : 'high';
-    return `<div class="medd-dim">
-      <span class="medd-dim-name">${label}</span>
-      <span class="medd-dim-score ${cls}">${v}</span>
-    </div>`;
+  document.getElementById('meddGrid').innerHTML = Object.entries(dimNames).map(([k,label]) => {
+    const v = d.meddpicc_dimensions?.[k] ?? 0;
+    const cls = v === 0 ? 'medd-score-0' : v < 1 ? 'medd-score-low' : 'medd-score-ok';
+    return `<div class="medd-dim"><span class="medd-dim-name">${label}</span><span class="medd-dim-score ${cls}">${v}</span></div>`;
   }).join('');
 
-  renderMd('overviewSummary', d.summary_md || '');
+  renderMd('ovSummary', d.summary_md);
+  renderMd('ovActions', d.actions?.content);
 
   const acts = d.activities || [];
-  document.getElementById('overviewActivities').innerHTML = acts.length
-    ? acts.slice(0, 10).map(a => `<div class="ov-activity-item">
-        <span class="ov-act-date">${a.date || '—'}</span>
-        <span class="ov-act-type">${a.type || ''}</span>
-        <span class="ov-act-summary">${esc(a.summary || '')}</span>
+  document.getElementById('ovActivity').innerHTML = acts.length
+    ? acts.slice(0,12).map(a => `<div class="ov-act-item">
+        <span class="ov-act-date">${String(a.timestamp||a.date||'').slice(0,16)}</span>
+        <span class="ov-act-badge">${a.type||a.source||'event'}</span>
+        <span class="ov-act-summary">${esc(a.summary||a.description||'')}</span>
       </div>`).join('')
-    : '<div style="color:var(--text3);font-size:.8rem;padding:.5rem 0">No activities recorded yet</div>';
+    : '<div style="color:var(--text3);font-size:.8rem;padding:.5rem 0">No activities yet</div>';
 
-  // ── Discovery tab ──
-  renderMd('discPrep',   d.discovery?.prep);
-  renderMd('discNotes',  d.discovery?.notes);
+  // ── Intel tab ──
+  _intelFiles = d.intel_files || [];
+  renderIntelGrid(_intelFiles);
 
-  // ── Battlecard tab ──
-  renderMd('bcMd', d.battlecard?.markdown);
+  // ── Discovery ──
+  renderMdSection('discPrep',  d.discovery?.prep,  'discPrepTime');
+  renderMdSection('discNotes', d.discovery?.notes, 'discNotesTime');
+
+  // ── Battlecard ──
+  renderMdSection('bcMd', d.battlecard?.markdown, 'bcTime');
   const comps = d.battlecard?.data?.competitors || d.competitors || [];
-  document.getElementById('bcCompetitors').innerHTML = comps.length
+  document.getElementById('bcComps').innerHTML = comps.length
     ? comps.map(c => `<span class="comp-tag">${esc(c)}</span>`).join('')
     : '<span style="color:var(--text3);font-size:.8rem">None identified yet</span>';
-
   const wp = d.win_probability;
-  const wCls = wp != null ? winClass(wp) : '';
-  document.getElementById('winRing').innerHTML = `
-    <div class="win-ring-num ${wCls}">${wp != null ? wp + '%' : '—'}</div>
-    <div class="win-ring-label">Win Probability</div>`;
+  document.getElementById('winDisplay').innerHTML = `<div class="win-num ${wp!=null?winCls(wp):''}">${wp!=null?wp+'%':'—'}</div><div class="win-lbl">Win Probability</div>`;
+  // Show battlecard raw data if available
+  const bcData = d.battlecard?.data || {};
+  const bcKeys = ['differentiators','objections','trap_questions'];
+  let bcRawHtml = '';
+  for (const k of bcKeys) {
+    if (bcData[k]?.length) bcRawHtml += `<div class="sec-title" style="margin-top:.8rem">${k.replace(/_/g,' ')}</div><ul class="md-box" style="padding:.65rem 1rem">${bcData[k].map(i=>`<li style="font-size:.8rem;color:var(--text2);margin-bottom:.2rem">${esc(i)}</li>`).join('')}</ul>`;
+  }
+  document.getElementById('bcRaw').innerHTML = bcRawHtml;
 
-  // ── Demo tab ──
-  renderMd('demoStrat',  d.demo?.strategy);
-  renderMd('demoScript', d.demo?.script);
+  // ── Demo ──
+  renderMdSection('demoStrat',  d.demo?.strategy, 'demoStratTime');
+  renderMdSection('demoScript', d.demo?.script,   'demoScriptTime');
 
-  // ── Value tab ──
-  renderMd('roiModel',  d.value?.roi);
-  renderMd('tcoModel',  d.value?.tco);
+  // ── Value ──
+  renderMdSection('roiMd', d.value?.roi, 'roiTime');
+  renderMdSection('tcoMd', d.value?.tco);
 
-  // ── Proposal tab ──
+  // ── Proposal ──
   const pd = d.proposal?.data || {};
-  document.getElementById('proposalWrap').innerHTML = `
-    <div class="proposal-wrap">
-      <div class="prop-status">
-        <strong>Status:</strong> ${pd.status || 'Not generated yet'} &nbsp;
-        <strong>Generated:</strong> ${pd.generated_at ? pd.generated_at.slice(0,10) : '—'}
-      </div>
-      ${d.proposal?.html_exists
-        ? `<button class="prop-open-btn" onclick="alert('Open ACCOUNTS/${esc(d.name)}/PROPOSAL/proposal.html in your browser')">Open HTML Proposal ↗</button>`
-        : '<span style="color:var(--text3);font-size:.78rem">HTML not generated yet — ask Claude to generate proposal</span>'}
-    </div>`;
-  renderMd('proposalMd', pd.executive_summary
-    ? `**Executive Summary:**\n${pd.executive_summary}\n\n**Solution:** ${pd.proposed_solution || '—'}`
-    : '');
+  document.getElementById('propBanner').innerHTML = `<div class="prop-banner">
+    <div>
+      <strong>Status:</strong> ${pd.status||'Not generated'} &nbsp;
+      <strong>Generated:</strong> ${d.proposal?.modified||'—'}
+    </div>
+    ${d.proposal?.html_exists
+      ? `<button class="prop-btn" onclick="alert('Open: ~/JARVIS/ACCOUNTS/${esc(d.name)}/PROPOSAL/proposal.html')">Open HTML ↗</button>`
+      : '<span style="color:var(--text3);font-size:.78rem">Not generated — ask Claude to generate proposal</span>'}
+  </div>`;
+  const propContent = pd.executive_summary
+    ? `## Executive Summary\n${pd.executive_summary}\n\n**Solution:** ${pd.proposed_solution||'—'}\n\n**Pricing:** ${pd.pricing||'—'}`
+    : '';
+  renderMd('propMd', propContent);
 
-  // ── Risk tab ──
-  renderMd('riskMd', d.risk?.report);
+  // ── Risk ──
+  renderMdSection('riskMd', d.risk?.report, 'riskTime');
 
-  // ── Contacts tab ──
+  // ── Contacts ──
   const contacts = d.contacts || [];
   document.getElementById('contactsGrid').innerHTML = contacts.length
     ? contacts.map(c => `<div class="contact-card">
-        <div class="contact-name">${esc(c.name || 'Unknown')}</div>
-        <div class="contact-title">${esc(c.title || c.role || '')}</div>
+        <div class="contact-name">${esc(c.name||'Unknown')}</div>
+        <div class="contact-role">${esc(c.title||c.role||'')}</div>
         ${c.email ? `<div class="contact-email">${esc(c.email)}</div>` : ''}
-        ${c.type ? `<span class="badge badge-grey contact-role">${esc(c.type)}</span>` : ''}
+        ${c.type  ? `<span class="badge badge-neutral" style="margin-top:.4rem">${esc(c.type)}</span>` : ''}
       </div>`).join('')
-    : '<div class="no-contacts">No contacts saved yet — update discovery notes with contact names</div>';
+    : '<div class="no-contacts">No contacts yet — save discovery notes with contact names</div>';
+}
+
+// ── Intel Grid ────────────────────────────────────────────────
+function renderIntelGrid(files) {
+  const grid = document.getElementById('intelGrid');
+  if (!files.length) { grid.innerHTML = '<div class="empty-state">No intel files yet — JARVIS populates this as you chat and add documents</div>'; return; }
+  const icons = { md:'📄', json:'📊', txt:'📝' };
+  grid.innerHTML = files.map((f, i) => {
+    const ext = f.name.split('.').pop();
+    const icon = icons[ext] || '📄';
+    return `<div class="intel-card" onclick="openIntelModal(${i})">
+      <div class="intel-card-head">
+        <span class="intel-card-icon">${icon}</span>
+        <span class="intel-card-name">${esc(f.name)}</span>
+        <span class="intel-card-time">${f.modified}</span>
+      </div>
+      <div class="intel-card-preview">${esc(f.preview)}</div>
+      <div class="intel-card-footer">
+        <span>${f.size.toLocaleString()} chars</span>
+        <span>Click to view full content</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function filterIntel() {
+  const q = (document.getElementById('intelSearch').value || '').toLowerCase();
+  renderIntelGrid(q ? _intelFiles.filter(f => f.name.toLowerCase().includes(q) || f.preview.toLowerCase().includes(q)) : _intelFiles);
+}
+
+function openIntelModal(idx) {
+  const f = _intelFiles[idx];
+  if (!f) return;
+  const overlay = document.createElement('div');
+  overlay.className = 'intel-modal-overlay';
+  overlay.innerHTML = `<div class="intel-modal">
+    <div class="intel-modal-head">
+      <span class="intel-modal-title">📄 ${esc(f.name)}</span>
+      <button class="intel-modal-close" onclick="this.closest('.intel-modal-overlay').remove()">✕</button>
+    </div>
+    <div class="intel-modal-body"><div class="md-box" style="max-height:none;border:none;padding:0">${mdToHtml(f.content)}</div></div>
+  </div>`;
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
 }
 
 function showTab(name, el) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
-  if (el) el.classList.add('active');
-  const pane = document.getElementById('tab-' + name);
-  if (pane) pane.classList.add('active');
+  el?.classList.add('active');
+  document.getElementById('tab-' + name)?.classList.add('active');
 }
 
 // ── Activity Feed ─────────────────────────────────────────────
 async function loadActivity() {
   const list = document.getElementById('activityList');
-  list.innerHTML = '<div class="loading-msg">Loading…</div>';
+  list.innerHTML = '<div class="empty-state">Loading…</div>';
   try {
-    const items = await apiFetch('/api/activity?limit=60');
-    if (!items.length) { list.innerHTML = '<div class="loading-msg">No activity recorded yet</div>'; return; }
-    const icons = { discovery:'🔍', demo:'🎬', email:'📧', meeting:'📅', document:'📄', meddpicc:'📊', proposal:'📝', default:'⚡' };
+    const items = await get('/api/activity?limit=80');
+    if (!items.length) { list.innerHTML = '<div class="empty-state">No activity yet</div>'; return; }
     list.innerHTML = items.map(a => {
-      const icon = icons[a.type] || icons.default;
-      return `<div class="activity-item">
-        <div class="activity-icon">${icon}</div>
-        <div class="activity-body">
-          <div class="activity-header">
-            <span class="activity-account">${esc(a.account || '')}</span>
-            <span class="activity-type">${esc(a.type || '')}</span>
-            <span class="activity-date">${a.date || a.timestamp || '—'}</span>
+      const icon    = ACT_ICONS[a.type] || ACT_ICONS[a.source] || ACT_ICONS.default;
+      const summary = a.summary || a.description || '';
+      const isLong  = summary.length > 160;
+      return `<div class="act-item">
+        <div class="act-icon">${icon}</div>
+        <div class="act-body">
+          <div class="act-head">
+            <span class="act-account">${esc(a.account||'')}</span>
+            <span class="act-type">${esc(a.type||a.source||'')}</span>
+            <span class="act-date">${String(a.timestamp||a.date||'').slice(0,16)}</span>
           </div>
-          <div class="activity-summary">${esc(a.summary || a.description || '')}</div>
+          <div class="act-summary${isLong?' act-summary-long':''}">${esc(summary)}</div>
         </div>
       </div>`;
     }).join('');
-  } catch { list.innerHTML = '<div class="loading-msg">Failed to load activity</div>'; }
+  } catch { list.innerHTML = '<div class="empty-state">Failed to load</div>'; }
 }
 
-// ── Logs ─────────────────────────────────────────────────────
+// ── Logs ──────────────────────────────────────────────────────
 async function loadLogs() {
   const pre = document.getElementById('logPre');
   try {
-    const d = await apiFetch('/api/logs?lines=100');
+    const d = await get('/api/logs?lines=120');
     const lines = d.lines || [];
     if (!lines.length) { pre.textContent = 'No log output yet'; return; }
     pre.innerHTML = lines.map(l => {
-      if (/ERROR|error/.test(l))   return `<span style="color:var(--red)">${esc(l)}</span>`;
-      if (/WARN|warning/.test(l))  return `<span style="color:var(--yellow)">${esc(l)}</span>`;
-      if (/INFO/.test(l))          return `<span style="color:var(--text2)">${esc(l)}</span>`;
-      if (/started|Skill|trigger|Component/.test(l)) return `<span style="color:var(--green)">${esc(l)}</span>`;
+      if (/ERROR|error/.test(l))                              return `<span class="log-error">${esc(l)}</span>`;
+      if (/WARN|warning/.test(l))                             return `<span class="log-warn">${esc(l)}</span>`;
+      if (/Skill|trigger|skill\.trigger|Component started/.test(l)) return `<span class="log-skill">${esc(l)}</span>`;
+      if (/INFO/.test(l))                                     return `<span class="log-info">${esc(l)}</span>`;
       return esc(l);
     }).join('\n');
     pre.scrollTop = pre.scrollHeight;
@@ -355,86 +379,95 @@ async function loadLogs() {
 }
 
 function toggleAutoLogs() {
-  const checked = document.getElementById('autoRefreshCheck').checked;
-  if (checked) {
-    _logsTimer = setInterval(loadLogs, 5000);
-  } else {
-    clearInterval(_logsTimer);
-    _logsTimer = null;
-  }
+  const on = document.getElementById('autoLogCheck').checked;
+  if (on) { _logTimer = setInterval(loadLogs, 5000); }
+  else    { clearInterval(_logTimer); _logTimer = null; }
 }
 
-// ── Markdown renderer (lightweight) ──────────────────────────
-function renderMd(elId, md) {
+// ── Theme ─────────────────────────────────────────────────────
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme');
+  applyTheme(current === 'dark' ? 'light' : 'dark');
+}
+function applyTheme(t) {
+  document.documentElement.setAttribute('data-theme', t);
+  localStorage.setItem('theme', t);
+  document.getElementById('themeToggle').textContent = t === 'dark' ? '🌙' : '☀️';
+}
+
+// ── Markdown ──────────────────────────────────────────────────
+function renderMdSection(elId, section, timeElId) {
+  if (timeElId && section?.modified) {
+    const el = document.getElementById(timeElId);
+    if (el) el.textContent = section.modified;
+  }
+  renderMd(elId, section?.content, section?.placeholder);
+}
+
+function renderMd(elId, content, placeholder) {
   const el = document.getElementById(elId);
   if (!el) return;
-  if (!md || md.trim().length < 10 || md.includes('*Generating...') || md.includes('*Waiting')) {
-    el.innerHTML = '<div class="md-empty">Not generated yet — JARVIS will populate this after discovery data is saved</div>';
-    return;
+  const text = typeof content === 'string' ? content : (content?.content || '');
+  const isPlaceholder = placeholder !== false && (!text || text.length < 30 ||
+    ['*Generating...','*Waiting for','JARVIS is generating','Waiting for discovery'].some(m => text.includes(m)));
+
+  if (isPlaceholder) {
+    const isGenerating = text && text.includes('*Generating');
+    el.innerHTML = `<div class="md-box-placeholder">
+      <span class="ph-icon">${isGenerating ? '⏳' : '📭'}</span>
+      <div class="ph-title ${isGenerating ? 'ph-generating' : ''}">${isGenerating ? 'JARVIS is generating this…' : 'Not generated yet'}</div>
+      <div class="ph-sub">${isGenerating ? 'Waiting for NVIDIA LLM to complete' : 'Chat in this account folder to trigger generation'}</div>
+    </div>`;
+  } else {
+    el.innerHTML = mdToHtml(text);
   }
-  el.innerHTML = mdToHtml(md);
 }
 
 function mdToHtml(md) {
-  return md
-    // fenced code blocks
-    .replace(/```[\w]*\n([\s\S]*?)```/g, (_, code) => `<pre><code>${esc(code.trim())}</code></pre>`)
-    // headings
-    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
-    .replace(/^## (.+)$/gm,  '<h2>$1</h2>')
-    .replace(/^# (.+)$/gm,   '<h1>$1</h1>')
-    // bold + italic
-    .replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>')
-    .replace(/\*\*(.+?)\*\*/g,     '<strong>$1</strong>')
-    .replace(/_(.+?)_/g,           '<em>$1</em>')
-    // inline code
-    .replace(/`([^`]+)`/g, '<code>$1</code>')
-    // unordered lists
+  if (!md) return '';
+  let html = md
+    .replace(/```[\w]*\n?([\s\S]*?)```/g, (_,c) => `<pre><code>${esc(c.trim())}</code></pre>`)
+    .replace(/^#{1} (.+)$/gm, '<h1>$1</h1>')
+    .replace(/^#{2} (.+)$/gm, '<h2>$1</h2>')
+    .replace(/^#{3} (.+)$/gm, '<h3>$1</h3>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g,     '<em>$1</em>')
+    .replace(/`([^`]+)`/g,     '<code>$1</code>')
+    .replace(/^> (.+)$/gm,     '<blockquote>$1</blockquote>')
+    .replace(/^---+$/gm,       '<hr/>')
     .replace(/^\s*[-*] (.+)$/gm, '<li>$1</li>')
-    .replace(/(<li>.*<\/li>\n?)+/g, m => `<ul>${m}</ul>`)
-    // ordered lists
-    .replace(/^\d+\. (.+)$/gm, '<li>$1</li>')
-    // horizontal rule
-    .replace(/^---+$/gm, '<hr/>')
-    // blockquote
-    .replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>')
-    // simple table (| a | b | → table)
-    .replace(/((?:\|.+\|\n?)+)/g, m => {
-      const rows = m.trim().split('\n').filter(r => !r.match(/^\|[-| ]+\|$/));
-      if (rows.length < 1) return m;
-      const toRow = (r, tag) => `<tr>${r.split('|').filter((_,i,a)=>i>0&&i<a.length-1).map(c=>`<${tag}>${c.trim()}</${tag}>`).join('')}</tr>`;
-      return `<table>${toRow(rows[0],'th')}${rows.slice(1).map(r=>toRow(r,'td')).join('')}</table>`;
-    })
-    // paragraphs
-    .replace(/\n\n+/g, '</p><p>')
-    .replace(/^(.+)$/gm, (m) => m.startsWith('<') ? m : m)
-    .replace(/^(?!<)(.+)/gm, '$1')
-    // wrap in paragraphs properly
-    .split('\n\n').map(p => {
-      p = p.trim();
-      if (!p) return '';
-      if (p.startsWith('<')) return p;
-      return `<p>${p}</p>`;
-    }).join('');
+    .replace(/(<li>[\s\S]*?<\/li>\n?)+/g, m => `<ul>${m}</ul>`)
+    .replace(/^\d+\. (.+)$/gm, '<oli>$1</oli>')
+    .replace(/(<oli>[\s\S]*?<\/oli>\n?)+/g, m => `<ol>${m.replace(/<\/?oli>/g, m2 => m2 === '<oli>' ? '<li>' : '</li>')}</ol>`);
+
+  // Tables
+  html = html.replace(/((?:\|.+\|\n?)+)/g, block => {
+    const rows = block.trim().split('\n').filter(r => !/^\|[-|: ]+\|$/.test(r));
+    if (!rows.length) return block;
+    const cell = (r, tag) => `<tr>${r.split('|').filter((_,i,a) => i>0 && i<a.length-1).map(c => `<${tag}>${c.trim()}</${tag}>`).join('')}</tr>`;
+    return `<table>${cell(rows[0],'th')}${rows.slice(1).map(r=>cell(r,'td')).join('')}</table>`;
+  });
+
+  // Paragraphs (skip lines that are already HTML)
+  html = html.split('\n\n').map(p => {
+    p = p.trim();
+    if (!p || p.startsWith('<')) return p;
+    return `<p>${p.replace(/\n/g, '<br/>')}</p>`;
+  }).join('');
+  return html;
 }
 
 // ── Helpers ───────────────────────────────────────────────────
-async function apiFetch(path) {
-  const r = await fetch(API + path);
+async function get(path) {
+  const r = await fetch(path);
   if (!r.ok) throw new Error(r.status);
   return r.json();
 }
-
 function esc(s) {
-  return String(s ?? '')
-    .replace(/&/g,'&amp;')
-    .replace(/</g,'&lt;')
-    .replace(/>/g,'&gt;')
-    .replace(/"/g,'&quot;');
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
-
-function winClass(pct) {
-  if (pct >= 65) return 'high';
-  if (pct >= 35) return 'mid';
-  return 'low';
+function winCls(p) {
+  if (p >= 65) return 'win-high';
+  if (p >= 35) return 'win-mid';
+  return 'win-low';
 }
