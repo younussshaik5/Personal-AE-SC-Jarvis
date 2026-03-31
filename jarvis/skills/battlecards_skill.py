@@ -345,7 +345,7 @@ Return JSON:
             source = pdata.get('source', 'web search')
             table += f"| {comp} | Enterprise | {price} | {source} |\n"
         # Our pricing
-         company_name = getattr(self.config_manager.config, "identity", {}).get("company", "Your Company")
+        company_name = getattr(self.config_manager.config, "identity", {}).get("company", "Your Company")
         table += f"| **{company_name}** | Enterprise | **$79** | Official |\n"
         return f"""# Pricing Comparison - {account_name}
 
