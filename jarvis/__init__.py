@@ -1,28 +1,8 @@
-"""JARVIS - Autonomous AI Employee for OpenCode and Claude."""
+"""
+JARVIS v3 Universal Intelligence Bridge
+Complete autonomous system for cross-platform deployment
+"""
 
-__version__ = "2.0.0"
-__author__ = "your_username"
-
-from .core import Orchestrator, ComponentStatus
-from .utils import get_logger, event_bus
-from .persona import Persona, PersonaManager
-from .safety import SafetyGuard
-from .observers import FileSystemObserver, ConversationObserver
-from .learners import PatternRecognition
-from .mcp import ContextEngine
-from .archive import Archiver
-
-__all__ = [
-    'Orchestrator',
-    'ComponentStatus',
-    'get_logger',
-    'event_bus',
-    'Persona',
-    'PersonaManager',
-    'SafetyGuard',
-    'FileSystemObserver',
-    'ConversationObserver',
-    'PatternRecognition',
-    'ContextEngine',
-    'Archiver'
-]
+__version__ = "3.0.0"
+__author__ = "JARVIS Universal Team"
+__description__ = "Real-time intelligence across Claude Code, OpenCode, and manual inputs"

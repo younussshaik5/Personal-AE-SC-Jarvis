@@ -391,6 +391,58 @@ class AccountAutoInitializer:
                 except:
                     pass
 
+            # 4b. Create per-account .claude/CLAUDE.md — tells Claude to use JARVIS tools
+            #     automatically when chatting inside this account folder
+            claude_dir = account_dir / ".claude"
+            claude_md = claude_dir / "CLAUDE.md"
+            if not claude_md.exists():
+                claude_dir.mkdir(parents=True, exist_ok=True)
+                claude_md.write_text(
+                    f"# JARVIS — Account Context: {account_name}\n\n"
+                    "You are working inside a JARVIS account folder. "
+                    "JARVIS MCP tools are available. Follow these rules automatically.\n\n"
+                    "## Automatic Rules\n\n"
+                    f"**Account name for all JARVIS tool calls:** `{account_name}`\n\n"
+                    "### On every conversation turn:\n"
+                    "1. If the user mentions anything about this account (pain points, budget, stakeholders, "
+                    "timeline, competitors, next steps) — call `jarvis_save_conversation` with "
+                    f'`account="{account_name}"`, `role="user"`, `content=<their message>`.\n'
+                    "2. After YOUR response — call `jarvis_save_conversation` with "
+                    f'`account="{account_name}"`, `role="assistant"`, `content=<your response>`.\n\n'
+                    "### When the user shares discovery information:\n"
+                    f'Call `jarvis_update_discovery` with `account="{account_name}"` and the notes.\n'
+                    f'Then call `jarvis_trigger_skill` with `account="{account_name}"`, '
+                    '`skill="demo_strategy"` and `skill="value_architecture"` to regenerate them.\n\n'
+                    "### When the user asks about battlecard / competitors:\n"
+                    f'Call `jarvis_get_battlecard_full` with `account="{account_name}"`.\n'
+                    "If stale or the user wants it refreshed: "
+                    f'call `jarvis_trigger_skill` with `skill="battlecard"`.\n\n'
+                    "### When the user asks for demo strategy:\n"
+                    f'Call `jarvis_get_demo_strategy` with `account="{account_name}"`.\n\n'
+                    "### When the user asks for ROI / business case / value:\n"
+                    f'Call `jarvis_get_value_architecture` with `account="{account_name}"`.\n\n'
+                    "### When the user asks for proposal / pricing:\n"
+                    f'Call `jarvis_get_proposal` with `account="{account_name}"`.\n\n'
+                    "### When the user asks for SOW / scope of work:\n"
+                    f'Call `jarvis_get_sow` with `account="{account_name}"`.\n\n'
+                    "### When the user asks for risk report / deal review:\n"
+                    f'Call `jarvis_get_risk_report` with `account="{account_name}"`.\n\n'
+                    "### When the user asks for architecture diagram:\n"
+                    f'Call `jarvis_get_architecture_diagram` with `account="{account_name}"`.\n\n'
+                    "### When you detect a MEDDPICC signal in conversation:\n"
+                    "Tell the user: 'I found a MEDDPICC signal — want me to update the score?' "
+                    "Then call the appropriate update tool.\n\n"
+                    "### Trigger regeneration proactively:\n"
+                    "After any significant conversation (discovery notes, competitive intel, "
+                    "budget/timeline signals), call `jarvis_trigger_skill` for relevant skills so "
+                    "JARVIS keeps all files current in the background.\n\n"
+                    "## Tone\n"
+                    "Be concise and direct. Lead with the most important insight or action. "
+                    "Always end with a clear next step.\n",
+                    encoding="utf-8"
+                )
+                created_files.append(".claude/CLAUDE.md")
+
             # 5. Create summary.md template (auto-generated summary)
             summary_file = account_dir / "summary.md"
             if not summary_file.exists():

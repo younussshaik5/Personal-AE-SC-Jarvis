@@ -598,6 +598,46 @@ const TOOLS = [
       required: ["account"],
     },
   },
+  // ── Save Conversation ───────────────────────────────────────────────────────
+  {
+    name: "jarvis_save_conversation",
+    description:
+      "Save a conversation snippet to JARVIS_BRAIN.md for intelligence routing. " +
+      "This allows JARVIS to extract account context, contacts, MEDDPICC signals, and action items. " +
+      "If account is not provided, JARVIS will attempt to infer it from the current workspace.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        account: { type: "string" as const, description: "Account folder name (optional if called from inside an account folder)" },
+        role: { type: "string" as const, description: "Role: 'user' or 'assistant'" },
+        content: { type: "string" as const, description: "Conversation content (message text)" },
+        model: { type: "string" as const, description: "Model ID used (optional)" },
+      },
+      required: ["role", "content"],
+    },
+  },
+  // ── Trigger Skill ──────────────────────────────────────────────────────────
+  {
+    name: "jarvis_trigger_skill",
+    description:
+      "Trigger a JARVIS background skill to regenerate an intelligence file for an account. " +
+      "Use this after saving discovery notes, updating MEDDPICC, or when a file needs refreshing. " +
+      "Skills: battlecard, discovery, demo_strategy, risk_report, value_architecture, proposal, sow, architecture_diagram, summary. " +
+      "JARVIS orchestrator picks this up within seconds and regenerates the relevant files.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        account: { type: "string" as const, description: "Account folder name" },
+        skill: {
+          type: "string" as const,
+          description: "Skill to trigger",
+          enum: ["battlecard", "discovery", "demo_strategy", "risk_report", "value_architecture", "proposal", "sow", "architecture_diagram", "summary"],
+        },
+        reason: { type: "string" as const, description: "Why the skill should run (optional — logged for context)" },
+      },
+      required: ["account", "skill"],
+    },
+  },
   // ── SOW ────────────────────────────────────────────────────────────────
   {
     name: "jarvis_get_sow",
@@ -1740,10 +1780,61 @@ export function registerTools(server: Server, dataDir: string) {
         const data = jsonData ? JSON.parse(jsonData) : {};
         return { content: [{ type: "text" as const,
           text: `# Proposal — ${account}\n\n**Status:** ${data.status || "Draft"}\n**Generated:** ${data.generated_at || "Unknown"}\n\n**Executive Summary:**\n${data.executive_summary || "(not yet filled)"}\n\n**Proposed Solution:** ${data.proposed_solution || "(not yet filled)"}\n\n**Open to edit pricing and send:** ${htmlExists ? htmlPath : "HTML not yet generated"}\n\n---\n\n## Structured Data (use claude-haiku or claude-sonnet to create PPT/Excel)\n\`\`\`json\n${jsonData || "{}"}\n\`\`\`` }] };
-      }
+       }
 
-      // ---------------------------------------------------------------
-      case "jarvis_get_sow": {
+       // ---------------------------------------------------------------
+       case "jarvis_save_conversation": {
+         const { account, role, content, model } = args as { account?: string; role: string; content: string; model?: string };
+
+         if (!role || !content) {
+           return { content: [{ type: "text" as const, text: "Error: role and content are required" }], isError: true };
+         }
+
+         // Infer account if not provided
+         let resolvedAccount = account;
+         if (!resolvedAccount) {
+           try {
+             const cwd = process.cwd();
+             const accountsAbs = path.resolve(accountsDir);
+             const cwdAbs = path.resolve(cwd);
+             if (cwdAbs.startsWith(accountsAbs + path.sep) || cwdAbs === accountsAbs) {
+               const rel = path.relative(accountsAbs, cwdAbs);
+               const first = rel.split(path.sep)[0];
+               if (first) resolvedAccount = first;
+             }
+           } catch {
+             // ignore
+           }
+         }
+
+         const timestamp = Date.now();
+         const date = new Date(timestamp).toISOString().split('T')[0];
+         const workspace = process.cwd();
+
+         const entry = `<!-- JARVIS_ENTRY
+date: ${date}
+role: ${role}
+${resolvedAccount ? `account: ${resolvedAccount}\n` : ''}---
+\`\`\`json
+{
+  "workspace_dir": "${workspace}",
+  "timestamp": ${timestamp},
+  "model": ${model ? JSON.stringify(model) : null}
+}
+\`\`\`
+JARVIS_ENTRY_END -->\n`;
+
+         const brainPath = path.join(dataDir, "..", "JARVIS_BRAIN.md"); // JARVIS_HOME/JARVIS_BRAIN.md
+         try {
+           fs.appendFileSync(brainPath, entry);
+           return { content: [{ type: "text" as const, text: `Conversation saved${resolvedAccount ? ` for ${resolvedAccount}` : ''}` }] };
+         } catch (e: any) {
+           return { content: [{ type: "text" as const, text: `Failed to save conversation: ${e.message}` }], isError: true };
+         }
+       }
+
+       // ---------------------------------------------------------------
+       case "jarvis_get_sow": {
         const { account } = args as { account: string };
         const sowDir = path.join(accountsDir, account, "SOW");
         const sow = readFileOrNull(path.join(sowDir, "sow.md"));
@@ -1753,6 +1844,36 @@ export function registerTools(server: Server, dataDir: string) {
         }
         return { content: [{ type: "text" as const,
           text: sow }] };
+      }
+
+      // ---------------------------------------------------------------
+      case "jarvis_trigger_skill": {
+        const { account, skill, reason } = args as { account: string; skill: string; reason?: string };
+
+        // Write a trigger file that AccountWatcher detects within seconds
+        const accountDir = path.join(accountsDir, account);
+        if (!fs.existsSync(accountDir)) {
+          return { content: [{ type: "text" as const,
+            text: `Account "${account}" not found. Check the folder name with jarvis_list_accounts.` }], isError: true };
+        }
+
+        const triggerFile = path.join(accountDir, `.jarvis_trigger_${skill}`);
+        const triggerData = JSON.stringify({
+          skill,
+          account,
+          reason: reason || "Manually triggered via MCP",
+          triggered_at: new Date().toISOString(),
+          triggered_by: "claude",
+        }, null, 2);
+
+        try {
+          fs.writeFileSync(triggerFile, triggerData);
+          return { content: [{ type: "text" as const,
+            text: `Triggered: ${skill} for ${account}. JARVIS will regenerate the files in the background — check back in 30-60 seconds.` }] };
+        } catch (e: any) {
+          return { content: [{ type: "text" as const,
+            text: `Failed to write trigger file: ${e.message}` }], isError: true };
+        }
       }
 
       // ---------------------------------------------------------------

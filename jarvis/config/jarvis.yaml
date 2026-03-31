@@ -22,7 +22,7 @@ identity:
 # All run concurrently via the async worker pool (3 parallel workers)
 # All use the same NVIDIA API endpoint and key
 llm_models:
-  # General text reasoning — Step 3.5 Flash (196B/11B active MoE, 256K context)
+  # General text reasoning — Step 3.5 Flash (256K context)
   # Used for: discovery prep, next steps email drafts, general text tasks
   text:
     model: "stepfun-ai/step-3-5-flash"
@@ -60,18 +60,18 @@ llm_models:
 
   # Lightweight/quick tasks — classification, tagging, short summaries
   quick:
-    model: "nvidia/mistral-nemo-minitron-8b-8k-instruct"
+    model: "stepfun-ai/step-3-5-flash"
     temperature: 0.5
     max_tokens: 2048
     context_window: 8192
 
   # Deep reasoning — battlecard, demo strategy, competitive analysis
-  # Step 3.5 Flash: 196B/11B active MoE, multi-step structured reasoning
+  # Use Nemotron 3 Super 120B for complex analysis (1M token context)
   reasoning:
-    model: "stepfun-ai/step-3-5-flash"
+    model: "nvidia/nemotron-3-super-120b-a12b"
     temperature: 0.4
-    max_tokens: 8192
-    context_window: 131072
+    max_tokens: 32768
+    context_window: 1048576
 
 llm_nvidia_base_url: "https://integrate.api.nvidia.com/v1"
 
@@ -133,3 +133,12 @@ safety:
 # OpenCode integration
 opencode_db_path: "/Users/syounus/.local/share/opencode/opencode.db"
 killswitch_path: "/Users/syounus/JARVIS/data/.killswitch"
+
+# LLM configuration — use NVIDIA models (requires NVIDIA_API_KEY)
+llm:
+  provider: "openai"
+  api_key: ""  # Read from NVIDIA_API_KEY environment variable
+  model: "stepfun-ai/step-3-5-flash"
+  temperature: 0.7
+  max_tokens: 8192
+  context_window: 131072

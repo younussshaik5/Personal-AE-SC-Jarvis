@@ -11,6 +11,7 @@ from jarvis.utils.event_bus import EventBus, Event
 from jarvis.utils.identity import get_se_identity
 from jarvis.llm.llm_client import LLMManager, Message
 from jarvis.services.research_service import DynamicResearchService
+from jarvis.utils.account_utils import extract_account_name
 
 
 class BattlecardsSkill:
@@ -100,14 +101,7 @@ class BattlecardsSkill:
             return False
 
     def _extract_account_name(self, path: Path) -> Optional[str]:
-        try:
-            rel = path.resolve().relative_to(self.accounts_dir.resolve())
-            parts = rel.parts
-            if len(parts) >= 2:
-                return parts[-2] if parts[-1] in ('index.json', 'notes.json', 'activities.jsonl', 'summary.md', 'deals', 'discovery', 'battlecards') else parts[-1]
-            return parts[0] if parts else None
-        except:
-            return None
+        return extract_account_name(path, self.accounts_dir)
 
     async def _debounced_update(self, acc: str, delay: int):
         now = datetime.now()
@@ -351,7 +345,7 @@ Return JSON:
             source = pdata.get('source', 'web search')
             table += f"| {comp} | Enterprise | {price} | {source} |\n"
         # Our pricing
-        company_name = self.config_manager.config.get("identity", {}).get("company", "Your Company")
+         company_name = getattr(self.config_manager.config, "identity", {}).get("company", "Your Company")
         table += f"| **{company_name}** | Enterprise | **$79** | Official |\n"
         return f"""# Pricing Comparison - {account_name}
 

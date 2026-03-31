@@ -13,6 +13,7 @@ from jarvis.utils.event_bus import EventBus, Event
 from jarvis.utils.identity import get_se_identity
 from jarvis.llm.llm_client import LLMManager, Message
 from jarvis.services.research_service import DynamicResearchService
+from jarvis.utils.account_utils import extract_account_name
 
 
 class DealMeddpiccSkill:
@@ -119,16 +120,7 @@ class DealMeddpiccSkill:
             return False
 
     def _extract_account_name(self, path: Path) -> Optional[str]:
-        try:
-            rel = path.resolve().relative_to(self.accounts_dir.resolve())
-            parts = rel.parts
-            if len(parts) >= 2:
-                return parts[-2] if parts[-1] in ('index.json', 'notes.json', 'activities.jsonl', 'summary.md', 'deals', 'discovery', 'meddpicc', 'tech_utilities', 'battlecards', 'value_architecture', 'risk_reports', 'demo_strategy') else parts[-1]
-            elif len(parts) == 1:
-                return parts[0]
-        except:
-            pass
-        return None
+        return extract_account_name(path, self.accounts_dir)
 
     async def _debounced_update(self, account_name: str, delay_seconds: int):
         now = datetime.now()

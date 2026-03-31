@@ -9,6 +9,7 @@ credentials.json
 config/mcp-observer.json
 mcp-opencode-observer/.env
 jarvis/config/jarvis.yaml
+config/jarvis.universal.json
 # Claude Code MCP settings — machine-specific absolute paths, regenerated on every start
 .claude/settings.json
 
@@ -95,3 +96,31 @@ Thumbs.db
 jarvis/data/archives/
 jarvis/data/history/
 jarvis/data/cache/
+
+# JARVIS v3 Universal - Gitignore
+# Auto-generated - do not edit manually
+# Environment and secrets
+.env.local
+secrets/
+# Runtime directories
+run/
+instance/
+tmp/
+temp/
+# Generated data (exclude from git)
+JARVIS/data/
+JARVIS/recordings/
+JARVIS/cache/
+# IDE and editor files
+*~
+env/
+downloads/
+.eggs/
+lib/
+lib64/
+parts/
+.installed.cfg
+yarn-error.log*
+.pnpm-debug.log*
+# OS generated files
+ehthumbs.db

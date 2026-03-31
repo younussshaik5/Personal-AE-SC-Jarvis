@@ -89,15 +89,15 @@ Subject: [subject line]
 [email body]
 
 Best regards,
-{self.config.config.get("identity", {}).get("name", "Your Name")}
+{getattr(self.config.config, "identity", {}).get("name", "Your Name")}
 Account Executive & Solution Consultant
-{self.config.config.get("identity", {}).get("company", "Your Company")}"""
+{getattr(self.config.config, "identity", {}).get("company", "Your Company")}"""
 
         email_text = ""
         if self._llm_manager:
             from jarvis.llm.llm_client import Message
             messages = [
-                Message(role="system", content=f"You are JARVIS, drafting professional sales follow-up emails for {self.config.config.get('identity', {}).get('company', 'Your Company')}."),
+                Message(role="system", content=f"You are JARVIS, drafting professional sales follow-up emails for {getattr(self.config.config, 'identity', {}).get('company', 'Your Company')}."),
                 Message(role="user", content=prompt)
             ]
             email_text = await self._llm_manager.generate_with_routing(

@@ -13,6 +13,7 @@ from jarvis.utils.event_bus import EventBus, Event
 from jarvis.utils.identity import get_se_identity
 from jarvis.llm.llm_client import LLMManager
 from jarvis.services.research_service import DynamicResearchService
+from jarvis.utils.account_utils import extract_account_name
 
 
 class TechUtilitiesSkill:
@@ -119,15 +120,7 @@ class TechUtilitiesSkill:
             return False
 
     def _extract_account_name(self, path: Path) -> Optional[str]:
-        """Extract account name from any path under ACCOUNTS/.
-        The first component after ACCOUNTS/ is the account folder name."""
-        try:
-            rel = path.resolve().relative_to(self.accounts_dir.resolve())
-            if rel.parts:
-                return rel.parts[0]
-        except ValueError:
-            pass
-        return None
+        return extract_account_name(path, self.accounts_dir)
 
     async def _debounced_update(self, account_name: str, delay_seconds: int):
         now = datetime.now()

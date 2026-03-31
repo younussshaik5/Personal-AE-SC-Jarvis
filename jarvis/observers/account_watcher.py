@@ -28,8 +28,9 @@ from pathlib import Path
 from typing import Optional, Dict
 
 from jarvis.utils.logger import JARVISLogger
-from jarvis.utils.event_bus import Event, EventBus
+from jarvis.utils.event_bus import EventBus, Event
 from jarvis.utils.config import ConfigManager
+from jarvis.utils.account_utils import extract_account_name
 
 VIDEO_EXTS  = {".mp4", ".mov", ".avi", ".mkv", ".webm", ".mp3", ".wav", ".m4a"}
 DOC_EXTS    = {".pdf", ".docx", ".doc", ".txt", ".md", ".pptx", ".xlsx"}
@@ -43,6 +44,22 @@ IGNORE_NAMES = {
     "risk_report.md", "next_steps.md", "email_drafts.json",
     "roi_model.md", "tco_analysis.md", "value_data.json",
     "rfi_analysis.md", "rfi_responses.md",
+}
+
+# Trigger file prefix — written by MCP jarvis_trigger_skill tool
+TRIGGER_PREFIX = ".jarvis_trigger_"
+
+# Map from trigger skill name → event type + task name
+TRIGGER_SKILL_MAP = {
+    "battlecard":          "discovery.updated",   # reuses same pipeline as discovery update
+    "discovery":           "discovery.updated",
+    "demo_strategy":       "discovery.updated",
+    "risk_report":         "meddpicc.updated",
+    "value_architecture":  "discovery.updated",
+    "proposal":            "value_architecture.updated",
+    "sow":                 "proposal.generated",
+    "architecture_diagram":"discovery.updated",
+    "summary":             "account.initialized",
 }
 IGNORE_DIRS = {".git", "__pycache__", "node_modules", ".processed",
                "failed", "dist", "logs", "data", "INTEL"}
@@ -133,7 +150,6 @@ class AccountWatcher:
 
     async def _route_accounts_event(self, path: Path, is_dir: bool, evt_type: str):
         """Route events for files/folders inside ACCOUNTS/."""
-        # Determine the account name (first component after ACCOUNTS/)
         try:
             rel = path.relative_to(self._accounts_dir)
         except ValueError:
@@ -143,7 +159,18 @@ class AccountWatcher:
         if not parts:
             return
 
-        account_name = parts[0]
+        # Validate that the first component is a real account directory (not a system folder)
+        candidate = parts[0]
+        account_path = self._accounts_dir / candidate
+        if not account_path.is_dir():
+            return
+        IGNORED_SYSTEM_FOLDERS = {
+            'DOCUMENTS', 'EMAILS', 'MEETINGS', 'MEMORY',
+            'data', 'logs', 'recordings', '.git', '__pycache__'
+        }
+        if candidate in IGNORED_SYSTEM_FOLDERS:
+            return
+        account_name = candidate
 
         # ── New top-level account folder created ──────────────────────
         if is_dir and len(parts) == 1 and evt_type == "file.created":
@@ -244,6 +271,75 @@ class AccountWatcher:
             self._trigger_stage_skills(path, account_name)
             return
 
+        # ── .jarvis_trigger_{skill} — written by MCP jarvis_trigger_skill ──
+        # Claude writes this file → we detect it → fire event → delete file
+        if (sub.startswith(TRIGGER_PREFIX)
+                and not is_dir
+                and evt_type == "file.created"):
+            skill_name = sub[len(TRIGGER_PREFIX):]
+            await self._handle_skill_trigger(path, account_name, skill_name)
+            return
+
+    # ------------------------------------------------------------------
+    # MCP trigger file handler
+    # ------------------------------------------------------------------
+
+    async def _handle_skill_trigger(self, trigger_path: Path, account_name: str, skill_name: str):
+        """Process a .jarvis_trigger_{skill} file written by the MCP tool."""
+        try:
+            # Read trigger metadata
+            reason = "MCP trigger"
+            try:
+                import json as _json
+                data = _json.loads(trigger_path.read_text())
+                reason = data.get("reason", reason)
+            except Exception:
+                pass
+
+            # Delete the trigger file immediately to prevent re-processing
+            try:
+                trigger_path.unlink()
+            except Exception:
+                pass
+
+            # Map skill → event type
+            event_type = TRIGGER_SKILL_MAP.get(skill_name)
+            if not event_type:
+                self.logger.warning("Unknown trigger skill", skill=skill_name, account=account_name)
+                return
+
+            self.logger.info("Skill trigger detected",
+                             account=account_name, skill=skill_name,
+                             event=event_type, reason=reason)
+
+            # Publish the event that the skill subscribes to
+            self.event_bus.publish(Event(
+                type=event_type,
+                source="account_watcher.trigger",
+                data={
+                    "account": account_name,
+                    "account_name": account_name,
+                    "triggered_skill": skill_name,
+                    "reason": reason,
+                    "path": str(self._accounts_dir / account_name),
+                }
+            ))
+
+            # Also publish a dedicated skill.trigger event for any generic listener
+            self.event_bus.publish(Event(
+                type="skill.trigger.request",
+                source="account_watcher.trigger",
+                data={
+                    "skill": skill_name,
+                    "account": account_name,
+                    "reason": reason,
+                }
+            ))
+
+        except Exception as e:
+            self.logger.error("Failed to handle skill trigger",
+                              account=account_name, skill=skill_name, error=str(e))
+
     # ------------------------------------------------------------------
     # Stage skills trigger
     # ------------------------------------------------------------------
@@ -300,7 +396,10 @@ class AccountWatcher:
         # Ignore any path component in the ignore list
         if any(part in IGNORE_DIRS for part in parts):
             return True
-        # Ignore hidden files
+        # Allow JARVIS trigger files (they start with . but we need them)
+        if path.name.startswith(TRIGGER_PREFIX):
+            return False
+        # Ignore other hidden files
         if path.name.startswith("."):
             return True
         # Ignore temp files

@@ -231,20 +231,22 @@ class Orchestrator:
         self.logger.info("Worker pool started", workers=n_workers)
 
     async def _init_component(self, name: str):
-        """Initialize a single component."""
+        """Initialize a single component. If it fails, log and continue (don't crash)."""
         try:
             cls = self.COMPONENT_CLASSES[name]
             instance = cls(self.config, self.event_bus)
+            start_time = asyncio.get_event_loop().time()
             await instance.start()
+            elapsed = asyncio.get_event_loop().time() - start_time
             self.components[name] = instance
             self.status[name].healthy = True
             self.status[name].last_heartbeat = asyncio.get_event_loop().time()
-            self.logger.info("Component started", component=name)
+            self.logger.info("Component started", component=name, elapsed_sec=round(elapsed, 2))
         except Exception as e:
-            self.logger.error("Component failed to start", component=name, error=str(e))
+            self.logger.error("Component failed to start (continuing without it)", component=name, error=str(e))
             self.status[name].healthy = False
             self.status[name].error_count += 1
-            raise
+            # Don't raise — continue with other components
 
     async def _handle_component_error(self, event: Event):
         """Handle error events from components."""
