@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  jarvis-bridge:
+    image: python:3.11-slim
+    working_dir: /workspace
+    volumes:
+      - .:/workspace
+      - jarvis-data:/jarvis
+    environment:
+      - WORKSPACE_ROOT=/workspace
+      - JARVIS_ROOT=/jarvis
+      - NVIDIA_API_KEY=${NVIDIA_API_KEY:-}
+      - PLATFORM=container
+    command: >
+      bash -c "
+        pip install -q -r requirements-universal.txt &&
+        python -m jarvis.universal_bridge /workspace
+      "
+    restart: unless-stopped
+    stdin_open: true
+    tty: true
+
+volumes:
+  jarvis-data:

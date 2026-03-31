@@ -9,6 +9,7 @@ import os
 import json
 import asyncio
 import threading
+import shutil
 from pathlib import Path
 import re
 import time
@@ -291,6 +292,280 @@ Best regards
         
         return {"skill": skill, "note": "handled by system"}
     
+    def process_new_file(self, file_path: Path):
+        """Process newly created file (watchdog event)"""
+        self._process_file_event(file_path, "created")
+    
+    def process_modified_file(self, file_path: Path):
+        """Process modified file (watchdog event)"""
+        self._process_file_event(file_path, "modified")
+    
+    def _process_file_event(self, file_path: Path, event_type: str):
+        """Common file event processing"""
+        try:
+            # Check if this is a new account directory creation
+            if self._is_new_account_folder(file_path):
+                self._initialize_account_folder(file_path)
+                return
+            
+            # Determine source from path
+            source = self._detect_source_from_path(file_path)
+            
+            # Only process relevant files
+            if source in self.universal_sources:
+                self._process_source_file(source, file_path)
+        except Exception as e:
+            print(f"⚠️ Error processing {event_type} {file_path}: {e}")
+    
+    def _is_new_account_folder(self, file_path: Path) -> bool:
+        """Check if this path represents a new account folder being created"""
+        try:
+            # Check if path is within ACCOUNTS directory
+            accounts_dir = self.context.accounts_dir
+            if accounts_dir.name in file_path.parts:
+                # Find the account name (first directory under ACCOUNTS)
+                try:
+                    idx = file_path.parts.index(accounts_dir.name)
+                    if idx + 1 < len(file_path.parts):
+                        account_name = file_path.parts[idx + 1]
+                        account_path = accounts_dir / account_name
+                        
+                        # If this is the account folder itself being created
+                        if file_path == account_path or file_path.parent == account_path:
+                            # Check if it's a new directory (not already initialized)
+                            if not (account_path / "INTEL").exists():
+                                return True
+                except (ValueError, IndexError):
+                    pass
+        except:
+            pass
+        return False
+    
+    def _initialize_account_folder(self, account_path: Path):
+        """Create standard folder structure for a new account (clean minimal)"""
+        try:
+            account_name = account_path.name
+            
+            # Skip if already initialized
+            if (account_path / "INTEL").exists():
+                return
+            
+            print(f"📁 Initializing new account: {account_name}")
+            
+            # Create top-level folders (empty)
+            top_level_folders = [
+                "ARCHITECTURE",
+                "BATTLECARD",
+                "DEMO_STRATEGY",
+                "DISCOVERY",
+                "DOCUMENTS",
+                "EMAILS",
+                "INTEL",
+                "MEETINGS",
+                "NEXT_STEPS",
+                "PROPOSAL",
+                "RFI",
+                "RISK_REPORT",
+                "SOW",
+                "VALUE_ARCHITECTURE"
+            ]
+            
+            for folder in top_level_folders:
+                (account_path / folder).mkdir(parents=True, exist_ok=True)
+            
+            # Create root files with minimal content
+            root_files = {
+                "lookup.md": f"# Account Profile: {account_name}\n\n**Created:** {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n## Basic Information\n\n## Key Contacts\n\n## Timeline\n",
+                "notes.md": f"# Notes: {account_name}\n\n",
+                "account.html": f"<html><head><title>{account_name}</title></head><body><h1>{account_name}</h1></body></html>",
+                "actions.md": "# Actions\n\n## Next Steps\n\n## Follow-ups\n",
+                "activities.jsonl": "",
+                "contacts.json": "[]",
+                "deal_stage.json": '{"stage": "new_account", "confidence": 0.5, "created": "' + time.strftime('%Y-%m-%d') + '"}',
+                "index.json": '{"account": "' + account_name + '", "version": "3.0"}',
+                "meddpicc.json": '{"score": 0, "dimensions": {}}',
+                "notes.json": "[]",
+                "summary.md": f"# Account Summary: {account_name}\n\n## Overview\n\n## Key Points\n"
+            }
+            
+            for fname, content in root_files.items():
+                fpath = account_path / fname
+                if not fpath.exists():
+                    with open(fpath, "w") as f:
+                        f.write(content)
+            
+            # Create INTEL initial files
+            intel_files = {
+                "meeting_prep.md": f"# Meeting Prep: {account_name}\n\n## Current Status\n\n## Agenda Items\n\n## Preparation Notes\n",
+                "pain_points.json": "[]",
+                "value_architecture.md": f"# Value Architecture: {account_name}\n\n## Business Drivers\n\n## Technical Requirements\n\n## ROI Considerations\n"
+            }
+            
+            intel_dir = account_path / "INTEL"
+            for fname, content in intel_files.items():
+                fpath = intel_dir / fname
+                if not fpath.exists():
+                    with open(fpath, "w") as f:
+                        f.write(content)
+            
+            print(f"✅ Account '{account_name}' initialized with {len(top_level_folders)} folders + {len(root_files)} files")
+            
+        except Exception as e:
+            print(f"⚠️ Error initializing account {account_path.name}: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def _cleanup_template_artifacts(self, account_path: Path):
+        """Remove template artifacts that shouldn't be in a fresh account"""
+        # Remove empty nested INTEL/INTEL folder if it exists
+        nested_intel = account_path / "INTEL" / "INTEL"
+        if nested_intel.exists() and nested_intel.is_dir():
+            try:
+                import shutil
+                shutil.rmtree(nested_intel)
+                print(f"   🗑️ Removed empty nested INTEL/INTEL")
+            except:
+                pass
+    
+    def _minimal_initialize(self, account_path: Path):
+        """Fallback minimal initialization if template not available"""
+        account_name = account_path.name
+        
+        # Create basic structure
+        dirs = ["INTEL", "emails", "documents", "MEETINGS", "NOTES"]
+        for d in dirs:
+            (account_path / d).mkdir(parents=True, exist_ok=True)
+        
+        # Create basic files
+        files = {
+            "lookup.md": f"# Account Profile: {account_name}\n\n**Created:** {time.strftime('%Y-%m-%d %H:%M:%S')}\n",
+            "notes.md": f"# Notes: {account_name}\n\n",
+            "deal_stage.json": '{"stage": "new_account", "confidence": 0.5}',
+            "meddpicc.json": '{"score": 0, "dimensions": {}}'
+        }
+        
+        for fname, content in files.items():
+            fpath = account_path / fname
+            if not fpath.exists():
+                with open(fpath, "w") as f:
+                    f.write(content)
+    
+    def _update_account_files(self, account_path: Path, account_name: str):
+        """Update account-specific files with the correct account name"""
+        files_to_update = [
+            "lookup.md",
+            "summary.md",
+            "account.html"  # HTML may have account name embedded
+        ]
+        
+        for fname in files_to_update:
+            fpath = account_path / fname
+            if fpath.exists():
+                try:
+                    content = fpath.read_text()
+                    # Replace placeholder or template account name
+                    updated = content.replace("{{ACCOUNT_NAME}}", account_name)
+                    updated = updated.replace("Account Name", account_name)
+                    updated = updated.replace("Template Account", account_name)
+                    if updated != content:
+                        fpath.write_text(updated)
+                except:
+                    pass  # Silently skip if can't update
+    
+    def _check_and_initialize_account(self, dir_path: Path):
+        """Check if a newly created directory is an account and initialize it"""
+        try:
+            accounts_dir = self.context.accounts_dir
+            print(f"🔍 Checking directory: {dir_path} (parent: {dir_path.parent})")
+            print(f"   ACCOUNTS dir: {accounts_dir}")
+            
+            # If this IS the ACCOUNTS directory itself, skip
+            if dir_path.resolve() == accounts_dir.resolve():
+                print(f"   → Skipping ACCOUNTS root")
+                return
+            
+            # Check if directory is a direct child of ACCOUNTS
+            if dir_path.parent.resolve() == accounts_dir.resolve():
+                account_name = dir_path.name
+                account_path = accounts_dir / account_name
+                print(f"   → Detected new account: {account_name}")
+                
+                # Initialize if not already done
+                if not (account_path / "INTEL").exists():
+                    print(f"   → Initializing...")
+                    self._initialize_account_folder(account_path)
+                else:
+                    print(f"   → Already initialized")
+            else:
+                print(f"   → Not a direct child of ACCOUNTS")
+        except Exception as e:
+            print(f"⚠️ Error checking account folder {dir_path}: {e}")
+    
+    def _detect_source_from_path(self, file_path: Path) -> Optional[str]:
+        """Detect which source this file belongs to"""
+        path_str = str(file_path).lower()
+        
+        for source, get_path in self.universal_sources.items():
+            source_path = get_path()
+            if str(source_path).lower() in path_str:
+                return source
+        
+        return None
+    
+    def _process_source_file(self, source: str, file_path: Path):
+        """Process a file for a specific source"""
+        try:
+            if file_path.exists():
+                # Skip non-text files (images, videos, etc.)
+                skip_extensions = {'.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.tiff', '.ico',
+                                 '.mp4', '.avi', '.mov', '.wmv', '.flv', '.webm', '.mp3', '.wav', '.m4a'}
+                
+                if file_path.suffix.lower() in skip_extensions:
+                    return  # Silently skip binary files
+                
+                # Only process files with text extensions or common conversation formats
+                allowed_extensions = {'.md', '.txt', '.json', '.jsonl', '.yaml', '.yml', '.log', '.csv'}
+                if file_path.suffix.lower() and file_path.suffix.lower() not in allowed_extensions:
+                    # For files without clear extension, check if they might be text
+                    if not self._is_likely_text_file(file_path):
+                        return
+                
+                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    content = f.read()
+                
+                # Process each line as separate conversation
+                lines = content.strip().split('\n')
+                for line in lines:
+                    line = line.strip()
+                    if line and len(line) > 10:
+                        context = ConversationContext(
+                            source=source,
+                            text=line,
+                            timestamp=time.time(),
+                            workspace=str(self.workspace_root)
+                        )
+                        self.process_conversation(context)
+        except Exception as e:
+            print(f"⚠️ Error reading {file_path}: {e}")
+    
+    def _is_likely_text_file(self, file_path: Path, sample_size: int = 1024) -> bool:
+        """Check if a file is likely text by sampling its content"""
+        try:
+            with open(file_path, 'rb') as f:
+                sample = f.read(sample_size)
+            
+            # Check for null bytes (binary indicator)
+            if b'\0' in sample:
+                return False
+            
+            # Count printable ASCII characters
+            printable = sum(1 for byte in sample if 32 <= byte <= 126 or byte in [9, 10, 13])
+            ratio = printable / len(sample) if sample else 0
+            
+            return ratio > 0.7  # 70% printable = likely text
+        except:
+            return False
+    
     def start_realtime_monitoring(self):
         """Start real-time file system monitoring"""
         try:
@@ -302,21 +577,38 @@ Best regards
                     self.bridge = bridge_instance
                 
                 def on_created(self, event):
-                    if not event.is_directory:
-                        self.bridge.process_new_file(Path(event.src_path))
+                    src_path = Path(event.src_path)
+                    if event.is_directory:
+                        # Handle new directory creation (e.g., new account folder)
+                        self.bridge._check_and_initialize_account(src_path)
+                    else:
+                        self.bridge.process_new_file(src_path)
                 
                 def on_modified(self, event):
                     if not event.is_directory:
                         self.bridge.process_modified_file(Path(event.src_path))
             
             observer = Observer()
+            
+            # Watch universal sources (.claude, .opencode, etc.)
             for source_name, get_path_func in self.universal_sources.items():
-                if get_path_func().parent.exists():
+                source_path = get_path_func()
+                if source_path.parent.exists():
                     observer.schedule(
                         UniversalFileHandler(self),
-                        str(get_path_func().parent),
+                        str(source_path.parent),
                         recursive=True
                     )
+            
+            # Also watch ACCOUNTS directory for new account folders
+            accounts_dir = self.context.accounts_dir
+            if accounts_dir.exists():
+                observer.schedule(
+                    UniversalFileHandler(self),
+                    str(accounts_dir),
+                    recursive=True  # Watch all subdirectories for new account folders
+                )
+                print(f"👀 Watching ACCOUNTS directory: {accounts_dir}")
             
             observer.start()
             return observer
