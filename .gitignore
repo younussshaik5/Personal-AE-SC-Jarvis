@@ -1,126 +1,68 @@
-# Secrets - NEVER commit
-.env
-*.key
-*.pem
-google_token.json
-credentials.json
-
-# Generated configs (machine-specific, created by setup.sh / start_jarvis.sh)
-config/mcp-observer.json
-mcp-opencode-observer/.env
-jarvis/config/jarvis.yaml
-config/jarvis.universal.json
-# Claude Code MCP settings — machine-specific absolute paths, regenerated on every start
-.claude/settings.json
-
-# Runtime data (lives in JARVIS_HOME, not repo)
-# JARVIS_HOME/ is the portable template — keep structure, ignore real data
-JARVIS_HOME/ACCOUNTS/*/
-!JARVIS_HOME/ACCOUNTS/_template/
-!JARVIS_HOME/ACCOUNTS/.gitkeep
-JARVIS_HOME/MEETINGS/*
-!JARVIS_HOME/MEETINGS/.gitkeep
-JARVIS_HOME/logs/*
-!JARVIS_HOME/logs/.gitkeep
-JARVIS_HOME/recordings/*
-!JARVIS_HOME/recordings/.gitkeep
-JARVIS_HOME/data/*
-!JARVIS_HOME/data/.gitkeep
-# Brain file — real content is personal, keep blank template
-JARVIS_HOME/JARVIS_BRAIN.md
-!JARVIS_HOME/.gitkeep
-
-# Legacy paths
-ACCOUNTS/
-MEMORY/
-logs/
-recordings/
-data/backups/
-data/meeting_queue/
-data/notifications.json
-data/sync_state.json
-
-# Media files
-*.mp4
-*.wav
-*.m4a
-*.webm
-*.mp3
-*.ogg
-
 # Python
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
-*.egg-info/
-*.egg
 .Python
-build/
-dist/
-develop-eggs/
-eggs/
-sdist/
-var/
-wheels/
-venv/
-.venv/
-ENV/
-
-# Node.js
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-mcp-jarvis-server/dist/
-mcp-opencode-observer/dist/
-
-# OS
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-Thumbs.db
-
-# IDEs
-.idea/
-.vscode/
-*.swp
-*.swo
-
-# JARVIS runtime
-.ui.pid
-.mcp_pid
-.mcp_observer.pid
-.jarvis.pid
-jarvis/data/archives/
-jarvis/data/history/
-jarvis/data/cache/
-
-# JARVIS v3 Universal - Gitignore
-# Auto-generated - do not edit manually
-# Environment and secrets
-.env.local
-secrets/
-# Runtime directories
-run/
-instance/
-tmp/
-temp/
-# Generated data (exclude from git)
-JARVIS/data/
-JARVIS/recordings/
-JARVIS/cache/
-# IDE and editor files
-*~
 env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
 downloads/
+eggs/
 .eggs/
 lib/
 lib64/
 parts/
+sdist/
+var/
+wheels/
+*.egg-info/
 .installed.cfg
-yarn-error.log*
-.pnpm-debug.log*
-# OS generated files
-ehthumbs.db
+*.egg
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+logs/
+
+# Cache
+.cache/
+*.pyc
+
+# Temporary files
+.tmp/
+tmp/
+*.tmp
+
+# Build artifacts
+*.whl
+*.tar.gz
+
+# MCP/JARVIS specific
+.jarvis.pid
+.mcp.pid
+.mcp_observer.pid
+.ui.pid
+jarvis.log
+mcp.log

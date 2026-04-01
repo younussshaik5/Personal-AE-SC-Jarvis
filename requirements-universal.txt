@@ -1,5 +1,0 @@
-# JARVIS v3 Universal Dependencies
-# Minimal, cross-platform requirements
-watchdog>=4.0.0
-pyyaml>=6.0
-websockets>=12.0

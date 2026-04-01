@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=65", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "jarvis-mcp"
+version = "1.0.0"
+description = "Production-ready MCP server with 24 sales intelligence skills"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [{name = "JARVIS Team"}]
+requires-python = ">=3.9"
+dependencies = [
+    "openai>=1.0.0",
+    "pyyaml>=6.0",
+    "aiohttp>=3.8.0",
+    "pydantic>=2.0.0",
+    "mcp>=0.7.0",
+    "python-dotenv>=1.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.0.0",
+    "black>=23.0.0",
+    "flake8>=6.0.0",
+    "mypy>=1.0.0",
+    "autopep8>=2.0.0",
+]
+
+[tool.black]
+line-length = 100
+target-version = ['py39', 'py310', 'py311']
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = "--strict-markers -v"
+
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
