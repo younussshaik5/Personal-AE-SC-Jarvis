@@ -1,25 +1,22 @@
-# JARVIS MCP - AI Sales Intelligence Platform
+# JARVIS v2.0 - AI Sales Intelligence Platform
 
-**Zero-Config AI Assistant for Any Sales Team**
+**Production-ready autonomous AI sales assistant for presales & AE workflows**
 
-Everything auto-configures. Just clone, add API key, and start winning deals.
+Zero manual setup. Just clone, set API key, and go.
 
----
+## What is JARVIS v2.0?
 
-## What Is This?
+JARVIS is an MCP (Model Context Protocol) server that runs inside Claude Desktop and provides 25+ intelligent skills for sales teams:
 
-JARVIS is an **AI sales consultant** that:
-- Generates proposals, battlecards, demo strategies automatically
-- Understands your accounts from your own notes
-- Works with Claude Code (MCP protocol)
-- Self-learns your preferences
-- Anyone can use (sales reps, presales, managers)
+- **Account Management**: Auto-scaffold accounts with hierarchies (parent/child relationships like Tata → TataTele, TataSky)
+- **Discovery & Intelligence**: Competitive analysis, battlecards, MEDDPICC, technical risk assessment
+- **Proposal Generation**: SOWs, architecture diagrams, custom templates, value propositions
+- **Deal Tracking**: Real-time deal stage tracking, risk reports, stakeholder management
+- **Enterprise Dashboards**: CRM-like HTML dashboards for each opportunity
+- **Self-Learning**: CLAUDE.md auto-evolves based on interaction patterns
+- **Context-Aware**: Automatically detects which account you're working on
 
-**24 AI-powered skills** all working together.
-
----
-
-## Quick Start (3 Steps)
+## Quick Start (5 minutes)
 
 ### 1. Clone
 ```bash
@@ -27,417 +24,385 @@ git clone https://github.com/younussshaik5/Personal-AE-SC-Jarvis.git
 cd Personal-AE-SC-Jarvis
 ```
 
-### 2. Auto-Setup (Everything Automatic!)
+### 2. Set API Key
 ```bash
-bash setup_auto.sh
+export NVIDIA_API_KEY="your_nvidia_api_key_here"
 ```
 
-This automatically:
-- ✅ Creates Python environment
-- ✅ Installs dependencies
-- ✅ Sets up account folders  
-- ✅ Copies 3 example accounts
-- ✅ Creates .env file
-- ✅ Runs tests
-
-### 3. Add NVIDIA Key
+Or add to your `.zshrc` / `.bashrc`:
 ```bash
-nano .env
-# Add: NVIDIA_API_KEY=your_key_here
+echo 'export NVIDIA_API_KEY="your_key"' >> ~/.zshrc
+source ~/.zshrc
 ```
 
-**Done!** JARVIS is ready to use.
+### 3. Setup Claude Desktop (MCP)
 
----
+Edit `~/.claude/config.json` and add:
 
-## How to Use
-
-### In Claude Code
-
-Add to your MCP settings:
 ```json
 {
   "mcpServers": {
     "jarvis": {
-      "command": "python",
-      "args": ["-m", "jarvis_mcp.mcp_server"],
+      "command": "python3",
+      "args": [
+        "/path/to/Personal-AE-SC-Jarvis/jarvis_mcp/mcp_server.py"
+      ],
       "env": {
-        "NVIDIA_API_KEY": "your_key"
+        "NVIDIA_API_KEY": "your_nvidia_api_key",
+        "ACCOUNTS_ROOT": "/Users/YOUR_USERNAME/Documents/claude space/ACCOUNTS"
       }
     }
   }
 }
 ```
 
-### Then Use It
+### 4. Restart Claude Desktop
+
+Close and reopen Claude Desktop. You should see "jarvis-mcp" in the available tools.
+
+### 5. Try It Out
+
+In any cowork session:
 ```
-@jarvis-mcp get_proposal account=Acme Corp
-```
+@jarvis create account for Tata
 
-Returns: A professional sales proposal based on your account data.
+or
 
-```
-@jarvis-mcp get_battlecard account=Acme Corp competitor=ServiceCo
-```
-
-Returns: Competitive positioning and objection handling.
-
----
-
-## The 24 Skills
-
-**Core (5):** Proposal, Battlecard, Demo Strategy, Risk Report, Value Architecture  
-**Discovery (5):** Discovery, Competitive Intelligence, Meeting Prep, Call Analysis, MEDDPICC  
-**Deal (5):** Deal Tracker, SOW, Follow-up Email, Account Summary, Pricing Analysis  
-**Advanced (9):** Technical Risk, Architecture Diagram, Documentation, HTML Export, Knowledge Graph, + 4 more
-
-All work automatically based on your account files.
-
----
-
-## How It Works
-
-### For Each Account
-```
-Your Account Folder:
-├── company_research.md    ← You fill this (company info)
-├── discovery.md           ← You fill this (discovery notes)
-├── deal_stage.json        ← You fill this (stage, probability, timeline)
-└── proposal.md            ← Auto-generated
-    battlecard.md          ← Auto-generated  
-    demo_strategy.md       ← Auto-generated
-    ... (more auto-generated)
+I'm working on discovering Tata's technical architecture
+→ Claude auto-detects you're in Tata account context
+→ Recommends relevant skills
+→ Loads hierarchical settings
 ```
 
-### When You Ask for Something
-1. You: `@jarvis-mcp get_proposal account=Acme Corp`
-2. JARVIS reads: company_research.md, discovery.md, deal_stage.json
-3. JARVIS generates: Professional proposal using AI
-4. JARVIS saves: To proposal.md
-5. You get: The content in Claude Code
-
-**Automatic. Intelligent. Context-aware.**
-
----
-
-## Self-Setup, Self-Load, Self-Do
-
-### Auto-Setup
-```bash
-bash setup_auto.sh  # One command, everything ready
-```
-
-### Auto-Load
-- Detects all 24 skills ✓
-- Loads your accounts ✓
-- Reads API key from .env ✓
-- Sets up preferences ✓
-
-**No manual configuration needed.**
-
-### Auto-Do
-- Automatically reads account files ✓
-- Automatically chooses best AI model ✓
-- Automatically generates content ✓
-- Automatically saves results ✓
-- Automatically learns your preferences ✓
-
----
-
-## Preferences & Self-Learning
-
-JARVIS stores your preferences automatically:
-
-```
-.claude/CLAUDE.md  ← Your config (auto-updated)
-```
-
-What it learns:
-- Which models work best for you
-- How detailed you like content
-- Your company terminology
-- Your sales process
-- What has worked in the past
-
-**You don't configure it.** It learns from your usage.
-
----
-
-## Adding New Accounts
-
-### Option 1: Manual (2 minutes)
-```bash
-mkdir ~/Documents/claude\ space/ACCOUNTS/YourAccount
-
-# Create company_research.md
-cat > ~/Documents/claude\ space/ACCOUNTS/YourAccount/company_research.md << 'EOF'
-# Your Company Name
-## Overview
-- Founded: YYYY
-- Employees: XXX
-## Pain Points
-- Issue 1
-- Issue 2
-EOF
-
-# Create discovery.md  
-cat > ~/Documents/claude\ space/ACCOUNTS/YourAccount/discovery.md << 'EOF'
-# Discovery Notes
-## MEDDPICC
-- Metrics: XXX
-- Economic Buyer: XXX
-- Budget: XXX
-EOF
-
-# Create deal_stage.json
-cat > ~/Documents/claude\ space/ACCOUNTS/YourAccount/deal_stage.json << 'EOF'
-{
-  "stage": "Demo",
-  "probability": 70,
-  "deal_size": 500000,
-  "timeline": "Q3 2026"
-}
-EOF
-```
-
-### Option 2: Copy Example
-```bash
-cp -r ~/Documents/claude\ space/ACCOUNTS/AcmeCorp ~/Documents/claude\ space/ACCOUNTS/YourAccount
-# Edit the files
-```
-
-### Then Use It
-```
-@jarvis-mcp get_proposal account=YourAccount
-```
-
-JARVIS auto-detects and generates everything.
-
----
-
-## Can Anyone Use This?
-
-**YES:**
-- ✅ Sales Reps - proposals, follow-ups, account summaries
-- ✅ Presales - demo strategies, technical docs, architecture
-- ✅ Managers - risk reports, deal analysis, pipeline insights
-- ✅ Anyone with Claude Code - it's designed for you
-
-No special skills needed. If you can use Claude, you can use JARVIS.
-
----
-
-## New Folder Usage
-
-### Create Your Project Folder
-```bash
-mkdir ~/my-sales-project
-cd ~/my-sales-project
-```
-
-### Use JARVIS from Anywhere
-```
-@jarvis-mcp get_proposal account=Acme Corp
-```
-
-JARVIS still reads from:
-```
-~/Documents/claude space/ACCOUNTS/Acme Corp/
-```
-
-**Account data is centralized.** All your projects use the same accounts. This means:
-- ✅ Easy to share with team
-- ✅ Easy to backup
-- ✅ Consistent across projects
-- ✅ One source of truth
-
----
-
-## Auto-Population
-
-When you clone, example accounts auto-populate:
-```
-~/Documents/claude space/ACCOUNTS/
-├── AcmeCorp/           ✓ Ready to use
-├── TechStartup/        ✓ Ready to use
-└── GlobalBank/         ✓ Ready to use
-```
-
-When you create a NEW account, just add 3 files:
-```
-YourAccount/
-├── company_research.md
-├── discovery.md
-└── deal_stage.json
-```
-
-JARVIS auto-generates all others:
-```
-YourAccount/
-├── proposal.md         ← Auto-created
-├── battlecard.md       ← Auto-created
-├── demo_strategy.md    ← Auto-created
-├── risk_report.md      ← Auto-created
-└── ... (more auto-created)
-```
-
-**No empty files needed.** JARVIS creates what's needed, when it's needed.
-
----
-
-## Real Example
-
-### Day 1: Start
-```bash
-bash setup_auto.sh
-nano .env  # Add NVIDIA_API_KEY
-```
-
-Example accounts ready. You're done.
-
-### Day 2: Use with Example Account
-```
-@jarvis-mcp get_proposal account=AcmeCorp
-```
-
-JARVIS returns a proposal for AcmeCorp (from examples).
-
-### Day 3: Add Your Account
-```bash
-mkdir ~/Documents/claude\ space/ACCOUNTS/MyCustomer
-# Create 3 files with your info
-```
-
-### Day 4: Use with Your Account
-```
-@jarvis-mcp get_proposal account=MyCustomer
-@jarvis-mcp get_battlecard account=MyCustomer
-@jarvis-mcp get_demo_strategy account=MyCustomer
-```
-
-All automatic. All smart. All contextual.
-
-### Day 5+: JARVIS Learns
-```
-JARVIS stores:
-- What you asked for
-- How you used the results
-- What worked
-- Your preferences
-
-Next time, it's even better.
-```
-
----
-
-## File Structure
+## Project Structure
 
 ```
 Personal-AE-SC-Jarvis/
-├── jarvis_mcp/              # Core (24 skills + infrastructure)
-├── tests/                   # Full test suite (24 tests)
-├── examples/accounts/       # Example accounts
-├── .claude/                 # Claude Code config
-├── setup_auto.sh            # Auto-setup script
-├── setup.py                 # Package setup
-├── requirements.txt         # Dependencies
-├── Makefile                 # Dev commands
-├── README.md                # This file
-├── README_COMPLETE.md       # Full guide (read this for details!)
-└── .env.example             # Environment template
-
-~/Documents/claude space/ACCOUNTS/
-└── YourAccount/
-    ├── company_research.md  # You fill
-    ├── discovery.md         # You fill
-    ├── deal_stage.json      # You fill
-    ├── proposal.md          # Auto-generated
-    ├── battlecard.md        # Auto-generated
-    └── ... (more auto-generated)
+├── jarvis_mcp/                 # MCP Server (runs in Claude Desktop)
+│   ├── config/                 # Configuration management
+│   ├── llm/                    # LLM provider abstraction
+│   ├── utils/                  # Logging, file utilities
+│   ├── safety/                 # Safety guards & killswitch
+│   ├── skills/                 # 25+ presales skills
+│   ├── mcp_server.py           # Main MCP entry point
+│   ├── account_hierarchy.py    # Parent/child account management
+│   ├── context_detector.py     # Auto-detect current account
+│   ├── claude_md_loader.py     # Hierarchical settings loading
+│   ├── claude_md_evolve.py     # Self-learning CLAUDE.md
+│   ├── scaffolder.py           # Auto-create accounts & templates
+│   └── account_dashboard.py    # HTML dashboard generator
+│
+├── ACCOUNTS/                   # All opportunities (created on first use)
+│   ├── Tata/                   # Parent company
+│   │   ├── deal_stage.json     # Tata's deal metadata
+│   │   ├── company_research.md # Tata research (inherited by children)
+│   │   ├── discovery.md        # Tata's discovery notes
+│   │   ├── CLAUDE.md           # Tata account settings
+│   │   ├── dashboard.html      # Tata's CRM dashboard
+│   │   ├── TataTele/           # Sub-account (inherits parent research)
+│   │   │   ├── deal_stage.json
+│   │   │   ├── discovery.md    # Own discovery (not inherited)
+│   │   │   ├── CLAUDE.md
+│   │   │   └── dashboard.html
+│   │   └── TataSky/            # Another sub-account
+│   │       ├── deal_stage.json
+│   │       ├── discovery.md
+│   │       ├── CLAUDE.md
+│   │       └── dashboard.html
+│   └── [Other Accounts]/
+│
+└── README.md (this file)
 ```
 
----
+## Core Features
 
-## Commands
+### 1. Zero-Manual Account Creation
+
+**Old way**: Manually create folders, files, templates
+**New way**: Just mention an account name, Claude asks for confirmation
+
+```
+User: "I'm working on Tata"
+Claude: "Should I create a Tata account? (Revenue/Industry optional)"
+User: "Yes, create it"
+→ Instant: folder, deal_stage.json, company_research.md, discovery.md, CLAUDE.md
+```
+
+### 2. Account Hierarchies
+
+Create parent accounts with child opportunities:
+
+```
+Tata (parent)
+├── TataTele (child inherits company_research.md)
+├── TataSky (child inherits company_research.md)
+└── TataTV (child inherits company_research.md)
+```
+
+Each child:
+- **Inherits**: Parent's `company_research.md` (shared research)
+- **Owns**: Their own `discovery.md`, `deal_stage.json`, `CLAUDE.md`
+
+### 3. Context-Aware Workflow
+
+When you navigate into an account folder:
 
 ```bash
-# Run tests
-make test
-
-# Format code
-make format
-
-# Check code quality
-make lint
-
-# Run the server
-python -m jarvis_mcp.mcp_server
-
-# See all commands
-make help
+cd ~/Documents/claude\ space/ACCOUNTS/Tata/TataTele
+# Now in cowork session:
 ```
 
----
+JARVIS automatically:
+- ✓ Detects you're in TataTele account
+- ✓ Loads TataTele's deal_stage.json (deal metrics)
+- ✓ Loads TataTele's CLAUDE.md settings
+- ✓ Falls back to Tata's CLAUDE.md for inherited rules
+- ✓ Loads shared company_research.md from parent
+- ✓ Recommends relevant skills for this deal stage
 
-## Full Documentation
+### 4. Enterprise Dashboards
 
-For complete explanations, examples, and troubleshooting, read:
+Each account has a `dashboard.html` CRM-like view:
+
+```html
+Open: ~/ACCOUNTS/Tata/dashboard.html in browser
+→ Shows: Deal stage, probability, stakeholders, activities, risks, 
+         competitive info, value metrics
+→ Auto-updates from deal_stage.json
 ```
-README_COMPLETE.md
+
+### 5. Self-Learning CLAUDE.md
+
+JARVIS tracks your interactions and auto-evolves settings:
+
+- Records which skills you use
+- Learns your preferred models
+- Detects success patterns
+- Suggests CLAUDE.md improvements
+- Auto-applies approved changes
+
+Example: "I notice you use the Battlecard skill for every discovery call. Should I auto-enable it for this account?"
+
+### 6. 25+ Skills (Always Growing)
+
+Core skills:
+- `scaffold_account` - Create new accounts/sub-accounts
+- `account_summary` - Quick account overview
+- `discovery` - MEDDPICC framework
+- `battlecard` - Competitive positioning
+- `proposal` - Generate SOWs
+- `meeting_prep` - Pre-meeting intelligence
+- `demo_strategy` - Demo customization
+- `risk_report` - Technical/commercial risks
+- `value_architecture` - Architecture-based value prop
+- And 15+ more...
+
+## Settings & Customization
+
+### Per-Account: CLAUDE.md
+
+Each account has a `CLAUDE.md` that controls:
+
+```markdown
+# CLAUDE.md for Tata/TataTele
+
+## Cascade Rules
+- Parent settings: inherit from Tata if not specified
+- Global settings: inherit from ~/.claude/projects/...
+
+## Model Preferences
+- Use Sonnet for reasoning tasks (discovery, risk analysis)
+- Use Haiku for quick summaries
+- Use Opus for complex proposals
+
+## Skill Preferences
+- Auto-enable: discovery, battlecard
+- Suggest: proposal, demo_strategy
+- Hide: (not used for this deal)
+
+## Routing Rules
+- If mention competitor X → use competitive_intelligence
+- If discovery call → use discovery + risk_report
 ```
 
-That file has:
-- Detailed architecture
-- All 24 skills explained
-- Complete workflow examples
-- Troubleshooting guide
-- Advanced configuration
+### Global: Environment Variables
 
----
+```bash
+ACCOUNTS_ROOT=/path/to/accounts      # Where to store accounts
+NVIDIA_API_KEY=your_key              # NVIDIA LLM access
+NVIDIA_MODEL=meta/llama-3.1-405b    # Model choice
+```
 
-## Next Steps
+## Workflows
 
-1. **Clone & Auto-Setup** (3 minutes)
+### Workflow 1: New Opportunity
+
+```
+1. In cowork: "Create account for Acme Corp"
+2. Claude asks: "Create Acme with standard settings? (Optional: revenue, industry)"
+3. You confirm: "Yes"
+4. Instant: Folder created with all templates
+5. Navigate: cd ACCOUNTS/Acme
+6. Start discovery with auto-loaded context
+```
+
+### Workflow 2: Sub-Opportunity under Parent
+
+```
+1. "Create TataTele under Tata"
+2. Claude: "TataTele will inherit Tata's company_research.md. Continue?"
+3. You confirm
+4. Result: TataTele has own metrics but shares Tata's research
+```
+
+### Workflow 3: Discovery Call
+
+```
+1. Navigate to account: cd ACCOUNTS/Tata/TataTele
+2. Start cowork session
+3. Claude auto-detects context
+4. Use @jarvis discovery → auto-loads TataTele's discovery notes
+5. After call: @jarvis update deal_stage (auto-saves to deal_stage.json)
+6. View progress: Open dashboard.html in browser
+```
+
+### Workflow 4: Generate Proposal
+
+```
+1. In Tata/TataTele context
+2. @jarvis proposal --type=sow
+3. Claude loads:
+   - TataTele's deal_stage.json (deal metrics)
+   - Tata's company_research.md (shared research)
+   - TataTele's discovery.md (notes)
+   - Architecture from risk_report or demo_strategy
+4. Generate: Professional SOW ready for editing
+```
+
+## API Key Setup
+
+### Option 1: Environment Variable (Recommended)
+
+```bash
+export NVIDIA_API_KEY="nvidia-xxx-xxx"
+```
+
+### Option 2: .env File
+
+Create `~/.claude/.env`:
+```
+NVIDIA_API_KEY=nvidia-xxx-xxx
+```
+
+### Option 3: Claude Desktop Config
+
+Edit `~/.claude/config.json`:
+```json
+{
+  "mcpServers": {
+    "jarvis": {
+      "env": {
+        "NVIDIA_API_KEY": "nvidia-xxx-xxx"
+      }
+    }
+  }
+}
+```
+
+## Troubleshooting
+
+### MCP Not Appearing in Claude Desktop
+
+1. Check path in config.json is correct:
    ```bash
-   git clone https://github.com/younussshaik5/Personal-AE-SC-Jarvis.git
-   cd Personal-AE-SC-Jarvis
-   bash setup_auto.sh
+   ls ~/Personal-AE-SC-Jarvis/jarvis_mcp/mcp_server.py
    ```
 
-2. **Add Your NVIDIA Key** (30 seconds)
+2. Verify Python path:
    ```bash
-   nano .env
-   # Add: NVIDIA_API_KEY=your_key_here
+   which python3
    ```
 
-3. **Add to Claude Code** (1 minute)
-   - Open Claude Code settings
-   - Add MCP server config
-   - Restart Claude Code
-
-4. **Start Using** (immediately)
-   ```
-   @jarvis-mcp get_proposal account=AcmeCorp
+3. Test MCP directly:
+   ```bash
+   cd ~/Personal-AE-SC-Jarvis
+   python3 -c "from jarvis_mcp.mcp_server import JarvisServer; print('OK')"
    ```
 
-5. **Add Your Accounts** (as needed)
-   - Create account folders
-   - Add your data
-   - JARVIS handles the rest
+4. Restart Claude Desktop
+
+### Accounts Folder Not Found
+
+```bash
+# Check default location
+ls ~/Documents/claude\ space/ACCOUNTS/
+
+# Or set custom location
+export ACCOUNTS_ROOT="/your/custom/path"
+```
+
+### Skills Not Loading
+
+```bash
+cd ~/Personal-AE-SC-Jarvis
+python3 -c "from jarvis_mcp.skills import SKILL_REGISTRY; print(len(SKILL_REGISTRY))"
+# Should output: 25
+```
+
+## Architecture
+
+### MCP Server
+- **Entry**: `mcp_server.py` - Runs when Claude Desktop opens
+- **Lifecycle**: Starts when Claude boots, stops when Claude closes
+- **Transport**: stdio (built-in to MCP)
+- **Skills**: 25+ registered as MCP tools
+
+### Infrastructure
+- **ConfigManager**: Loads settings from environment + CLAUDE.md
+- **ContextDetector**: Detects current account from cwd
+- **AccountHierarchy**: Manages parent/child relationships
+- **ClaudeMDLoader**: Hierarchical settings (account → parent → global)
+- **ClaudeMDEvolve**: Self-learning system
+- **Scaffolder**: Auto-creates accounts with templates
+- **AccountDashboard**: Generates HTML dashboards
+
+### Data Structure
+- **deal_stage.json**: Account metrics (stage, probability, deal_size, stakeholders, etc.)
+- **company_research.md**: Shared research (inherited by children)
+- **discovery.md**: Account-specific discovery notes
+- **CLAUDE.md**: Settings & preferences (hierarchical)
+- **dashboard.html**: CRM view (auto-generated)
+
+## FAQ
+
+**Q: Do I need to manually create account folders?**
+A: No. Just mention the account name and Claude creates everything.
+
+**Q: Can I have sub-accounts under sub-accounts?**
+A: Yes. Unlimited nesting. Each level inherits parent's company_research.md.
+
+**Q: How often does CLAUDE.md auto-evolve?**
+A: Every 10 interactions. Suggestions are shown; you approve before changes apply.
+
+**Q: What happens if I'm not in an ACCOUNTS folder?**
+A: JARVIS uses ACCOUNTS_ROOT env var. You can work from anywhere.
+
+**Q: Can I customize dashboard styling?**
+A: Yes. Edit the HTML template in `account_dashboard.py` and regenerate.
+
+**Q: Is this production-ready?**
+A: Yes. Tested with 25+ skills, account hierarchies, and MCP integration.
+
+## Support
+
+- **Issues**: Report on GitHub
+- **Features**: Suggest improvements
+- **Questions**: Check troubleshooting section
+
+## License
+
+Internal tool for yellow.ai sales team. All rights reserved.
 
 ---
 
-## Questions?
-
-- **How does it work?** → Read README_COMPLETE.md
-- **What are the 24 skills?** → README_COMPLETE.md
-- **How do I add accounts?** → README_COMPLETE.md
-- **How do preferences work?** → README_COMPLETE.md
-- **Issues?** → Check troubleshooting in README_COMPLETE.md
-
----
-
-**Zero config. Self-setup. Self-learning. Self-doing.**
-
-Just clone and start winning. 🚀
-
+**Ready to use. Just set your NVIDIA_API_KEY and go.**
