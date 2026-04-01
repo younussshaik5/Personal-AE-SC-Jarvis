@@ -169,10 +169,17 @@ except (FileNotFoundError, json.JSONDecodeError):
 if "mcpServers" not in config:
     config["mcpServers"] = {}
 
-# Register JARVIS
+# Register JARVIS MCP server
 config["mcpServers"]["jarvis"] = {
     "command": python_path,
     "args": [f"{project_path}/jarvis_mcp_server.py"],
+    "disabled": False
+}
+
+# Register JARVIS CRM sidecar (auto-starts CRM dashboard with Claude)
+config["mcpServers"]["jarvis-crm"] = {
+    "command": python_path,
+    "args": [f"{project_path}/crm_sidecar.py"],
     "disabled": False
 }
 
@@ -194,7 +201,8 @@ with open(config_path, "w") as f:
 
 print(f"   ✅ Claude Desktop configured")
 print(f"      Python: {python_path}")
-print(f"      Server: {project_path}/jarvis_mcp_server.py")
+print(f"      JARVIS: {project_path}/jarvis_mcp_server.py")
+print(f"      CRM sidecar: {project_path}/crm_sidecar.py")
 print(f"      Accounts: {accounts_path}")
 PYEOF
 
@@ -242,11 +250,15 @@ echo "   • Dependencies: Installed ✅"
 echo "   • Project: $PROJECT_DIR"
 echo "   • ACCOUNTS: $ACCOUNTS_DIR"
 echo "   • Claude Config: Updated ✅"
+echo "   • JARVIS MCP: Registered ✅"
+echo "   • CRM Sidecar: Registered ✅"
 echo ""
 echo "🚀 Next Steps:"
-echo "   1. Quit Claude Desktop (⌘Q)"
-echo "   2. Reopen Claude Desktop"
-echo "   3. Look for 🔨 Tools — JARVIS should appear"
+echo "   1. Add NVIDIA API key to .env file (if not done)"
+echo "   2. Quit Claude Desktop (⌘Q)"
+echo "   3. Reopen Claude Desktop"
+echo "   4. Look for 🔨 Tools — JARVIS + CRM should appear"
+echo "   5. CRM Dashboard auto-starts at http://localhost:8000"
 echo ""
 echo "💡 Tip: Run setup.sh again anytime to reinstall dependencies."
 echo ""

@@ -164,7 +164,7 @@ Comprehensive tests needed for:
 
 ## 📊 File Manifest
 
-**Location:** `/Users/syounus/Documents/claude space/Personal-AE-SC-Jarvis/`
+**Location:** `/path/to/Personal-AE-SC-Jarvis/`
 
 ```
 jarvis_mcp/

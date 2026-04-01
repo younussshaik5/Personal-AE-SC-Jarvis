@@ -1,198 +1,500 @@
 #!/usr/bin/env python3
 """
-JARVIS CRM Dashboard Server
-Serves the interactive CRM dashboard with real data from ACCOUNTS folder
+JARVIS CRM Dashboard Server — VP-Grade Deal Intelligence
+Auto-generates skill outputs. Persists a job queue across restarts.
+Loads ALL account data: deal_stage.json + all skill output .md files.
+
 Run: python3 serve_crm.py
 """
 
 import json
 import os
-from pathlib import Path
-from http.server import HTTPServer, SimpleHTTPRequestHandler
+import re
+import sys
+import asyncio
+import logging
 import threading
-import webbrowser
 import time
+from pathlib import Path
+from http.server import HTTPServer, BaseHTTPRequestHandler
+import webbrowser
 
-# Find ACCOUNTS folder - look in parent and current directory
-script_dir = Path(__file__).parent
-ACCOUNTS_ROOT = script_dir / "ACCOUNTS"
-if not ACCOUNTS_ROOT.exists():
-    # Try looking in parent directory (~/Documents/claude space/ACCOUNTS)
-    ACCOUNTS_ROOT = script_dir.parent / "ACCOUNTS"
-if not ACCOUNTS_ROOT.exists():
-    # Fallback to absolute path
-    ACCOUNTS_ROOT = Path.home() / "Documents" / "claude space" / "ACCOUNTS"
+# ── Path setup so jarvis_mcp imports work ────────────────────────────────────
+_here = Path(__file__).parent
+if str(_here) not in sys.path:
+    sys.path.insert(0, str(_here))
 
-class CRMHandler(SimpleHTTPRequestHandler):
-    """HTTP handler for CRM dashboard"""
-
-    def do_GET(self):
-        """Handle GET requests"""
-        # API endpoint: /api/accounts
-        if self.path == "/api/accounts":
-            self.send_response(200)
-            self.send_header("Content-type", "application/json")
-            self.send_header("Access-Control-Allow-Origin", "*")
-            self.end_headers()
-
-            accounts_data = load_accounts_data()
-            self.wfile.write(json.dumps(accounts_data).encode())
-            return
-
-        # Serve crm.html for root
-        if self.path == "/" or self.path == "":
-            try:
-                crm_file = Path(__file__).parent / "crm.html"
-                with open(crm_file, 'r') as f:
-                    self.send_response(200)
-                    self.send_header("Content-type", "text/html")
-                    self.end_headers()
-                    self.wfile.write(f.read().encode())
-                return
-            except:
-                self.send_error(404)
-                return
-
-        # Try to serve other files from script directory
-        try:
-            file_path = Path(__file__).parent / self.path.lstrip('/')
-            if file_path.exists() and file_path.is_file():
-                with open(file_path, 'rb') as f:
-                    self.send_response(200)
-                    if str(file_path).endswith('.html'):
-                        self.send_header("Content-type", "text/html")
-                    elif str(file_path).endswith('.js'):
-                        self.send_header("Content-type", "application/javascript")
-                    elif str(file_path).endswith('.css'):
-                        self.send_header("Content-type", "text/css")
-                    elif str(file_path).endswith('.json'):
-                        self.send_header("Content-type", "application/json")
-                    self.end_headers()
-                    self.wfile.write(f.read())
-                return
-        except:
-            pass
-
-        self.send_error(404)
-
-    def do_OPTIONS(self):
-        """Handle CORS preflight"""
-        self.send_response(200)
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
-        self.end_headers()
-
-    def log_message(self, format, *args):
-        """Suppress default logging"""
+# Load .env
+def _load_env():
+    env_file = _here / ".env"
+    if not env_file.exists():
+        return
+    try:
+        from dotenv import load_dotenv
+        load_dotenv(env_file, override=False)
+        return
+    except ImportError:
         pass
+    for line in env_file.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        k, _, v = line.partition("=")
+        k, v = k.strip(), v.strip().strip('"').strip("'")
+        if k and k not in os.environ:
+            os.environ[k] = v
+
+_load_env()
+
+logging.basicConfig(level=logging.INFO, format="[CRM] %(message)s", stream=sys.stderr)
+log = logging.getLogger(__name__)
+
+# ── ACCOUNTS root ─────────────────────────────────────────────────────────────
+_candidates = [
+    Path(os.getenv("ACCOUNTS_ROOT", "")),
+    _here / "ACCOUNTS",
+    Path.home() / "Documents" / "claude space" / "ACCOUNTS",
+    Path.cwd() / "ACCOUNTS",
+]
+ACCOUNTS_ROOT = next((p for p in _candidates if p.exists()), _here / "ACCOUNTS")
+
+# ── Skill output file registry ────────────────────────────────────────────────
+SKILL_FILES = {
+    "account_summary":          {"file": "account_summary.md",          "label": "Executive Summary",      "icon": "briefcase",  "cmd": "get_account_summary"},
+    "quick_insights":           {"file": "quick_insights.md",           "label": "Quick Insights",         "icon": "zap",        "cmd": "quick_insights"},
+    "battlecard":               {"file": "battlecard.md",               "label": "Battlecard",             "icon": "swords",     "cmd": "get_battlecard"},
+    "meddpicc":                 {"file": "meddpicc.md",                 "label": "MEDDPICC Analysis",      "icon": "target",     "cmd": "track_meddpicc"},
+    "risk_report":              {"file": "risk_report.md",              "label": "Risk Report",            "icon": "alert",      "cmd": "get_risk_report"},
+    "value_architecture":       {"file": "value_architecture.md",       "label": "Value Architecture",     "icon": "layers",     "cmd": "get_value_architecture"},
+    "competitive_intelligence": {"file": "competitive_intelligence.md", "label": "Competitive Intel",      "icon": "eye",        "cmd": "get_competitive_intelligence"},
+    "competitor_pricing":       {"file": "competitor_pricing.md",       "label": "Pricing Analysis",       "icon": "dollar",     "cmd": "analyze_competitor_pricing"},
+    "meeting_prep":             {"file": "meeting_prep.md",             "label": "Meeting Prep",           "icon": "calendar",   "cmd": "get_meeting_prep"},
+    "demo_strategy":            {"file": "demo_strategy.md",            "label": "Demo Strategy",          "icon": "play",       "cmd": "get_demo_strategy"},
+    "proposal":                 {"file": "proposal.md",                 "label": "Proposal",               "icon": "file-text",  "cmd": "get_proposal"},
+    "followup_email":           {"file": "followup_email.md",           "label": "Follow-up Email",        "icon": "mail",       "cmd": "generate_followup"},
+    "technical_risk":           {"file": "technical_risk.md",           "label": "Technical Risk",         "icon": "cpu",        "cmd": "assess_technical_risk"},
+    "sow":                      {"file": "sow.md",                      "label": "Statement of Work",      "icon": "clipboard",  "cmd": "generate_sow"},
+}
+
+# ── Queue manager ─────────────────────────────────────────────────────────────
+_queue = None
+_llm = None
+_config = None
+
+def _init_queue():
+    global _queue, _llm, _config
+    try:
+        from jarvis_mcp.queue_manager import QueueManager
+        from jarvis_mcp.config.config_manager import ConfigManager
+        from jarvis_mcp.llm.llm_manager import LLMManager
+        _config = ConfigManager()
+        _llm = LLMManager(_config)
+        _queue = QueueManager()
+        log.info("Queue manager initialized")
+    except Exception as e:
+        log.warning(f"Queue manager unavailable (skills won't auto-generate): {e}")
+
+def _queue_status() -> dict:
+    if _queue:
+        return _queue.get_status()
+    return {"pending": 0, "processing": 0, "done": 0, "failed": 0, "total": 0, "is_active": False, "by_account": {}}
+
+def _add_to_queue(account: str, skill_key: str) -> str:
+    if _queue:
+        return _queue.add_job(account, skill_key, priority=1)
+    return ""
+
+# ── Background queue worker ───────────────────────────────────────────────────
+_worker_lock = threading.Lock()
+
+def _queue_worker():
+    """Background thread: processes queue, then watches for new jobs every 30s."""
+    # Give the server a moment to start
+    time.sleep(3)
+
+    # Scan for missing skills on startup
+    if _queue:
+        changed = _queue.scan_changed_files(ACCOUNTS_ROOT)
+        missing = _queue.scan_missing_skills(ACCOUNTS_ROOT, SKILL_FILES)
+        if changed + missing:
+            log.info(f"Startup scan: {changed} changed files, {missing} missing skills queued")
+
+    while True:
+        with _worker_lock:
+            pending = _queue.get_pending() if _queue else []
+            if pending:
+                log.info(f"Processing {len(pending)} queued jobs…")
+                try:
+                    asyncio.run(_run_queue_async())
+                except Exception as e:
+                    log.error(f"Queue processing error: {e}")
+        time.sleep(30)
+
+async def _run_queue_async():
+    if _queue and _llm and _config:
+        await _queue.process_all(_llm, _config)
+
+# ── Data helpers ──────────────────────────────────────────────────────────────
+
+def sanitize(text, max_len=None):
+    if not text:
+        return ""
+    cleaned = ''.join(c for c in text if ord(c) >= 32 or c in '\n\t\r')
+    return cleaned[:max_len] if max_len else cleaned
+
+
+def read_file(path):
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            return f.read()
+    except Exception:
+        return ""
+
+
+def parse_md_sections(md):
+    sections = {}
+    cur = "intro"
+    lines = []
+    for line in md.split('\n'):
+        if line.startswith('## '):
+            if lines:
+                sections[cur] = '\n'.join(lines).strip()
+            cur = line[3:].strip()
+            lines = []
+        else:
+            lines.append(line)
+    if lines:
+        sections[cur] = '\n'.join(lines).strip()
+    return sections
+
+
+def extract_bullets(text):
+    items = []
+    for line in text.split('\n'):
+        line = line.strip()
+        if line.startswith(('- ', '* ', '• ')):
+            items.append(line[2:].strip())
+        elif re.match(r'^\d+\.?\s', line):
+            items.append(re.sub(r'^\d+\.?\s*', '', line).strip())
+    return items
+
+
+def compute_meddpicc(deal, disc_sec, claude_sec, stakeholders):
+    score = {}
+    success = disc_sec.get('Success Criteria', '')
+    score['metrics'] = min(10, len(extract_bullets(success)) * 2) if success else 0
+
+    has_budget_holder = any(k in s.lower() for s in stakeholders for k in ['cfo', 'budget', 'finance', 'ceo', 'president'])
+    score['economic_buyer'] = 10 if has_budget_holder else (3 if stakeholders else 0)
+
+    criteria = disc_sec.get('Key Pain Points to Address', '') or disc_sec.get('Key Challenges', '') or disc_sec.get('Business Drivers', '')
+    score['decision_criteria'] = min(10, len(extract_bullets(criteria)) * 2) if criteria else 0
+
+    process = disc_sec.get('Decision Drivers', '') or disc_sec.get('Budget & Timeline', '')
+    score['decision_process'] = 8 if process else 2
+
+    stage = deal.get('stage', '').lower()
+    has_legal = any(k in s.lower() for s in stakeholders for k in ['procurement', 'legal', 'contract'])
+    score['paper_process'] = 9 if 'negotiate' in stage or 'close' in stage else (6 if has_legal else 2)
+
+    pain = disc_sec.get('Business Drivers', '') or disc_sec.get('Key Challenges', '')
+    score['implications'] = min(10, len(extract_bullets(pain)) * 2) if pain else 0
+
+    has_champ = any(k in str(v).lower() for v in [str(disc_sec), str(claude_sec)] for k in ['champion', 'advocate', 'sponsor'])
+    score['champion'] = 7 if has_champ else (5 if claude_sec.get('Account Context', '') else 1)
+
+    comp = deal.get('competitive_situation', {})
+    comp_sec = disc_sec.get('Competitive Landscape', '')
+    score['competition'] = (8 if comp_sec else 6) if (comp.get('primary_competitor', 'TBD') != 'TBD') else 1
+
+    score['total'] = sum(score.values())
+    score['max'] = 80
+    score['percentage'] = round((score['total'] / 80) * 100)
+    return score
+
+
+def compute_risks(deal, disc_sec, meddpicc):
+    risks = []
+    prob = deal.get('probability', 0)
+    size = deal.get('deal_size', 0)
+    comp = deal.get('competitive_situation', {})
+
+    if meddpicc.get('economic_buyer', 0) < 5:
+        risks.append({'level': 'high', 'cat': 'Stakeholder', 'text': 'No economic buyer identified — budget approval at risk'})
+    if prob < 0.3 and size > 500000:
+        risks.append({'level': 'high', 'cat': 'Pipeline', 'text': f'Low win probability ({int(prob * 100)}%) on ${size:,.0f} deal'})
+    cs = comp.get('competitor_status', '').lower()
+    if 'incumbent' in cs or 'strong' in cs:
+        risks.append({'level': 'high', 'cat': 'Competition', 'text': f'Strong competitor: {comp.get("primary_competitor", "")} ({cs})'})
+    if meddpicc.get('percentage', 0) < 40:
+        risks.append({'level': 'medium', 'cat': 'Qualification', 'text': f'MEDDPICC {meddpicc["percentage"]}% — deal under-qualified'})
+    if meddpicc.get('champion', 0) < 4:
+        risks.append({'level': 'medium', 'cat': 'Champion', 'text': 'No internal champion identified'})
+    if meddpicc.get('competition', 0) < 3:
+        risks.append({'level': 'low', 'cat': 'Competition', 'text': 'Competitive landscape unknown'})
+    return risks
+
+
+def compute_discovery(disc_sec):
+    areas = ['Company Background', 'Business Drivers', 'Key Challenges', 'Technical Environment',
+             'Success Criteria', 'Budget & Timeline', 'Key Stakeholders', 'Competitive Landscape', 'Decision Drivers']
+    found = sum(1 for a in areas if any(a.lower() in k.lower() for k in disc_sec.keys()))
+    return {
+        'completed': found, 'total': len(areas),
+        'percentage': round((found / len(areas)) * 100),
+        'missing': [a for a in areas if not any(a.lower() in k.lower() for k in disc_sec.keys())]
+    }
+
+
+def load_account(folder, name, parent=None):
+    dsf = folder / "deal_stage.json"
+    if not dsf.exists():
+        return None
+    try:
+        with open(dsf, 'r', encoding='utf-8') as f:
+            deal = json.load(f)
+    except Exception:
+        return None
+
+    company_md = sanitize(read_file(folder / "company_research.md"))
+    discovery_md = sanitize(read_file(folder / "discovery.md"))
+    claude_md = sanitize(read_file(folder / "CLAUDE.md"))
+
+    co_sec = parse_md_sections(company_md)
+    disc_sec = parse_md_sections(discovery_md)
+    cl_sec = parse_md_sections(claude_md)
+
+    stakeholders = deal.get("stakeholders", [])
+    meddpicc = compute_meddpicc(deal, {**disc_sec, **co_sec}, cl_sec, stakeholders)
+    risks = compute_risks(deal, disc_sec, meddpicc)
+    disc_comp = compute_discovery(disc_sec)
+
+    next_actions = extract_bullets(cl_sec.get('Next Actions', '') or cl_sec.get('Next Steps', ''))
+    pain_points = extract_bullets(cl_sec.get('Key Pain Points to Address', ''))
+
+    prog = []
+    for line in cl_sec.get('Deal Progression', '').split('\n'):
+        line = line.strip()
+        if not line:
+            continue
+        status = ('completed' if any(c in line for c in ['✅', '✓']) else
+                  'current' if '🔄' in line else
+                  'pending' if '⏳' in line else 'unknown')
+        clean = re.sub(r'[✅✓🔄⏳\-\*]', '', line).strip()
+        if clean:
+            prog.append({'name': clean, 'status': status})
+
+    skill_outputs = {}
+    for skill_key, skill_info in SKILL_FILES.items():
+        filepath = folder / skill_info["file"]
+        if filepath.exists():
+            content = sanitize(read_file(filepath))
+            if content.strip():
+                skill_outputs[skill_key] = content
+
+    # Queue status for this account
+    queue_status = {}
+    if _queue:
+        q = _queue.get_status()
+        queue_status = q.get("by_account", {}).get(name, [])
+
+    return {
+        "id": name.lower().replace("/", "_").replace(" ", "_"),
+        "name": deal.get("account_name", name),
+        "folder": name,
+        "path": str(folder),
+        "parent": parent,
+        "stage": deal.get("stage", "Unknown"),
+        "probability": deal.get("probability", 0),
+        "deal_size": deal.get("deal_size", 0),
+        "timeline": deal.get("timeline", "TBD"),
+        "last_updated": deal.get("last_updated", "Unknown"),
+        "stakeholders": stakeholders,
+        "competitive_situation": deal.get("competitive_situation", {}),
+        "activities": deal.get("activities", []),
+        "constraints": deal.get("constraints", []),
+        "next_milestone": deal.get("next_milestone", {}),
+        "company_info": sanitize(company_md, 3000),
+        "discovery_notes": sanitize(discovery_md, 5000),
+        "account_rules_md": sanitize(claude_md, 3000),
+        "meddpicc": meddpicc,
+        "risks": risks,
+        "discovery_completeness": disc_comp,
+        "next_actions": next_actions,
+        "deal_progression": prog,
+        "pain_points": pain_points,
+        "skill_outputs": skill_outputs,
+        "skills_generated": len(skill_outputs),
+        "skills_total": len(SKILL_FILES),
+        "skills_queued": queue_status,
+    }
 
 
 def load_accounts_data():
-    """Load all accounts and deals from ACCOUNTS folder"""
     accounts = []
-    deals = []
-    contacts = []
-
     if not ACCOUNTS_ROOT.exists():
-        return {"accounts": [], "deals": [], "contacts": []}
+        return {"accounts": [], "pipeline_summary": {}, "skill_registry": SKILL_FILES, "queue": _queue_status()}
 
-    # Scan all account folders
-    for account_folder in ACCOUNTS_ROOT.iterdir():
-        if not account_folder.is_dir() or account_folder.name.startswith('.'):
+    for af in sorted(ACCOUNTS_ROOT.iterdir()):
+        if not af.is_dir() or af.name.startswith('.'):
             continue
+        d = load_account(af, af.name)
+        if d:
+            accounts.append(d)
+            for sf in sorted(af.iterdir()):
+                if sf.is_dir() and not sf.name.startswith('.'):
+                    sd = load_account(sf, f"{af.name}/{sf.name}", parent=af.name)
+                    if sd:
+                        accounts.append(sd)
 
-        account_name = account_folder.name
-        account_data = load_account(account_folder, account_name)
+    open_accts = [a for a in accounts if a['stage'].lower() not in ('closed won', 'closed lost')]
+    won_accts  = [a for a in accounts if a['stage'].lower() == 'closed won']
+    lost_accts = [a for a in accounts if a['stage'].lower() == 'closed lost']
 
-        if account_data:
-            accounts.append(account_data)
+    tp = sum(a['deal_size'] for a in open_accts)
+    tw = sum(a['deal_size'] * a['probability'] for a in open_accts)
+    am = round(sum(a['meddpicc']['percentage'] for a in accounts) / len(accounts)) if accounts else 0
+    hr = sum(1 for a in accounts for r in a['risks'] if r['level'] == 'high')
 
-            # Load sub-accounts (like Tata/TataSky)
-            for sub_folder in account_folder.iterdir():
-                if sub_folder.is_dir() and not sub_folder.name.startswith('.'):
-                    sub_account_name = f"{account_name}/{sub_folder.name}"
-                    sub_data = load_account(sub_folder, sub_account_name, parent=account_name)
-                    if sub_data:
-                        accounts.append(sub_data)
+    stages = {}
+    for a in accounts:
+        s = a['stage']
+        if s not in stages:
+            stages[s] = {'count': 0, 'value': 0}
+        stages[s]['count'] += 1
+        stages[s]['value'] += a['deal_size']
+
+    total_closed = len(won_accts) + len(lost_accts)
 
     return {
         "accounts": accounts,
-        "deals": deals,
-        "contacts": contacts
+        "pipeline_summary": {
+            'total_accounts': len(accounts),
+            'open_accounts': len(open_accts),
+            'total_pipeline': tp,
+            'total_weighted': tw,
+            'avg_meddpicc': am,
+            'high_risks': hr,
+            'total_skills_generated': sum(a['skills_generated'] for a in accounts),
+            'stages': stages,
+            'won_count': len(won_accts),
+            'lost_count': len(lost_accts),
+            'total_won': sum(a['deal_size'] for a in won_accts),
+            'total_lost': sum(a['deal_size'] for a in lost_accts),
+            'win_rate': round(len(won_accts) / total_closed * 100) if total_closed else 0,
+            'avg_deal_size': round(tp / len(open_accts)) if open_accts else 0,
+            'pipeline_coverage': round(tp / tw, 1) if tw > 0 else 0,
+        },
+        "skill_registry": {k: {"label": v["label"], "icon": v["icon"], "cmd": v["cmd"]} for k, v in SKILL_FILES.items()},
+        "queue": _queue_status(),
     }
 
 
-def load_account(folder_path, account_name, parent=None):
-    """Load a single account's data"""
-    deal_stage_file = folder_path / "deal_stage.json"
-    company_research_file = folder_path / "company_research.md"
+# ── HTTP Handler ──────────────────────────────────────────────────────────────
 
-    if not deal_stage_file.exists():
-        return None
+class CRMHandler(BaseHTTPRequestHandler):
 
-    # Read deal_stage.json
-    try:
-        with open(deal_stage_file, 'r') as f:
-            deal_data = json.load(f)
-    except:
-        return None
+    def do_GET(self):
+        if self.path == "/api/accounts":
+            self._json(load_accounts_data())
+        elif self.path == "/api/queue":
+            self._json(_queue_status())
+        elif self.path in ("/", ""):
+            self._serve_file(_here / "crm.html", "text/html")
+        else:
+            fpath = _here / self.path.lstrip("/")
+            if fpath.exists() and fpath.is_file():
+                mime = "text/css" if self.path.endswith(".css") else \
+                       "application/javascript" if self.path.endswith(".js") else \
+                       "text/html"
+                self._serve_file(fpath, mime)
+            else:
+                self.send_error(404)
 
-    # Read company_research.md if exists
-    company_info = ""
-    if company_research_file.exists():
+    def do_POST(self):
+        if self.path == "/api/generate":
+            length = int(self.headers.get("Content-Length", 0))
+            body = json.loads(self.rfile.read(length) or b"{}")
+            account = body.get("account", "")
+            skill = body.get("skill", "")
+            if account and skill:
+                job_id = _add_to_queue(account, skill)
+                self._json({"queued": True, "job_id": job_id})
+            elif account and not skill:
+                # Queue all missing skills for this account
+                folder = ACCOUNTS_ROOT / account.replace("/", os.sep)
+                count = 0
+                for sk, si in SKILL_FILES.items():
+                    if not (folder / si["file"]).exists():
+                        _add_to_queue(account, sk)
+                        count += 1
+                self._json({"queued": True, "count": count})
+            else:
+                self._json({"error": "account required"}, 400)
+        elif self.path == "/api/generate/all":
+            count = 0
+            if _queue:
+                count = _queue.scan_missing_skills(ACCOUNTS_ROOT, SKILL_FILES)
+            self._json({"queued": True, "count": count})
+        else:
+            self.send_error(404)
+
+    def do_OPTIONS(self):
+        self.send_response(200)
+        self._cors()
+        self.end_headers()
+
+    def _json(self, data, code=200):
+        body = json.dumps(data, ensure_ascii=True).encode()
+        self.send_response(code)
+        self.send_header("Content-type", "application/json")
+        self._cors()
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _serve_file(self, path, mime):
         try:
-            with open(company_research_file, 'r') as f:
-                company_info = f.read()
-        except:
-            pass
+            content = path.read_bytes()
+            self.send_response(200)
+            self.send_header("Content-type", mime)
+            self._cors()
+            self.end_headers()
+            self.wfile.write(content)
+        except Exception:
+            self.send_error(500)
 
-    # Extract account info from deal_stage.json
-    account_obj = {
-        "id": account_name.lower().replace("/", "_").replace(" ", "_"),
-        "name": deal_data.get("account_name", account_name),
-        "path": str(folder_path),
-        "parent": parent,
-        "stage": deal_data.get("stage", "Unknown"),
-        "probability": deal_data.get("probability", 0),
-        "deal_size": deal_data.get("deal_size", 0),
-        "timeline": deal_data.get("timeline", "TBD"),
-        "stakeholders": deal_data.get("stakeholders", []),
-        "competitive_situation": deal_data.get("competitive_situation", {}),
-        "company_info": company_info[:500] if company_info else "No company information",
-        "activities": deal_data.get("activities", []),
-        "last_updated": deal_data.get("last_updated", "Unknown")
-    }
+    def _cors(self):
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
 
-    return account_obj
+    def log_message(self, fmt, *args):
+        pass  # suppress access logs
 
 
-def start_server(port=8000):
-    """Start the CRM server"""
-    server_address = ('', port)
-    httpd = HTTPServer(server_address, CRMHandler)
+# ── Entry point ───────────────────────────────────────────────────────────────
 
-    print(f"")
-    print(f"╔════════════════════════════════════════════════╗")
-    print(f"║     🤖 JARVIS CRM Dashboard Server Started     ║")
-    print(f"╚════════════════════════════════════════════════╝")
-    print(f"")
-    print(f"📊 Dashboard: http://localhost:{port}")
-    print(f"📁 ACCOUNTS:  {ACCOUNTS_ROOT}")
-    print(f"")
-    print(f"Press Ctrl+C to stop the server")
-    print(f"")
+def start_server(port=None):
+    port = port or int(os.getenv("CRM_PORT", "8000"))
 
-    # Open browser automatically
-    time.sleep(1)
-    webbrowser.open(f'http://localhost:{port}')
+    # Initialize queue
+    _init_queue()
+
+    # Start background worker
+    t = threading.Thread(target=_queue_worker, daemon=True)
+    t.start()
+
+    httpd = HTTPServer(("", port), CRMHandler)
+    log.info(f"CRM Dashboard → http://localhost:{port}")
+    log.info(f"ACCOUNTS: {ACCOUNTS_ROOT}")
+    log.info(f"Skills tracked: {len(SKILL_FILES)}")
 
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
-        print("\n\n✅ Server stopped")
+        log.info("Stopped.")
         httpd.server_close()
 
 
 if __name__ == "__main__":
-    start_server(8000)
+    start_server()

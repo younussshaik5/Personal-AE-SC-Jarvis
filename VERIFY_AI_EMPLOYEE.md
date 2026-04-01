@@ -5,7 +5,7 @@ When you return, run this to verify everything is working:
 ## Quick Verification (2 minutes)
 
 ```bash
-cd "/Users/syounus/Documents/claude space/Personal-AE-SC-Jarvis"
+cd "/path/to/Personal-AE-SC-Jarvis"
 python3 test_multi_agent.py
 ```
 

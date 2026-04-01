@@ -254,7 +254,7 @@ class VectorizerAgent:
 Run this to verify model assignments are loaded:
 
 ```bash
-cd "/Users/syounus/Documents/claude space/Personal-AE-SC-Jarvis"
+cd "/path/to/Personal-AE-SC-Jarvis"
 python3 -c "from jarvis_mcp.config.model_config import *; print(get_all_models()); print('\\n✅ Models loaded successfully')"
 ```
 

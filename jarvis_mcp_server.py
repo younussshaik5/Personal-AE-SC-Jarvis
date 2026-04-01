@@ -5,6 +5,7 @@ Runs automatically with Claude Desktop via stdio.
 """
 
 import sys
+import os
 import asyncio
 import logging
 from pathlib import Path
@@ -12,6 +13,30 @@ from pathlib import Path
 # Add project root so jarvis_mcp imports work
 PROJECT_ROOT = Path(__file__).parent
 sys.path.insert(0, str(PROJECT_ROOT))
+
+# Load .env so NVIDIA_API_KEY works without shell env vars
+def _load_dotenv():
+    env_file = PROJECT_ROOT / ".env"
+    if not env_file.exists():
+        return
+    try:
+        from dotenv import load_dotenv
+        load_dotenv(env_file, override=False)
+        return
+    except ImportError:
+        pass
+    # Fallback: manual parser
+    for line in env_file.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        k, _, v = line.partition("=")
+        k = k.strip()
+        v = v.strip().strip('"').strip("'")
+        if k and k not in os.environ:
+            os.environ[k] = v
+
+_load_dotenv()
 
 import mcp.types as types
 from mcp.server import Server
@@ -287,6 +312,26 @@ async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
+async def _process_startup_queue():
+    """On startup: detect file changes + process any queued jobs from when Claude was closed."""
+    try:
+        from jarvis_mcp.queue_manager import QueueManager
+        if _jarvis is None:
+            return
+        q = QueueManager()
+        q.scan_changed_files(_jarvis.config.accounts_root)
+        q.scan_missing_skills(_jarvis.config.accounts_root,
+                               {k: {"file": f"{k}.md"} for k in q.__class__.__module__ and []})
+        pending = len(q.get_pending())
+        if pending:
+            log.info(f"Queue: {pending} jobs pending — processing in background…")
+            asyncio.create_task(q.process_all(_jarvis.llm, _jarvis.config))
+        else:
+            log.info("Queue: nothing pending")
+    except Exception as e:
+        log.warning(f"Queue startup scan skipped: {e}")
+
+
 async def main():
     log.info("JARVIS MCP server ready — waiting for Claude Desktop…")
     async with stdio_server() as (read_stream, write_stream):

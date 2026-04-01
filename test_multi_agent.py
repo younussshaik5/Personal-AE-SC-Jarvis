@@ -5,7 +5,7 @@ import tempfile
 from pathlib import Path
 import sys
 
-sys.path.insert(0, '/Users/syounus/Documents/claude space/Personal-AE-SC-Jarvis')
+sys.path.insert(0, str(Path(__file__).parent))
 
 async def main():
     print("\n✅ Testing Multi-Agent System...\n")

@@ -61,7 +61,7 @@ Process exits cleanly
     "jarvis": {
       "command": "python3",
       "args": [
-        "/Users/syounus/Documents/claude space/Personal-AE-SC-Jarvis/jarvis_mcp_launcher.py"
+        "/path/to/Personal-AE-SC-Jarvis/jarvis_mcp_launcher.py"
       ],
       "disabled": false,
       "autostart": true,

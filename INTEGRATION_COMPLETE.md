@@ -179,7 +179,7 @@ But the core system is **production ready now**.
 ## Verification Command
 
 ```bash
-cd "/Users/syounus/Documents/claude space/Personal-AE-SC-Jarvis"
+cd "/path/to/Personal-AE-SC-Jarvis"
 python3 test_enricher.py
 ```
 

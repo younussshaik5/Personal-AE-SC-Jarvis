@@ -233,7 +233,7 @@ test_full_autonomy.py            ← Proves files are actually modified
 
 ```bash
 # Run the full autonomy test
-python3 "/Users/syounus/Documents/claude space/Personal-AE-SC-Jarvis/test_full_autonomy.py"
+python3 "/path/to/Personal-AE-SC-Jarvis/test_full_autonomy.py"
 
 # You'll see:
 # ✅ Files detected

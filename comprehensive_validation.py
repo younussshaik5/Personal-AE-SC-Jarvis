@@ -371,7 +371,7 @@ except Exception as e:
 
 # Test 25: Dashboard HTML
 try:
-    dashboard_path = Path("/Users/syounus/Documents/claude space/Personal-AE-SC-Jarvis/JARVIS_REALTIME_DASHBOARD.html")
+    dashboard_path = Path(__file__).parent / "JARVIS_REALTIME_DASHBOARD.html"
 
     assert dashboard_path.exists()
     assert dashboard_path.stat().st_size > 10000  # At least 10KB

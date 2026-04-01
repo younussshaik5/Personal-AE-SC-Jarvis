@@ -3,6 +3,7 @@ ClaudeMdLoader - Parses CLAUDE.md files for configuration and cascade rules.
 Supports hierarchical parsing (account-level → global level).
 """
 
+import os
 import re
 from pathlib import Path
 from typing import Dict, List, Any, Optional, Tuple
@@ -54,8 +55,9 @@ class ClaudeMdLoader:
         
     def load_global_config(self) -> Dict[str, Any]:
         """Load global CLAUDE.md configuration"""
-        # Try to find global CLAUDE.md at project root
-        global_path = Path.home() / "Documents" / "claude space" / "CLAUDE.md"
+        # Project root CLAUDE.md (works for any clone location)
+        project_root = Path(__file__).parent.parent
+        global_path = Path(os.getenv("JARVIS_CLAUDE_MD", str(project_root / "CLAUDE.md")))
         
         if global_path.exists():
             return self._parse_claude_md(global_path)

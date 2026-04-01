@@ -8,7 +8,7 @@ import tempfile
 import sys
 
 # Add to path
-sys.path.insert(0, '/Users/syounus/Documents/claude space/Personal-AE-SC-Jarvis')
+sys.path.insert(0, str(Path(__file__).parent))
 
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
 logger = logging.getLogger(__name__)
