@@ -106,10 +106,29 @@ except Exception as e:
 " || exit 1
 
 # =============================================================================
-# STEP 5: Create ACCOUNTS folder
+# STEP 5: Setup .env configuration
 # =============================================================================
 echo ""
-echo "5️⃣  Setting up ACCOUNTS folder..."
+echo "5️⃣  Setting up .env configuration..."
+
+if [ ! -f "$PROJECT_DIR/.env" ]; then
+    if [ -f "$PROJECT_DIR/.env.example" ]; then
+        cp "$PROJECT_DIR/.env.example" "$PROJECT_DIR/.env"
+        echo "   ✅ Created .env from .env.example"
+        echo "   ℹ️  Edit .env and add your NVIDIA API key (or use existing key)"
+        echo "      Location: $PROJECT_DIR/.env"
+    else
+        echo "   ⚠️  .env.example not found, skipping .env creation"
+    fi
+else
+    echo "   ✅ .env already exists (skipping)"
+fi
+
+# =============================================================================
+# STEP 6: Create ACCOUNTS folder
+# =============================================================================
+echo ""
+echo "6️⃣  Setting up ACCOUNTS folder..."
 
 # Check if user has custom ACCOUNTS location
 if [ -d "$HOME/ACCOUNTS" ]; then
@@ -124,10 +143,10 @@ mkdir -p "$ACCOUNTS_DIR"
 echo "   ✅ ACCOUNTS: $ACCOUNTS_DIR"
 
 # =============================================================================
-# STEP 6: Register in Claude Desktop
+# STEP 7: Register in Claude Desktop
 # =============================================================================
 echo ""
-echo "6️⃣  Registering with Claude Desktop..."
+echo "7️⃣  Registering with Claude Desktop..."
 
 mkdir -p "$(dirname "$CLAUDE_CONFIG")"
 
@@ -180,10 +199,10 @@ print(f"      Accounts: {accounts_path}")
 PYEOF
 
 # =============================================================================
-# STEP 7: Final smoke test
+# STEP 8: Final smoke test
 # =============================================================================
 echo ""
-echo "7️⃣  Running final smoke test..."
+echo "8️⃣  Running final smoke test..."
 
 "$PYTHON" << 'SMOKENTEST'
 import sys
