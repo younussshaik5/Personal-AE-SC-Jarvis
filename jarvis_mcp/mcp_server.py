@@ -1,316 +1,400 @@
-"""JARVIS MCP Server - Main entry point with zero-manual-creation features"""
+"""
+JARVIS MCP Server - Production-ready Model Context Protocol server.
+Registers all 24 sales intelligence skills + onboarding wizard as MCP tools.
+Integrates auto-scaffolding, context detection, and autonomous learning.
+"""
 
-import json
-import logging
 import asyncio
-import sys
+import logging
+import json
+from typing import Any, Optional
 from pathlib import Path
-from typing import Dict, Any, Optional
 
-from .account_hierarchy import AccountHierarchy
-from .context_detector import ContextDetector
-from .claude_md_loader import ClaudeMdLoader
-from .claude_md_evolve import ClaudeMdEvolution
-from .scaffolder import AccountScaffolder
 from .config.config_manager import ConfigManager
 from .llm.llm_manager import LLMManager
-from .utils.logger import setup_logger
 from .skills import SKILL_REGISTRY
+from .safety.guard import SafetyGuard
+from .utils.logger import setup_logger
+from .agents import AgentOrchestrator
+from .context_detector import ContextDetector
+from .account_scaffolder import AccountScaffolder
+from .skill_context_enricher import SkillContextEnricher
+from .account_hierarchy import AccountHierarchy
+from .claude_md_loader import ClaudeMdLoader
 
+
+# Setup logging
 logger = setup_logger("jarvis_mcp")
 
 
 class JarvisServer:
-    """JARVIS MCP Server - AI Sales Intelligence Platform"""
+    """JARVIS MCP Server - Main entry point with multi-agent orchestration"""
 
-    def __init__(self, config: Optional[ConfigManager] = None):
-        """Initialize JARVIS server with all infrastructure"""
-        self.config = config or ConfigManager()
+    def __init__(self):
+        """Initialize JARVIS server with orchestrator"""
+        self.config = ConfigManager()
         self.llm = LLMManager(self.config)
-
-        # New zero-manual-creation infrastructure
-        self.accounts_root = self.config.get_accounts_root()
-        self.account_hierarchy = AccountHierarchy(self.accounts_root)
-        self.context_detector = ContextDetector(self.accounts_root)
-        self.claude_md_loader = ClaudeMdLoader(self.accounts_root)
-        self.scaffolder = AccountScaffolder(self.accounts_root)
-
-        # Initialize skills
-        self.skills: Dict[str, Any] = {}
+        self.guard = SafetyGuard()
+        self.logger = logger
+        
+        # Initialize context management
+        self.context_detector = ContextDetector()
+        self.account_hierarchy = AccountHierarchy()
+        self.account_scaffolder = AccountScaffolder()
+        self.claude_loader = ClaudeMdLoader()
+        
+        # Initialize skill instances
+        self.skills = {}
         self._initialize_skills()
 
-        logger.info("JARVIS Server initialized with zero-manual-creation features")
+        # Initialize orchestrator for current account
+        self.orchestrator = None
+        self._initialize_orchestrator()
+
+        # Agent background tasks
+        self.agent_task = None
+        self.orchestration_running = False
 
     def _initialize_skills(self):
-        """Initialize all 24 skills"""
+        """Initialize all skill instances"""
+        self.logger.info("Initializing JARVIS skills...")
         for skill_name, skill_class in SKILL_REGISTRY.items():
             try:
                 self.skills[skill_name] = skill_class(self.llm, self.config)
-                logger.info(f"Loaded skill: {skill_name}")
+                self.logger.info(f"✓ Initialized: {skill_name}")
             except Exception as e:
-                logger.error(f"Failed to load skill {skill_name}: {e}")
+                self.logger.error(f"✗ Failed to initialize {skill_name}: {e}")
 
-    async def handle_tool_call(
-        self,
-        tool_name: str,
-        account: Optional[str] = None,
-        **kwargs
-    ) -> str:
-        """
-        Handle tool call with automatic context detection.
+        self.logger.info(f"✅ Initialized {len(self.skills)} skills")
 
-        Args:
-            tool_name: Name of the skill to call
-            account: Optional explicit account name
-            **kwargs: Skill-specific arguments
-
-        Returns:
-            Skill output
-        """
-        # Step 1: Detect or resolve account
-        resolved_account = self._resolve_account(account)
-
-        if not resolved_account and tool_name != "scaffold_account":
-            return "Error: Could not determine account. Provide account name or open account folder in cowork."
-
-        # Step 2: Get account path with hierarchy support
-        if resolved_account:
-            account_path = self.account_hierarchy.find_account(resolved_account)
-        else:
-            account_path = None
-
-        if not account_path and tool_name != "scaffold_account":
-            # Check if this is a new account - offer to scaffold
-            if tool_name == "scaffold_account":
-                return await self._handle_scaffold_account(
-                    resolved_account, **kwargs
-                )
-            return f"Account not found: {resolved_account}"
-
-        # Step 3: Load context
-        context = {}
-        if account_path:
-            context = self.account_hierarchy.get_account_context(account_path)
-
-        # Step 4: Call skill
+    def _initialize_orchestrator(self):
+        """Initialize multi-agent orchestrator for current account"""
         try:
-            if tool_name == "scaffold_account":
-                return await self._handle_scaffold_account(
-                    resolved_account, **kwargs
-                )
-
-            if tool_name in self.skills:
-                skill = self.skills[tool_name]
-                result = await skill.generate(resolved_account, **kwargs)
-
-                # Track interaction
-                if account_path:
-                    await self._track_interaction(
-                        account_path, tool_name, result, **kwargs
-                    )
-
-                return result
+            account_path = self.context_detector.get_current_account_path()
+            if account_path:
+                self.orchestrator = AgentOrchestrator(account_path)
+                self.logger.info(f"✅ Orchestrator initialized for {account_path}")
             else:
-                return f"Skill not found: {tool_name}"
-
+                self.logger.warning("No account context detected - orchestrator disabled")
         except Exception as e:
-            logger.error(f"Error calling skill {tool_name}: {e}")
-            return f"Error: {str(e)}"
+            self.logger.error(f"Failed to initialize orchestrator: {e}")
 
-    def _resolve_account(self, explicit_account: Optional[str]) -> Optional[str]:
-        """Resolve account from explicit parameter or context"""
-        if explicit_account:
-            return explicit_account
-
-        # Try to detect from context
-        context = self.context_detector.detect_account_context()
-        if context:
-            return context.get("account_name")
-
-        return None
-
-    async def _handle_scaffold_account(
-        self,
-        account_name: str,
-        parent_account: Optional[str] = None,
-        **kwargs
-    ) -> str:
-        """Handle account scaffolding"""
-        try:
-            # Determine parent path if specified
-            parent_path = None
-            if parent_account:
-                parent_path = self.account_hierarchy.find_account(parent_account)
-                if not parent_path:
-                    return f"Parent account not found: {parent_account}"
-
-            # Scaffold the account
-            account_path = self.scaffolder.scaffold_account(
-                account_name,
-                parent_path=parent_path,
-                metadata=kwargs
-            )
-
-            result = (
-                f"Account created: {account_name}\n"
-                f"Path: {account_path}\n"
-                f"Files created:\n"
-                f"- company_research.md\n"
-                f"- discovery.md\n"
-                f"- deal_stage.json\n"
-                f"- CLAUDE.md\n"
-            )
-
-            if parent_path:
-                result += f"\nSub-account under: {parent_path.name}\n"
-
+    async def auto_scaffold_account_if_needed(self, account_name: str, company_info: Optional[dict] = None) -> dict:
+        """
+        Auto-scaffold a new account if it doesn't exist.
+        
+        Returns:
+            Dict with scaffold result or existing account info
+        """
+        account_path = self.account_hierarchy.get_account_path(account_name)
+        
+        if account_path:
+            self.logger.info(f"Account already exists: {account_name}")
+            return {'status': 'exists', 'path': str(account_path)}
+        else:
+            self.logger.info(f"Creating new account: {account_name}")
+            result = self.account_scaffolder.scaffold_account(account_name, company_info)
+            
+            # Invalidate hierarchy cache
+            self.account_hierarchy._cache_valid = False
+            
+            # Load CLAUDE.md for new account
+            new_account_path = self.account_hierarchy.get_account_path(account_name)
+            if new_account_path:
+                self.claude_loader.load_config(str(new_account_path), force_reload=True)
+                
             return result
 
-        except Exception as e:
-            return f"Error creating account: {str(e)}"
+    async def start_background_orchestration(self):
+        """Start background orchestration with full autonomy and evolution."""
+        if not self.orchestrator:
+            return
 
-    async def _track_interaction(
-        self,
-        account_path: Path,
-        skill_name: str,
-        result: str,
-        **kwargs
-    ):
-        """Track interaction for CLAUDE.md evolution"""
+        self.orchestration_running = True
+        self.logger.info("🤖 Starting autonomous AI employee system...")
+
         try:
-            evolve = ClaudeMdEvolution(account_path)
+            await self.orchestrator.start()
 
-            # Estimate quality (0-5 scale)
-            # In real implementation, this would come from user feedback
-            quality = 4.5  # Default
+            while self.orchestration_running:
+                # Run full cycle: file learning + document vectorization + evolution + outcome tracking
+                cycle_result = await self.orchestrator.run_full_cycle()
+                self.logger.debug(f"Orchestration cycle {cycle_result['cycle']} complete")
 
-            # Check if user requested ROI (for learning)
-            feedback = ""
-            if "roi" in str(result).lower():
-                feedback = "roi_included"
-
-            evolve.record_interaction(
-                skill=skill_name,
-                model_type="text",
-                quality=quality,
-                feedback=feedback
-            )
-
-            # Analyze for suggestions
-            suggestions = evolve.analyze_patterns()
-            if suggestions:
-                logger.info(f"JARVIS learned {len(suggestions)} improvement(s) for {account_path.name}")
-
+                # Run every 30 seconds
+                await asyncio.sleep(30)
+        except asyncio.CancelledError:
+            self.logger.info("Autonomous system stopped")
         except Exception as e:
-            logger.warning(f"Could not track interaction: {e}")
+            self.logger.error(f"Autonomous system error: {e}")
 
-    def list_accounts(self) -> Dict[str, str]:
-        """List all accounts with their paths"""
-        accounts = {}
-        for name, path in self.account_hierarchy.list_all_accounts():
-            accounts[name] = str(path)
-        return accounts
+    def _get_tool_list(self) -> list:
+        """Get list of available tools"""
+        return [
+            # Onboarding
+            "onboarding_start",
+            "onboarding_next",
+            
+            # Account Management
+            "scaffold_account",
+            
+            # Sales Skills
+            "get_proposal",
+            "get_battlecard",
+            "get_demo_strategy",
+            "get_risk_report",
+            "get_value_architecture",
+            "get_discovery",
+            "get_competitive_intelligence",
+            "get_meeting_prep",
+            "process_meeting",
+            "summarize_conversation",
+            "track_meddpicc",
+            "generate_sow",
+            "generate_followup",
+            "get_account_summary",
+            "assess_technical_risk",
+            "analyze_competitor_pricing",
+            "update_deal_stage",
+            "generate_architecture",
+            "generate_documentation",
+            "generate_html_report",
+            "extract_intelligence",
+            "build_knowledge_graph",
+            "quick_insights",
+            "generate_custom_template",
+        ]
 
-    def get_account_info(self, account_name: str) -> Optional[Dict[str, Any]]:
-        """Get detailed account information"""
-        account_path = self.account_hierarchy.find_account(account_name)
-        if not account_path:
-            return None
+    async def handle_tool_call(self, tool_name: str, arguments: dict) -> dict:
+        """Handle tool call with FULL autonomous evolution and learning."""
+        # Auto-detect account from context if not provided
+        account = arguments.get("account")
+        if not account:
+            context = self.context_detector.detect_context()
+            if context:
+                account = context.get('name')
+                arguments['account'] = account
+                self.logger.info(f"Auto-detected account: {account}")
 
-        return {
-            "account_name": account_name,
-            "path": str(account_path),
-            "is_sub_account": account_path.parent != self.accounts_root,
-            "sub_accounts": [
-                p.name
-                for p in self.account_hierarchy.get_sub_accounts(account_path)
-            ],
-            "context": self.account_hierarchy.get_account_context(account_path),
-            "claude_settings": self.claude_md_loader.load_for_account(account_path),
+        # Safety check
+        if not self.guard.check_safety(tool_name, account):
+            return {"error": "Safety check failed"}
+
+        # Handle onboarding tools
+        if tool_name.startswith("onboarding_"):
+            return await self.handle_onboarding_tool(tool_name, arguments)
+
+        # Handle account scaffolding tool
+        if tool_name == "scaffold_account":
+            return await self.handle_scaffold_account(arguments)
+
+        # Map tool names to skills
+        tool_to_skill = {
+            "get_proposal": "proposal",
+            "get_battlecard": "battlecard",
+            "get_demo_strategy": "demo_strategy",
+            "get_risk_report": "risk_report",
+            "get_value_architecture": "value_architecture",
+            "get_discovery": "discovery",
+            "get_competitive_intelligence": "competitive_intelligence",
+            "get_meeting_prep": "meeting_prep",
+            "process_meeting": "meeting_summary",
+            "summarize_conversation": "conversation_summarizer",
+            "track_meddpicc": "meddpicc",
+            "generate_sow": "sow",
+            "generate_followup": "followup_email",
+            "get_account_summary": "account_summary",
+            "assess_technical_risk": "technical_risk",
+            "analyze_competitor_pricing": "competitor_pricing",
+            "update_deal_stage": "deal_stage_tracker",
+            "generate_architecture": "architecture_diagram",
+            "generate_documentation": "documentation",
+            "generate_html_report": "html_generator",
+            "extract_intelligence": "conversation_extractor",
+            "build_knowledge_graph": "knowledge_builder",
+            "quick_insights": "quick_insights",
+            "generate_custom_template": "custom_template",
         }
 
-    def get_server_status(self) -> Dict[str, Any]:
-        """Get server status and statistics"""
-        accounts = self.account_hierarchy.list_all_accounts()
+        skill_name = tool_to_skill.get(tool_name)
+        if not skill_name or skill_name not in self.skills:
+            return {"error": f"Unknown tool: {tool_name}"}
 
-        return {
-            "status": "running",
-            "version": "2.0.0",
-            "features": [
-                "zero_manual_creation",
-                "account_hierarchy",
-                "context_detection",
-                "claude_md_evolution",
-                "25_skills"
-            ],
-            "total_accounts": len(accounts),
-            "accounts_root": str(self.accounts_root),
-            "skills_available": len(self.skills),
-            "infrastructure": {
-                "account_hierarchy": True,
-                "context_detector": True,
-                "claude_md_loader": True,
-                "claude_md_evolve": True,
-                "scaffolder": True,
+        try:
+            skill = self.skills[skill_name]
+
+            # Enrich context with learned knowledge
+            if self.orchestrator:
+                enriched_context = await self.orchestrator.enrich_skill_context(skill_name, f"{tool_name} for {account}")
+                self.logger.debug(f"✓ Context enriched for {skill_name}")
+
+            # Execute skill
+            result = await skill.generate(account, **arguments)
+
+            # CRITICAL: Record this outcome for learning
+            if self.orchestrator:
+                await self.orchestrator.record_skill_outcome(
+                    skill_name,
+                    arguments.get("opportunity_id", "unknown"),
+                    {
+                        "status": "executed",
+                        "quality_score": 4.5,  # Would be from user feedback
+                        "impact": "high"
+                    }
+                )
+                self.logger.debug(f"✓ Outcome recorded for {skill_name}")
+
+            return {"result": result}
+        except Exception as e:
+            self.logger.error(f"Error in {tool_name}: {e}")
+            return {"error": str(e)}
+
+    async def handle_onboarding_tool(self, tool_name: str, arguments: dict) -> dict:
+        """Handle onboarding flow"""
+        try:
+            onboarding_skill = self.skills.get('onboarding')
+            if not onboarding_skill:
+                return {"error": "Onboarding skill not initialized"}
+            
+            if tool_name == "onboarding_start":
+                # Start onboarding
+                result = await onboarding_skill.generate(action='start')
+                return {"result": result}
+            
+            elif tool_name == "onboarding_next":
+                # Process response and advance
+                response = arguments.get('response', '')
+                result = await onboarding_skill.generate(action='next', response=response)
+                return {"result": result}
+            
+            return {"error": f"Unknown onboarding action: {tool_name}"}
+        
+        except Exception as e:
+            self.logger.error(f"Onboarding error: {e}")
+            return {"error": str(e)}
+
+    async def handle_scaffold_account(self, arguments: dict) -> dict:
+        """Handle account scaffolding request"""
+        account_name = arguments.get("account_name")
+        if not account_name:
+            return {"error": "account_name required"}
+        
+        company_info = arguments.get("company_info")
+        parent_account = arguments.get("parent_account")
+        
+        try:
+            if parent_account:
+                # Create sub-account
+                parent_path = self.account_hierarchy.get_account_path(parent_account)
+                if not parent_path:
+                    return {"error": f"Parent account '{parent_account}' not found"}
+                result = self.account_scaffolder.scaffold_account(
+                    account_name,
+                    company_info,
+                    parent_account
+                )
+            else:
+                # Create top-level account
+                result = self.account_scaffolder.scaffold_account(account_name, company_info)
+            
+            # Invalidate cache and reload config
+            self.account_hierarchy._cache_valid = False
+            new_path = self.account_hierarchy.get_account_path(account_name)
+            if new_path:
+                self.claude_loader.load_config(str(new_path), force_reload=True)
+            
+            return {
+                "result": self.account_scaffolder.format_scaffold_result(result),
+                "metadata": result
             }
+        except Exception as e:
+            self.logger.error(f"Failed to scaffold account: {e}")
+            return {"error": str(e)}
+
+    async def log_conversation(self, user_message: str, assistant_response: str, skill_used: str = None):
+        """Log chat for learning - called by Claude after each interaction."""
+        if self.orchestrator:
+            await self.orchestrator.analyze_user_chat(user_message, assistant_response, skill_used)
+            self.logger.debug("✓ Conversation logged for learning")
+
+    async def process_cowork_file(self, file_path: str, file_name: str):
+        """Process file from cowork upload - called when user drops file in chat."""
+        if self.orchestrator:
+            result = await self.orchestrator.process_cowork_upload(file_path, file_name)
+            self.logger.info(f"✓ Cowork file processed: {result['action_taken']}")
+            return result
+
+    async def get_system_status(self) -> dict:
+        """Get comprehensive system status"""
+        context = self.context_detector.detect_context()
+        
+        status = {
+            "server_name": "JARVIS MCP",
+            "status": "running",
+            "skills_initialized": len(self.skills),
+            "skills_available": self._get_tool_list(),
+            "orchestrator_enabled": self.orchestrator is not None,
+            "background_orchestration": self.orchestration_running,
+            "context": {
+                "auto_detected": context is not None,
+                "account": context.get('name') if context else None,
+                "path": context.get('path') if context else None
+            },
+            "accounts_available": len(self.account_hierarchy.list_accounts())
         }
 
+        if self.orchestrator:
+            status["agent_status"] = await self.orchestrator.get_system_status()
 
-# ============================================================================
-# Standalone Server Mode (for testing/verification)
-# ============================================================================
+        return status
 
-def print_banner():
-    """Print JARVIS banner"""
-    banner = """
-╔═══════════════════════════════════════════════════════════╗
-║          JARVIS v2.0 - MCP Server                         ║
-║   AI Sales Intelligence Platform                         ║
-╚═══════════════════════════════════════════════════════════╝
+    async def run_standalone(self):
+        """Run server in standalone mode for verification"""
+        self.logger.info("🚀 Starting JARVIS MCP Server (Standalone Mode)...")
+        self.logger.info(f"✅ Initialized {len(self.skills)} skills")
+        self.logger.info(f"✅ Available tools: {', '.join(self._get_tool_list())}")
 
-✓ Server initialized
-✓ 25+ skills loaded
-✓ Ready for Claude Desktop
+        if self.orchestrator:
+            self.logger.info("✅ Multi-agent orchestrator initialized")
+            status = await self.get_system_status()
+            self.logger.info(f"System Status: {json.dumps(status, indent=2)}")
 
-To use with Claude Desktop:
-1. Add to ~/.claude/config.json (see README.md)
-2. Restart Claude Desktop
-3. MCP server will start automatically
-"""
-    print(banner)
+            # Start background orchestration
+            self.agent_task = asyncio.create_task(self.start_background_orchestration())
+            self.logger.info("✅ Background agent orchestration started")
+
+            try:
+                # Run for 60 seconds in standalone mode
+                await asyncio.sleep(60)
+            except KeyboardInterrupt:
+                pass
+            finally:
+                self.orchestration_running = False
+                if self.agent_task:
+                    self.agent_task.cancel()
+        else:
+            self.logger.warning("⚠️  Multi-agent orchestrator not initialized")
+
+    async def shutdown(self):
+        """Graceful shutdown"""
+        self.logger.info("🛑 Shutting down JARVIS MCP Server...")
+        self.orchestration_running = False
+
+        if self.agent_task:
+            self.agent_task.cancel()
+            try:
+                await self.agent_task
+            except asyncio.CancelledError:
+                pass
+
+        self.logger.info("✅ Shutdown complete")
 
 
-async def run_standalone():
-    """Run server in standalone mode (for verification)"""
-    print_banner()
-    
+async def main():
+    """Main entry point for standalone testing"""
     server = JarvisServer()
-    status = server.get_server_status()
-    
-    print(f"\nServer Status:")
-    print(f"  Status: {status['status']}")
-    print(f"  Skills: {status['skills_available']}")
-    print(f"  Accounts: {status['total_accounts']}")
-    print(f"  Version: {status['version']}")
-    
-    print(f"\nAvailable Skills ({len(server.skills)}):")
-    for i, skill_name in enumerate(sorted(server.skills.keys()), 1):
-        print(f"  {i:2d}. {skill_name}")
-    
-    print("\n✓ Server ready to accept connections from Claude Desktop")
+    await server.run_standalone()
 
 
 if __name__ == "__main__":
-    # When run as: python3 mcp_server.py
-    # This can be used for testing/verification
-    # For production, Claude Desktop manages the server lifecycle
-    
-    try:
-        asyncio.run(run_standalone())
-    except KeyboardInterrupt:
-        print("\n\nShutdown requested")
-    except Exception as e:
-        print(f"\n✗ Error: {e}")
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)
+    asyncio.run(main())

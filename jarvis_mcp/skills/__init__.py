@@ -18,6 +18,7 @@ from .knowledge_builder import KnowledgeBuilderSkill
 from .meddpicc import MeddpiccSkill
 from .meeting_prep import MeetingPrepSkill
 from .meeting_summary import MeetingSummarySkill
+from .onboarding import OnboardingSkill
 from .proposal import ProposalSkill
 from .quick_insights import QuickInsightsSkill
 from .risk_report import RiskReportSkill
@@ -25,6 +26,7 @@ from .scaffold_account import ScaffoldAccountSkill
 from .sow import SowSkill
 from .technical_risk import TechnicalRiskSkill
 from .value_architecture import ValueArchitectureSkill
+from .system_health import SystemHealthSkill
 
 # Skill registry mapping skill names to classes
 SKILL_REGISTRY = {
@@ -46,6 +48,7 @@ SKILL_REGISTRY = {
     "meddpicc": MeddpiccSkill,
     "meeting_prep": MeetingPrepSkill,
     "meeting_summary": MeetingSummarySkill,
+    "onboarding": OnboardingSkill,
     "proposal": ProposalSkill,
     "quick_insights": QuickInsightsSkill,
     "risk_report": RiskReportSkill,
@@ -53,6 +56,7 @@ SKILL_REGISTRY = {
     "sow": SowSkill,
     "technical_risk": TechnicalRiskSkill,
     "value_architecture": ValueArchitectureSkill,
+    "system_health": SystemHealthSkill,
 }
 
 __all__ = [
@@ -75,6 +79,7 @@ __all__ = [
     "MeddpiccSkill",
     "MeetingPrepSkill",
     "MeetingSummarySkill",
+    "OnboardingSkill",
     "ProposalSkill",
     "QuickInsightsSkill",
     "RiskReportSkill",
@@ -82,4 +87,5 @@ __all__ = [
     "SowSkill",
     "TechnicalRiskSkill",
     "ValueArchitectureSkill",
+    "SystemHealthSkill",
 ]

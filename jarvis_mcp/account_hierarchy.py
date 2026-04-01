@@ -1,200 +1,245 @@
-"""Account Hierarchy Manager - Handles parent/child account relationships and recursive discovery"""
+"""
+AccountHierarchy - Manages parent/child account relationships.
+Supports Tata → TataTele, TataSky sub-accounts with inheritance.
+"""
 
 import json
-import logging
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Optional, Dict, List, Any
+import logging
 from difflib import SequenceMatcher
-import functools
-
-logger = logging.getLogger(__name__)
 
 
 class AccountHierarchy:
-    """Manages account hierarchy with parent/child relationships and recursive discovery"""
+    """
+    Manages account folder hierarchy and relationships.
+    Supports nested accounts: ACCOUNTS/Tata/TataTele/ inherits from ACCOUNTS/Tata/
+    """
 
-    def __init__(self, accounts_root: Path):
-        self.accounts_root = Path(accounts_root).expanduser()
-        self._account_cache: Dict[str, Path] = {}  # Cache: account_name -> account_path
-        self._parent_cache: Dict[str, Optional[Path]] = {}  # Cache: account_path -> parent_path
-        self._rebuild_cache()
-
-    def _rebuild_cache(self):
-        """Rebuild the account cache by scanning accounts_root recursively"""
-        self._account_cache.clear()
-        self._parent_cache.clear()
-
-        if not self.accounts_root.exists():
-            logger.warning(f"Accounts root does not exist: {self.accounts_root}")
+    def __init__(self, accounts_root: Optional[str] = None):
+        """Initialize hierarchy manager"""
+        self.logger = logging.getLogger(__name__)
+        self.accounts_root = Path(accounts_root) if accounts_root else Path.home() / "Documents" / "claude space" / "ACCOUNTS"
+        self.accounts_root.mkdir(parents=True, exist_ok=True)
+        
+        # Cache for account lookups (account_name -> path)
+        self._hierarchy_cache = {}
+        self._cache_valid = False
+        
+    def rebuild_cache(self):
+        """Rebuild account hierarchy cache"""
+        self._hierarchy_cache = {}
+        self._scan_hierarchy(self.accounts_root, parent_path=None)
+        self._cache_valid = True
+        self.logger.info(f"Rebuilt hierarchy cache: {len(self._hierarchy_cache)} accounts found")
+        
+    def _scan_hierarchy(self, path: Path, parent_path: Optional[str] = None, depth: int = 0):
+        """Recursively scan for account folders"""
+        if depth > 5:  # Limit recursion depth
             return
-
-        # Recursively scan for account folders (folders with deal_stage.json)
-        for account_path in self.accounts_root.rglob("deal_stage.json"):
-            account_dir = account_path.parent
-            account_name = account_dir.name
-
-            # Only cache if it's a valid account (has deal_stage.json)
-            if account_path.exists():
-                self._account_cache[account_name] = account_dir
-                # Store parent directory if it exists
-                parent_dir = account_dir.parent
-                if parent_dir != self.accounts_root:
-                    self._parent_cache[str(account_dir)] = parent_dir
-
-    def find_account(
-        self, account_name: str, fuzzy: bool = True, threshold: float = 0.6
-    ) -> Optional[Path]:
+            
+        try:
+            for item in path.iterdir():
+                if item.is_dir() and not item.name.startswith('.'):
+                    # Check if this looks like an account folder
+                    if self._is_account_folder(item):
+                        account_name = item.name
+                        self._hierarchy_cache[account_name.lower()] = {
+                            'path': str(item),
+                            'name': account_name,
+                            'parent': parent_path,
+                            'depth': depth
+                        }
+                        # Recurse into child accounts
+                        self._scan_hierarchy(item, parent_path=account_name, depth=depth+1)
+        except PermissionError:
+            self.logger.warning(f"Permission denied scanning {path}")
+            
+    def _is_account_folder(self, path: Path) -> bool:
+        """Check if folder looks like an account folder"""
+        # Look for account markers: deal_stage.json or discovery.md
+        has_deal_stage = (path / "deal_stage.json").exists()
+        has_discovery = (path / "discovery.md").exists()
+        return has_deal_stage or has_discovery
+        
+    def get_account_path(self, account_name: str, fuzzy_match: bool = True) -> Optional[Path]:
         """
-        Find account by name, optionally using fuzzy matching.
-
-        Args:
-            account_name: Account name to find (e.g., "Tata", "TataTele", "Tata Tele")
-            fuzzy: Use fuzzy matching if exact match not found
-            threshold: Minimum similarity score for fuzzy match (0-1)
-
+        Find account path by name, with optional fuzzy matching.
+        
         Returns:
-            Path to account folder if found, None otherwise
+            Path to account folder or None if not found
+            
+        Examples:
+            get_account_path("Tata") → /ACCOUNTS/Tata/
+            get_account_path("TataTele") → /ACCOUNTS/Tata/TataTele/
+            get_account_path("tata", fuzzy_match=True) → /ACCOUNTS/Tata/ (case-insensitive)
+            get_account_path("tata tele", fuzzy_match=True) → /ACCOUNTS/Tata/TataTele/ (removes spaces)
         """
-        # Exact match
-        if account_name in self._account_cache:
-            return self._account_cache[account_name]
-
-        # Fuzzy match
-        if fuzzy:
-            normalized_query = account_name.lower().replace(" ", "").replace("-", "")
-
+        if not self._cache_valid:
+            self.rebuild_cache()
+            
+        account_key = account_name.lower()
+        
+        # Exact match first
+        if account_key in self._hierarchy_cache:
+            return Path(self._hierarchy_cache[account_key]['path'])
+            
+        # Fuzzy matching
+        if fuzzy_match:
+            # Try removing spaces
+            normalized = account_name.replace(" ", "").lower()
+            if normalized in self._hierarchy_cache:
+                return Path(self._hierarchy_cache[normalized]['path'])
+                
+            # Try similarity matching (best match)
             best_match = None
-            best_score = threshold
-
-            for cached_name, account_path in self._account_cache.items():
-                normalized_cached = cached_name.lower().replace(" ", "").replace("-", "")
-                score = SequenceMatcher(None, normalized_query, normalized_cached).ratio()
-
-                if score > best_score:
-                    best_score = score
-                    best_match = account_path
-
+            best_ratio = 0.0
+            
+            for cached_name in self._hierarchy_cache.keys():
+                ratio = SequenceMatcher(None, normalized, cached_name).ratio()
+                if ratio > best_ratio and ratio > 0.75:  # 75% match threshold
+                    best_ratio = ratio
+                    best_match = cached_name
+                    
             if best_match:
-                logger.info(
-                    f"Fuzzy matched '{account_name}' to '{best_match.name}' "
-                    f"(score: {best_score:.2f})"
-                )
-                return best_match
-
+                self.logger.info(f"Fuzzy matched '{account_name}' → '{best_match}' (similarity: {best_ratio:.1%})")
+                return Path(self._hierarchy_cache[best_match]['path'])
+                
         return None
-
-    def get_account_context(self, account_path: Path) -> Dict[str, Path]:
+        
+    def get_parent_account_path(self, account_name: str) -> Optional[Path]:
+        """Get parent account path if this is a child account"""
+        if not self._cache_valid:
+            self.rebuild_cache()
+            
+        account_key = account_name.lower()
+        
+        # Exact match
+        if account_key in self._hierarchy_cache:
+            parent_name = self._hierarchy_cache[account_key].get('parent')
+            if parent_name:
+                return Path(self._hierarchy_cache[parent_name.lower()]['path'])
+                
+        return None
+        
+    def list_accounts(self, parent_name: Optional[str] = None) -> List[Dict[str, Any]]:
         """
-        Get account context including parent account if exists.
-
+        List all accounts, optionally filtered by parent.
+        
         Returns:
-            Dict with 'account' and 'parent' (if exists) paths
+            List of account info dicts with: name, path, parent, depth
         """
-        context = {"account": account_path}
-
-        # Check if this account has a parent (is a sub-account)
-        parent_dir = account_path.parent
-        if parent_dir != self.accounts_root and (
-            parent_dir / "deal_stage.json"
-        ).exists():
-            context["parent"] = parent_dir
-
+        if not self._cache_valid:
+            self.rebuild_cache()
+            
+        if parent_name:
+            parent_key = parent_name.lower()
+            return [
+                info for info in self._hierarchy_cache.values()
+                if info['parent'] and info['parent'].lower() == parent_key
+            ]
+        else:
+            return list(self._hierarchy_cache.values())
+            
+    def get_account_context(self, account_name: str) -> Dict[str, Any]:
+        """
+        Get full account context including parent account info.
+        
+        Returns:
+            Dict with: path, name, parent_path, parent_name, company_research (if exists), discovery (if exists), deal_stage (if exists)
+        """
+        account_path = self.get_account_path(account_name)
+        if not account_path:
+            return {}
+            
+        context = {
+            'path': str(account_path),
+            'name': account_path.name,
+            'account_key': account_path.name.lower()
+        }
+        
+        # Parent account info
+        parent_path = self.get_parent_account_path(account_name)
+        if parent_path:
+            context['parent_path'] = str(parent_path)
+            context['parent_name'] = parent_path.name
+            
+        # Load company research (inherit from parent if not present)
+        company_research_path = account_path / "company_research.md"
+        if company_research_path.exists():
+            with open(company_research_path, 'r') as f:
+                context['company_research'] = f.read()
+        elif parent_path:
+            parent_research = parent_path / "company_research.md"
+            if parent_research.exists():
+                with open(parent_research, 'r') as f:
+                    context['company_research_inherited'] = f.read()
+                    context['company_research_source'] = 'parent'
+                    
+        # Load discovery
+        discovery_path = account_path / "discovery.md"
+        if discovery_path.exists():
+            with open(discovery_path, 'r') as f:
+                context['discovery'] = f.read()
+                
+        # Load deal stage
+        deal_stage_path = account_path / "deal_stage.json"
+        if deal_stage_path.exists():
+            with open(deal_stage_path, 'r') as f:
+                context['deal_stage'] = json.load(f)
+                
         return context
-
-    def get_file_with_inheritance(
-        self, account_path: Path, filename: str
-    ) -> Optional[Path]:
+        
+    def get_child_accounts(self, parent_name: str) -> List[str]:
+        """Get list of child account names for a parent"""
+        return [info['name'] for info in self.list_accounts(parent_name)]
+        
+    def create_child_account(self, parent_name: str, child_name: str) -> Path:
         """
-        Get file from account, falling back to parent if not found.
-
-        Useful for company_research.md which should be inherited from parent if child doesn't have own.
-
-        Args:
-            account_path: Path to account folder
-            filename: File to look for (e.g., "company_research.md")
-
-        Returns:
-            Path to file if found in account or parent, None otherwise
+        Create a child account under a parent.
+        
+        Example: create_child_account("Tata", "TataTele") → /ACCOUNTS/Tata/TataTele/
         """
-        # Check account itself
-        file_path = account_path / filename
-        if file_path.exists():
-            return file_path
-
-        # Check parent account if exists
-        parent_dir = account_path.parent
-        if parent_dir != self.accounts_root and (
-            parent_dir / "deal_stage.json"
-        ).exists():
-            parent_file = parent_dir / filename
-            if parent_file.exists():
-                logger.debug(
-                    f"Inheriting {filename} from parent account "
-                    f"{parent_dir.name}"
-                )
-                return parent_file
-
-        return None
-
-    def get_sub_accounts(self, account_path: Path) -> List[Path]:
-        """Get all sub-accounts (direct children) of an account"""
-        sub_accounts = []
-
-        if not account_path.exists():
-            return sub_accounts
-
-        # Look for direct children with deal_stage.json
-        for child_dir in account_path.iterdir():
-            if child_dir.is_dir() and (child_dir / "deal_stage.json").exists():
-                sub_accounts.append(child_dir)
-
-        return sorted(sub_accounts)
-
-    def get_account_hierarchy_tree(self, account_path: Path, indent: int = 0) -> str:
-        """Get a text tree representation of account hierarchy"""
-        lines = []
-        account_name = account_path.name
-
-        lines.append("  " * indent + f"├─ {account_name}/")
-
-        # Add sub-accounts
-        sub_accounts = self.get_sub_accounts(account_path)
-        for sub_account in sub_accounts:
-            tree = self.get_account_hierarchy_tree(sub_account, indent + 1)
-            lines.append(tree)
-
-        return "\n".join(lines)
-
-    def create_sub_account(
-        self, parent_path: Path, sub_account_name: str
-    ) -> Path:
-        """
-        Create a new sub-account under a parent account.
-
-        Args:
-            parent_path: Path to parent account
-            sub_account_name: Name of sub-account to create
-
-        Returns:
-            Path to newly created sub-account
-        """
-        sub_account_path = parent_path / sub_account_name
-        sub_account_path.mkdir(parents=True, exist_ok=True)
-
-        logger.info(
-            f"Created sub-account {sub_account_name} under "
-            f"{parent_path.name}"
-        )
-
+        parent_path = self.get_account_path(parent_name)
+        if not parent_path:
+            raise ValueError(f"Parent account '{parent_name}' not found")
+            
+        child_path = parent_path / child_name
+        child_path.mkdir(parents=True, exist_ok=True)
+        
         # Invalidate cache
-        self._rebuild_cache()
-
-        return sub_account_path
-
-    def list_all_accounts(self) -> List[Tuple[str, Path]]:
-        """List all accounts in hierarchy (flattened)"""
-        return sorted(self._account_cache.items())
-
-    def refresh_cache(self):
-        """Manually refresh account cache"""
-        self._rebuild_cache()
+        self._cache_valid = False
+        
+        self.logger.info(f"Created child account: {parent_name}/{child_name}")
+        return child_path
+        
+    def get_hierarchy_tree(self, root_name: Optional[str] = None, indent: int = 0) -> str:
+        """
+        Get visual tree representation of account hierarchy.
+        
+        Example output:
+            Tata/
+              TataTele/
+              TataSky/
+            AcmeCorp/
+        """
+        if not self._cache_valid:
+            self.rebuild_cache()
+            
+        lines = []
+        
+        if root_name:
+            root_path = self.get_account_path(root_name)
+            if root_path:
+                lines.append("  " * indent + root_path.name + "/")
+                for child in self.get_child_accounts(root_name):
+                    lines.append(self.get_hierarchy_tree(child, indent+1))
+        else:
+            # Show top-level accounts only
+            for account in self._hierarchy_cache.values():
+                if account['depth'] == 0:
+                    lines.append(account['name'] + "/")
+                    for child in self.get_child_accounts(account['name']):
+                        lines.append("  " + child + "/")
+                        
+        return "\n".join(lines)

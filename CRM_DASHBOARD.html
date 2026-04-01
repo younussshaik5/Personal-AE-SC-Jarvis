@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JARVIS CRM Dashboard - Account Management</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f1419;
+            color: #e0e0e0;
+            line-height: 1.6;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 30px;
+            color: white;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+        
+        .header h1 { font-size: 32px; margin-bottom: 5px; }
+        .header p { opacity: 0.9; font-size: 14px; }
+        
+        .container {
+            display: flex;
+            height: calc(100vh - 100px);
+        }
+        
+        .sidebar {
+            width: 250px;
+            background: #1a1f26;
+            border-right: 1px solid #2a2f35;
+            overflow-y: auto;
+            padding: 20px 0;
+        }
+        
+        .sidebar-item {
+            padding: 12px 20px;
+            cursor: pointer;
+            border-left: 3px solid transparent;
+            transition: all 0.3s;
+        }
+        
+        .sidebar-item:hover {
+            background: #252b33;
+            border-left-color: #667eea;
+        }
+        
+        .sidebar-item.active {
+            background: #2a3040;
+            border-left-color: #667eea;
+            color: #667eea;
+            font-weight: 600;
+        }
+        
+        .main-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 30px;
+        }
+        
+        .section { display: none; }
+        .section.active { display: block; }
+        
+        .accounts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .account-card {
+            background: #1a1f26;
+            border: 1px solid #2a2f35;
+            border-radius: 8px;
+            padding: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .account-card:hover {
+            border-color: #667eea;
+            box-shadow: 0 0 20px rgba(102, 126, 234, 0.1);
+        }
+        
+        .account-card h3 { color: #667eea; margin-bottom: 10px; }
+        
+        .account-stat {
+            display: flex;
+            justify-content: space-between;
+            margin: 8px 0;
+            font-size: 13px;
+        }
+        
+        .stat-label { opacity: 0.7; }
+        .stat-value { font-weight: 600; color: #4ade80; }
+        
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        
+        .table th {
+            background: #2a2f35;
+            padding: 12px;
+            text-align: left;
+            border-bottom: 2px solid #3a3f45;
+            font-weight: 600;
+            color: #667eea;
+        }
+        
+        .table td {
+            padding: 12px;
+            border-bottom: 1px solid #2a2f35;
+        }
+        
+        .table tr:hover {
+            background: #252b33;
+        }
+        
+        .file-list {
+            list-style: none;
+            margin: 20px 0;
+        }
+        
+        .file-item {
+            padding: 12px;
+            background: #1a1f26;
+            margin: 8px 0;
+            border-radius: 4px;
+            border-left: 3px solid #667eea;
+            display: flex;
+            justify-content: space-between;
+        }
+        
+        .file-item .filename { font-weight: 500; }
+        .file-item .filesize { opacity: 0.7; font-size: 12px; }
+        .file-item .filedate { opacity: 0.7; font-size: 12px; }
+        
+        .log-item {
+            padding: 15px;
+            background: #1a1f26;
+            margin: 10px 0;
+            border-radius: 4px;
+            border-left: 3px solid #4ade80;
+        }
+        
+        .log-item.error { border-left-color: #f87171; }
+        .log-item.warning { border-left-color: #fbbf24; }
+        .log-item.info { border-left-color: #667eea; }
+        
+        .log-time { opacity: 0.7; font-size: 12px; margin-bottom: 5px; }
+        .log-message { font-size: 14px; }
+        
+        .metric {
+            background: #1a1f26;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border: 1px solid #2a2f35;
+        }
+        
+        .metric h4 { color: #667eea; margin-bottom: 10px; }
+        
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #2a2f35;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            transition: width 0.3s;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+            margin: 0 4px 0 0;
+        }
+        
+        .badge.success { background: #10b981; }
+        .badge.warning { background: #f59e0b; }
+        .badge.danger { background: #ef4444; }
+        .badge.info { background: #667eea; }
+        
+        .search-box {
+            width: 100%;
+            padding: 10px 15px;
+            background: #1a1f26;
+            border: 1px solid #2a2f35;
+            border-radius: 4px;
+            color: #e0e0e0;
+            margin-bottom: 20px;
+        }
+        
+        .refresh-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            margin: 10px 0;
+        }
+        
+        .refresh-btn:hover {
+            background: #764ba2;
+        }
+        
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        
+        .stat-box {
+            background: #1a1f26;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #2a2f35;
+            text-align: center;
+        }
+        
+        .stat-box .label { opacity: 0.7; font-size: 12px; margin-bottom: 5px; }
+        .stat-box .value { font-size: 24px; font-weight: 600; color: #4ade80; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🤖 JARVIS CRM Dashboard</h1>
+        <p>Autonomous AI Employee - Account Management & Activity Monitor</p>
+    </div>
+    
+    <div class="container">
+        <div class="sidebar">
+            <div class="sidebar-item active" onclick="showSection('accounts')">
+                📊 All Accounts
+            </div>
+            <div class="sidebar-item" onclick="showSection('files')">
+                📁 Files & Documents
+            </div>
+            <div class="sidebar-item" onclick="showSection('activity')">
+                🔄 JARVIS Activity Log
+            </div>
+            <div class="sidebar-item" onclick="showSection('learning')">
+                🧠 Learning History
+            </div>
+            <div class="sidebar-item" onclick="showSection('skills')">
+                ⚡ Skill Effectiveness
+            </div>
+            <div class="sidebar-item" onclick="showSection('deals')">
+                💼 Deal Pipeline
+            </div>
+            <div class="sidebar-item" onclick="showSection('knowledge')">
+                💡 Knowledge Base
+            </div>
+        </div>
+        
+        <div class="main-content">
+            <!-- ACCOUNTS SECTION -->
+            <div id="accounts" class="section active">
+                <h2>📊 All Accounts</h2>
+                <input type="text" class="search-box" placeholder="Search accounts..." id="accountSearch" 
+                       onkeyup="filterAccounts()">
+                <button class="refresh-btn" onclick="refreshData()">🔄 Refresh Data</button>
+                
+                <div class="stats-row" id="accountsStats">
+                    <div class="stat-box">
+                        <div class="label">Total Accounts</div>
+                        <div class="value" id="totalAccounts">0</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="label">Active Deals</div>
+                        <div class="value" id="activeDeals">0</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="label">Documents Learned</div>
+                        <div class="value" id="docsLearned">0</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="label">Win Rate</div>
+                        <div class="value" id="winRate">0%</div>
+                    </div>
+                </div>
+                
+                <div class="accounts-grid" id="accountsGrid"></div>
+            </div>
+            
+            <!-- FILES SECTION -->
+            <div id="files" class="section">
+                <h2>📁 Files & Documents</h2>
+                <input type="text" class="search-box" placeholder="Search files..." id="fileSearch" 
+                       onkeyup="filterFiles()">
+                
+                <table class="table" id="filesTable">
+                    <thead>
+                        <tr>
+                            <th>File Name</th>
+                            <th>Account</th>
+                            <th>Type</th>
+                            <th>Size</th>
+                            <th>Last Modified</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="filesTableBody"></tbody>
+                </table>
+            </div>
+            
+            <!-- ACTIVITY LOG SECTION -->
+            <div id="activity" class="section">
+                <h2>🔄 JARVIS Activity Log</h2>
+                <button class="refresh-btn" onclick="refreshActivityLog()">🔄 Refresh Log</button>
+                <button class="refresh-btn" onclick="autoRefresh()">⏰ Auto Refresh</button>
+                
+                <div style="margin-top: 20px;">
+                    <h3 style="margin-bottom: 15px;">Orchestrator Cycles</h3>
+                    <div id="activityLog"></div>
+                </div>
+            </div>
+            
+            <!-- LEARNING HISTORY SECTION -->
+            <div id="learning" class="section">
+                <h2>🧠 Learning History</h2>
+                <button class="refresh-btn" onclick="refreshLearning()">🔄 Refresh Learning</button>
+                
+                <h3 style="margin-top: 20px; margin-bottom: 15px;">Conversations Analyzed</h3>
+                <div id="conversationLearning"></div>
+                
+                <h3 style="margin-top: 20px; margin-bottom: 15px;">File Evolutions</h3>
+                <div id="fileEvolution"></div>
+                
+                <h3 style="margin-top: 20px; margin-bottom: 15px;">Learned Patterns</h3>
+                <div id="learnedPatterns"></div>
+            </div>
+            
+            <!-- SKILL EFFECTIVENESS SECTION -->
+            <div id="skills" class="section">
+                <h2>⚡ Skill Effectiveness</h2>
+                <button class="refresh-btn" onclick="refreshSkillMetrics()">🔄 Refresh Metrics</button>
+                
+                <div id="skillMetrics"></div>
+            </div>
+            
+            <!-- DEALS SECTION -->
+            <div id="deals" class="section">
+                <h2>💼 Deal Pipeline</h2>
+                <button class="refresh-btn" onclick="refreshDeals()">🔄 Refresh Deals</button>
+                
+                <table class="table" id="dealsTable">
+                    <thead>
+                        <tr>
+                            <th>Deal ID</th>
+                            <th>Account</th>
+                            <th>Status</th>
+                            <th>Probability</th>
+                            <th>Last Updated</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="dealsTableBody"></tbody>
+                </table>
+            </div>
+            
+            <!-- KNOWLEDGE BASE SECTION -->
+            <div id="knowledge" class="section">
+                <h2>💡 Knowledge Base</h2>
+                <button class="refresh-btn" onclick="refreshKnowledge()">🔄 Refresh Knowledge</button>
+                
+                <div id="knowledgeStats" class="stats-row"></div>
+                
+                <h3 style="margin-top: 20px; margin-bottom: 15px;">Vectorized Documents</h3>
+                <div id="vectoredDocs"></div>
+                
+                <h3 style="margin-top: 20px; margin-bottom: 15px;">Account Knowledge Summary</h3>
+                <div id="accountKnowledge"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Sample data structure
+        const accountsData = {
+            'Tata': {
+                deals: 3,
+                documents: 5,
+                files: ['discovery.md', 'proposal.pdf', 'rfi.json', 'CLAUDE.md', 'deal_stage.json'],
+                knowledge: { documents: 5, last_updated: '2024-04-01 15:30' },
+                win_rate: 0.95,
+                outcomes: [
+                    { date: '2024-04-01 14:30', deal: 'tata-001', status: 'won', probability: 0.95 },
+                    { date: '2024-04-01 10:15', deal: 'tata-002', status: 'pending', probability: 0.75 }
+                ]
+            },
+            'Acme Corp': {
+                deals: 2,
+                documents: 3,
+                files: ['discovery.md', 'proposal.pdf', 'meeting_notes.txt', 'CLAUDE.md'],
+                knowledge: { documents: 3, last_updated: '2024-03-31 18:00' },
+                win_rate: 0.87,
+                outcomes: [
+                    { date: '2024-03-31 16:45', deal: 'acme-001', status: 'won', probability: 0.92 }
+                ]
+            },
+            'TataTele': {
+                deals: 2,
+                documents: 4,
+                files: ['battlecard.md', 'competitive_intel.pdf', 'CLAUDE.md', 'deal_stage.json'],
+                knowledge: { documents: 4, last_updated: '2024-04-01 12:00' },
+                win_rate: 0.78,
+                outcomes: []
+            },
+            'TataSky': {
+                deals: 1,
+                documents: 2,
+                files: ['discovery.md', 'CLAUDE.md'],
+                knowledge: { documents: 2, last_updated: '2024-03-30 09:00' },
+                win_rate: 0.65,
+                outcomes: []
+            }
+        };
+        
+        const activityLog = [
+            { cycle: 5, timestamp: '2024-04-01 15:45:22', phase: 'File Monitoring', status: 'complete', files: 12 },
+            { cycle: 5, timestamp: '2024-04-01 15:45:25', phase: 'Vectorization', status: 'complete', files: 3 },
+            { cycle: 5, timestamp: '2024-04-01 15:45:28', phase: 'Knowledge Base', status: 'complete', docs: 15 },
+            { cycle: 5, timestamp: '2024-04-01 15:45:31', phase: 'Outcome Analysis', status: 'complete', outcomes: 5 },
+            { cycle: 5, timestamp: '2024-04-01 15:45:34', phase: 'File Evolution', status: 'complete', files_modified: 3 }
+        ];
+        
+        function showSection(sectionId) {
+            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+            document.querySelectorAll('.sidebar-item').forEach(s => s.classList.remove('active'));
+            
+            document.getElementById(sectionId).classList.add('active');
+            event.target.classList.add('active');
+            
+            // Load data for section
+            if (sectionId === 'accounts') loadAccounts();
+            else if (sectionId === 'files') loadFiles();
+            else if (sectionId === 'activity') loadActivityLog();
+            else if (sectionId === 'learning') loadLearning();
+            else if (sectionId === 'skills') loadSkillMetrics();
+            else if (sectionId === 'deals') loadDeals();
+            else if (sectionId === 'knowledge') loadKnowledge();
+        }
+        
+        function loadAccounts() {
+            const grid = document.getElementById('accountsGrid');
+            grid.innerHTML = '';
+            
+            let totalAccounts = 0;
+            let totalDeals = 0;
+            let totalDocs = 0;
+            let totalWins = 0;
+            let totalOutcomes = 0;
+            
+            Object.entries(accountsData).forEach(([name, data]) => {
+                totalAccounts++;
+                totalDeals += data.deals;
+                totalDocs += data.documents;
+                totalWins += (data.outcomes.filter(o => o.status === 'won').length);
+                totalOutcomes += data.outcomes.length;
+                
+                const card = document.createElement('div');
+                card.className = 'account-card';
+                card.innerHTML = `
+                    <h3>${name}</h3>
+                    <div class="account-stat">
+                        <span class="stat-label">Active Deals</span>
+                        <span class="stat-value">${data.deals}</span>
+                    </div>
+                    <div class="account-stat">
+                        <span class="stat-label">Documents</span>
+                        <span class="stat-value">${data.documents}</span>
+                    </div>
+                    <div class="account-stat">
+                        <span class="stat-label">Win Rate</span>
+                        <span class="stat-value">${(data.win_rate * 100).toFixed(0)}%</span>
+                    </div>
+                    <div class="account-stat">
+                        <span class="stat-label">Knowledge</span>
+                        <span class="stat-value">${data.knowledge.documents} docs</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: ${data.win_rate * 100}%"></div>
+                    </div>
+                    <div style="margin-top: 10px; font-size: 12px; opacity: 0.7;">
+                        Updated: ${data.knowledge.last_updated}
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+            
+            document.getElementById('totalAccounts').textContent = totalAccounts;
+            document.getElementById('activeDeals').textContent = totalDeals;
+            document.getElementById('docsLearned').textContent = totalDocs;
+            document.getElementById('winRate').textContent = totalOutcomes > 0 ? ((totalWins / totalOutcomes) * 100).toFixed(0) + '%' : '0%';
+        }
+        
+        function loadFiles() {
+            const tbody = document.getElementById('filesTableBody');
+            tbody.innerHTML = '';
+            
+            Object.entries(accountsData).forEach(([account, data]) => {
+                data.files.forEach(file => {
+                    const row = tbody.insertRow();
+                    row.innerHTML = `
+                        <td>${file}</td>
+                        <td>${account}</td>
+                        <td>${file.split('.').pop().toUpperCase()}</td>
+                        <td>${Math.floor(Math.random() * 500) + 10}KB</td>
+                        <td>${new Date(Date.now() - Math.random() * 86400000).toLocaleString()}</td>
+                        <td><span class="badge success">Synced</span></td>
+                    `;
+                });
+            });
+        }
+        
+        function loadActivityLog() {
+            const logDiv = document.getElementById('activityLog');
+            logDiv.innerHTML = '';
+            
+            activityLog.forEach(log => {
+                const item = document.createElement('div');
+                item.className = 'log-item info';
+                item.innerHTML = `
+                    <div class="log-time">[Cycle ${log.cycle}] ${log.timestamp}</div>
+                    <div class="log-message">✓ ${log.phase}: ${log.status.toUpperCase()}</div>
+                    <div style="margin-top: 5px; font-size: 12px; opacity: 0.6;">
+                        ${Object.entries(log).filter(([k]) => !['cycle', 'timestamp', 'phase', 'status'].includes(k))
+                            .map(([k, v]) => `${k}: ${v}`).join(' | ')}
+                    </div>
+                `;
+                logDiv.appendChild(item);
+            });
+        }
+        
+        function loadLearning() {
+            const convDiv = document.getElementById('conversationLearning');
+            convDiv.innerHTML = '<div class="log-item"><strong>✓ Learned from 24 conversations</strong><br/>Pain points: ROI focus, implementation timeline, system integration</div>';
+            
+            const evoDiv = document.getElementById('fileEvolution');
+            evoDiv.innerHTML = `
+                <div class="log-item">✓ CLAUDE.md evolved 3 times (proposal skill optimized)</div>
+                <div class="log-item">✓ discovery.md evolved 2 times (new discovery questions added)</div>
+                <div class="log-item">✓ deal_stage.json updated with 5 new deals</div>
+            `;
+            
+            const patDiv = document.getElementById('learnedPatterns');
+            patDiv.innerHTML = `
+                <div class="metric">
+                    <h4>Pattern 1: ROI Focus</h4>
+                    <p>When customers mention ROI metrics, detailed ROI analysis increases win probability by 23%</p>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: 85%"></div>
+                    </div>
+                </div>
+                <div class="metric">
+                    <h4>Pattern 2: Timeline</h4>
+                    <p>90-day implementation commitments are correlated with 92% closure rate</p>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: 92%"></div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        function loadSkillMetrics() {
+            const metricsDiv = document.getElementById('skillMetrics');
+            metricsDiv.innerHTML = '';
+            
+            const skills = [
+                { name: 'proposal', uses: 24, wins: 21, quality: 4.8 },
+                { name: 'discovery', uses: 18, wins: 16, quality: 4.6 },
+                { name: 'battlecard', uses: 15, wins: 13, quality: 4.5 },
+                { name: 'demo_strategy', uses: 12, wins: 11, quality: 4.7 },
+                { name: 'risk_report', uses: 10, wins: 8, quality: 4.4 }
+            ];
+            
+            skills.forEach(skill => {
+                const winRate = ((skill.wins / skill.uses) * 100).toFixed(0);
+                const metric = document.createElement('div');
+                metric.className = 'metric';
+                metric.innerHTML = `
+                    <h4>${skill.name}</h4>
+                    <div class="account-stat">
+                        <span>Uses</span>
+                        <span>${skill.uses}</span>
+                    </div>
+                    <div class="account-stat">
+                        <span>Win Rate</span>
+                        <span>${winRate}%</span>
+                    </div>
+                    <div class="account-stat">
+                        <span>Avg Quality</span>
+                        <span>${skill.quality}/5.0</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: ${winRate}%"></div>
+                    </div>
+                `;
+                metricsDiv.appendChild(metric);
+            });
+        }
+        
+        function loadDeals() {
+            const tbody = document.getElementById('dealsTableBody');
+            tbody.innerHTML = '';
+            
+            Object.entries(accountsData).forEach(([account, data]) => {
+                data.outcomes.forEach(outcome => {
+                    const row = tbody.insertRow();
+                    const badge = outcome.status === 'won' ? '<span class="badge success">WON</span>' : 
+                                  '<span class="badge info">PENDING</span>';
+                    row.innerHTML = `
+                        <td>${outcome.deal}</td>
+                        <td>${account}</td>
+                        <td>${badge}</td>
+                        <td>${(outcome.probability * 100).toFixed(0)}%</td>
+                        <td>${outcome.date}</td>
+                        <td><button class="refresh-btn" style="padding: 5px 10px;">Details</button></td>
+                    `;
+                });
+            });
+        }
+        
+        function loadKnowledge() {
+            const statsDiv = document.getElementById('knowledgeStats');
+            statsDiv.innerHTML = `
+                <div class="stat-box">
+                    <div class="label">Total Documents</div>
+                    <div class="value">18</div>
+                </div>
+                <div class="stat-box">
+                    <div class="label">Knowledge Ready</div>
+                    <div class="value">✓</div>
+                </div>
+                <div class="stat-box">
+                    <div class="label">Last Updated</div>
+                    <div class="value">Now</div>
+                </div>
+            `;
+            
+            const docsDiv = document.getElementById('vectoredDocs');
+            docsDiv.innerHTML = `
+                <ul class="file-list">
+                    <li class="file-item">
+                        <span class="filename">📄 tata_rfi.pdf</span>
+                        <span class="filesize">Vectorized 2024-04-01</span>
+                    </li>
+                    <li class="file-item">
+                        <span class="filename">📄 acme_proposal.docx</span>
+                        <span class="filesize">Vectorized 2024-03-31</span>
+                    </li>
+                    <li class="file-item">
+                        <span class="filename">📊 competitive_analysis.xlsx</span>
+                        <span class="filesize">Vectorized 2024-03-30</span>
+                    </li>
+                </ul>
+            `;
+            
+            const accountKnowDiv = document.getElementById('accountKnowledge');
+            accountKnowDiv.innerHTML = Object.entries(accountsData)
+                .map(([name, data]) => `
+                    <div class="metric">
+                        <h4>${name}</h4>
+                        <p>Documents: ${data.knowledge.documents} | Last Updated: ${data.knowledge.last_updated}</p>
+                    </div>
+                `)
+                .join('');
+        }
+        
+        function refreshData() {
+            loadAccounts();
+            alert('✓ Data refreshed');
+        }
+        
+        function filterAccounts() {
+            const searchTerm = document.getElementById('accountSearch').value.toLowerCase();
+            const cards = document.querySelectorAll('.account-card');
+            cards.forEach(card => {
+                card.style.display = card.textContent.toLowerCase().includes(searchTerm) ? '' : 'none';
+            });
+        }
+        
+        function filterFiles() {
+            const searchTerm = document.getElementById('fileSearch').value.toLowerCase();
+            const rows = document.querySelectorAll('#filesTableBody tr');
+            rows.forEach(row => {
+                row.style.display = row.textContent.toLowerCase().includes(searchTerm) ? '' : 'none';
+            });
+        }
+        
+        function refreshActivityLog() { loadActivityLog(); alert('✓ Activity log refreshed'); }
+        function refreshLearning() { loadLearning(); alert('✓ Learning history refreshed'); }
+        function refreshSkillMetrics() { loadSkillMetrics(); alert('✓ Metrics refreshed'); }
+        function refreshDeals() { loadDeals(); alert('✓ Deals refreshed'); }
+        function refreshKnowledge() { loadKnowledge(); alert('✓ Knowledge base refreshed'); }
+        
+        function autoRefresh() {
+            setInterval(() => {
+                if (document.getElementById('activity').classList.contains('active')) {
+                    loadActivityLog();
+                }
+            }, 10000); // Refresh every 10 seconds
+            alert('✓ Auto-refresh enabled (10s interval)');
+        }
+        
+        // Load initial data
+        loadAccounts();
+    </script>
+</body>
+</html>
