@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>JARVIS — Deal Intelligence</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked@9/marked.min.js"></script>
     <style>
         :root {
             --bg:#0f1117; --s1:#1a1d27; --s2:#232736; --bdr:#2d3148;
@@ -116,6 +117,23 @@
         .ps:last-child .pline{display:none}.ps.completed .pline{background:var(--g)}
 
         .skill-md{white-space:pre-wrap;font-size:12px;line-height:1.85;color:var(--t2)}
+        .md-body{white-space:normal}
+        .md-body h1,.md-body h2,.md-body h3,.md-body h4{color:var(--t1);font-weight:600;margin:12px 0 6px}
+        .md-body h1{font-size:15px}.md-body h2{font-size:14px;border-bottom:1px solid var(--bdr);padding-bottom:4px}.md-body h3{font-size:13px}.md-body h4{font-size:12px;color:var(--t2)}
+        .md-body p{margin:4px 0 8px;color:var(--t2)}
+        .md-body ul,.md-body ol{margin:4px 0 8px;padding-left:18px;color:var(--t2)}
+        .md-body li{margin:2px 0}
+        .md-body strong{color:var(--t1);font-weight:600}
+        .md-body em{color:var(--accent2);font-style:italic}
+        .md-body code{background:var(--s1);color:var(--accent1);padding:1px 5px;border-radius:4px;font-family:monospace;font-size:11px}
+        .md-body pre{background:var(--s1);border:1px solid var(--bdr);border-radius:6px;padding:10px;overflow-x:auto;margin:8px 0}
+        .md-body pre code{background:none;padding:0;color:var(--t1)}
+        .md-body table{width:100%;border-collapse:collapse;margin:8px 0;font-size:11px}
+        .md-body th{background:var(--s1);color:var(--t1);font-weight:600;padding:6px 10px;text-align:left;border:1px solid var(--bdr)}
+        .md-body td{padding:5px 10px;border:1px solid var(--bdr);color:var(--t2);vertical-align:top}
+        .md-body tr:nth-child(even) td{background:rgba(255,255,255,.02)}
+        .md-body blockquote{border-left:3px solid var(--accent1);margin:6px 0;padding:4px 12px;color:var(--t3);font-style:italic}
+        .md-body hr{border:none;border-top:1px solid var(--bdr);margin:10px 0}
         .skill-empty{text-align:center;padding:24px 12px}
         .skill-empty .se-title{font-size:13px;font-weight:600;color:var(--t1);margin-bottom:4px}
         .skill-empty .se-desc{font-size:11px;color:var(--t2);margin-bottom:10px}
@@ -366,7 +384,7 @@ function renderReport(a){
 
 function skillBlock(key,a,title,standalone){
     var content=a.skill_outputs[key];
-    if(content)return'<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--bdr)"><span class="jarvis-tag">'+title+'</span><div class="skill-md" style="margin-top:6px">'+esc(content)+'</div></div>';
+    if(content)return'<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--bdr)"><span class="jarvis-tag">'+title+'</span><div class="skill-md md-body" style="margin-top:6px">'+(typeof marked!=='undefined'?marked.parse(content):esc(content))+'</div></div>';
     if(standalone){var info=REG[key]||{cmd:key};return'<div class="skill-empty"><div class="se-title">Not Generated Yet</div><div class="se-desc">Ask JARVIS:</div><div class="se-cmd" onclick="copyCmd(this)">"Run '+info.cmd+' for '+a.name+'"</div></div>'}
     return'';
 }

@@ -1,4 +1,24 @@
-"""LLM Manager for JARVIS — calls NVIDIA NIM API (OpenAI-compatible)."""
+"""
+LLM Manager for JARVIS — NVIDIA-first multi-model with automatic fallback.
+
+NVIDIA Model Chain (per call):
+  1. nvidia-llama70b   meta/llama-3.3-70b-instruct        (12s — best reasoning)
+  2. nvidia-nemotron   nvidia/nemotron-3-nano-30b-a3b      (15s — long context, text gen/summary)
+  3. nvidia-8b         meta/llama-3.1-8b-instruct          (12s — fastest)
+  4. groq              llama-3.3-70b-versatile             (30s — optional, if GROQ_API_KEY set)
+  5. together          Llama-3.3-70B-Instruct-Turbo        (30s — optional, if TOGETHER_API_KEY set)
+
+Model type routing:
+  - default / reasoning → start from nvidia-llama70b (strongest)
+  - text / summary      → start from nvidia-nemotron (long context, no hallucination)
+  - fast / quick        → start from nvidia-8b (lowest latency)
+
+Rules:
+  - Timeout  → immediately try next provider (no waiting)
+  - 429      → mark provider as rate-limited for 60s, try next
+  - 401      → log error, skip provider (bad key)
+  - optional providers (groq, together) → silently skipped if no key set
+"""
 
 import os
 import json
@@ -8,96 +28,222 @@ import ssl
 import time
 import urllib.request
 import urllib.error
-from typing import Dict, Any, Optional, List
-
-# Build a verified SSL context using certifi if available, else system default
-def _ssl_ctx():
-    try:
-        import certifi
-        ctx = ssl.create_default_context(cafile=certifi.where())
-    except ImportError:
-        ctx = ssl.create_default_context()
-    return ctx
-
-_SSL_CTX = _ssl_ctx()
+from typing import Dict, Any, Optional, List, Tuple
 
 log = logging.getLogger(__name__)
 
+# ── SSL context ───────────────────────────────────────────────────────────────
+def _ssl_ctx():
+    try:
+        import certifi
+        return ssl.create_default_context(cafile=certifi.where())
+    except ImportError:
+        return ssl.create_default_context()
+
+_SSL_CTX = _ssl_ctx()
+
+# ── Provider definitions ──────────────────────────────────────────────────────
+# optional=True → silently skipped if key not set (no error logged)
+_PROVIDERS = [
+    {
+        "name":     "nvidia-llama70b",
+        "base_url": "https://integrate.api.nvidia.com/v1",
+        "key_env":  "NVIDIA_API_KEY",
+        "optional": False,
+        "models": {
+            "default":   "meta/llama-3.3-70b-instruct",
+            "reasoning": "meta/llama-3.3-70b-instruct",
+            "text":      "meta/llama-3.3-70b-instruct",
+            "summary":   "meta/llama-3.3-70b-instruct",
+            "fast":      "meta/llama-3.1-8b-instruct",
+            "quick":     "meta/llama-3.1-8b-instruct",
+        },
+        "timeout": 12,
+    },
+    {
+        "name":     "nvidia-nemotron",
+        "base_url": "https://integrate.api.nvidia.com/v1",
+        "key_env":  "NVIDIA_API_KEY",
+        "optional": False,
+        # nemotron-3-nano-30b: long context, no hallucination, great for text gen / rephrase / summary
+        # NOT for creative tasks or open-ended search — use llama70b for those
+        "models": {
+            "default":   "nvidia/nemotron-3-nano-30b-a3b",
+            "reasoning": "nvidia/llama-3.1-nemotron-70b-instruct",
+            "text":      "nvidia/nemotron-3-nano-30b-a3b",
+            "summary":   "nvidia/nemotron-3-nano-30b-a3b",
+            "fast":      "nvidia/nemotron-3-nano-30b-a3b",
+            "quick":     "meta/llama-3.1-8b-instruct",
+        },
+        "timeout": 15,
+    },
+    {
+        "name":     "nvidia-8b",
+        "base_url": "https://integrate.api.nvidia.com/v1",
+        "key_env":  "NVIDIA_API_KEY",
+        "optional": False,
+        "models": {
+            "default":   "meta/llama-3.1-8b-instruct",
+            "reasoning": "meta/llama-3.1-8b-instruct",
+            "text":      "meta/llama-3.1-8b-instruct",
+            "summary":   "meta/llama-3.1-8b-instruct",
+            "fast":      "meta/llama-3.1-8b-instruct",
+            "quick":     "meta/llama-3.1-8b-instruct",
+        },
+        "timeout": 12,
+    },
+    {
+        "name":     "groq",
+        "base_url": "https://api.groq.com/openai/v1",
+        "key_env":  "GROQ_API_KEY",
+        "optional": True,   # skipped silently if no GROQ_API_KEY
+        "models": {
+            "default":   "llama-3.3-70b-versatile",
+            "reasoning": "llama-3.3-70b-versatile",
+            "text":      "llama-3.3-70b-versatile",
+            "summary":   "llama-3.3-70b-versatile",
+            "fast":      "llama-3.1-8b-instant",
+            "quick":     "llama-3.1-8b-instant",
+        },
+        "timeout": 30,
+    },
+    {
+        "name":     "together",
+        "base_url": "https://api.together.xyz/v1",
+        "key_env":  "TOGETHER_API_KEY",
+        "optional": True,   # skipped silently if no TOGETHER_API_KEY
+        "models": {
+            "default":   "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+            "reasoning": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+            "text":      "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+            "summary":   "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+            "fast":      "meta-llama/Llama-3.1-8B-Instruct-Turbo",
+            "quick":     "meta-llama/Llama-3.1-8B-Instruct-Turbo",
+        },
+        "timeout": 30,
+    },
+]
+
+# Provider order by model_type
+# NVIDIA models first — groq/together are just safety nets if all NVIDIA is down
+_ORDER_DEFAULT  = ["nvidia-llama70b", "nvidia-nemotron", "nvidia-8b", "groq", "together"]
+_ORDER_TEXT     = ["nvidia-nemotron",  "nvidia-llama70b", "nvidia-8b", "groq", "together"]
+_ORDER_FAST     = ["nvidia-8b",        "nvidia-nemotron", "nvidia-llama70b", "groq", "together"]
+
+_PROVIDER_MAP = {p["name"]: p for p in _PROVIDERS}
+
 
 class LLMManager:
-    """Manages LLM interactions with NVIDIA NIM (OpenAI-compatible endpoint)."""
+    """NVIDIA-first multi-model LLM manager with automatic timeout/rate-limit fallback."""
 
     def __init__(self, config):
         self.config = config
-        self.api_key = config.get_api_key("nvidia")
-        self.base_url = os.getenv(
-            "NVIDIA_BASE_URL",
-            "https://integrate.api.nvidia.com/v1"
-        ).rstrip("/")
+        # Rate-limit cooldown: {provider_name: until_timestamp}
+        self._rate_limited_until: Dict[str, float] = {}
+        # Cache resolved API keys
+        self._keys: Dict[str, str] = {}
+        for p in _PROVIDERS:
+            self._keys[p["name"]] = os.getenv(p["key_env"], "")
 
-        # Model assignments — override via env vars
-        self.models = {
-            "default":      os.getenv("NVIDIA_MODEL",           "meta/llama-3.3-70b-instruct"),
-            "reasoning":    os.getenv("NVIDIA_REASONING_MODEL", "meta/llama-3.3-70b-instruct"),
-            "fast":         os.getenv("NVIDIA_FAST_MODEL",      "meta/llama-3.1-8b-instruct"),
-            "long_context": os.getenv("NVIDIA_LONG_MODEL",      "meta/llama-3.1-70b-instruct"),
-            "text":         os.getenv("NVIDIA_TEXT_MODEL",      "meta/llama-3.3-70b-instruct"),
-            "quick":        os.getenv("NVIDIA_FAST_MODEL",      "meta/llama-3.1-8b-instruct"),
-        }
+        # Warn if NVIDIA key missing (required)
+        if not self._keys.get("nvidia-llama70b"):
+            log.warning("NVIDIA_API_KEY not set — add to .env and restart Claude Desktop.")
 
-        if not self.api_key:
-            log.warning("NVIDIA_API_KEY not set — LLM calls will fail. Run setup.sh and add your key to .env")
+        # Info log which optional providers are active
+        for name in ("groq", "together"):
+            if self._keys.get(name):
+                log.info(f"Optional provider '{name}' is active (key found).")
 
-    def _call_api_sync(self, model: str, messages: list, max_tokens: int, temperature: float) -> str:
-        """Make a synchronous HTTPS call to the NVIDIA NIM endpoint."""
-        if not self.api_key:
-            return "❌ NVIDIA_API_KEY not configured. Edit your .env file and add NVIDIA_API_KEY=nvapi-..."
+    # ── Internal HTTP call (sync, runs in executor) ───────────────────────────
 
-        url = f"{self.base_url}/chat/completions"
+    def _http_call(self, base_url: str, api_key: str, model: str,
+                   messages: list, max_tokens: int, temperature: float) -> str:
+        url = f"{base_url}/chat/completions"
         payload = json.dumps({
-            "model": model,
-            "messages": messages,
-            "max_tokens": max_tokens,
+            "model":       model,
+            "messages":    messages,
+            "max_tokens":  max_tokens,
             "temperature": temperature,
-            "stream": False,
+            "stream":      False,
         }).encode("utf-8")
 
         req = urllib.request.Request(
-            url,
-            data=payload,
+            url, data=payload,
             headers={
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type":  "application/json",
+                "Authorization": f"Bearer {api_key}",
             },
             method="POST",
         )
+        with urllib.request.urlopen(req, timeout=120, context=_SSL_CTX) as resp:
+            body = json.loads(resp.read().decode("utf-8"))
+            return body["choices"][0]["message"]["content"]
 
-        max_retries = 3
-        for attempt in range(max_retries):
-            try:
-                with urllib.request.urlopen(req, timeout=90, context=_SSL_CTX) as resp:
-                    body = json.loads(resp.read().decode("utf-8"))
-                    return body["choices"][0]["message"]["content"]
-            except urllib.error.HTTPError as e:
-                error_body = e.read().decode("utf-8") if e.fp else str(e)
-                if e.code == 401:
-                    log.error("NVIDIA API key invalid or expired")
-                    raise RuntimeError("❌ NVIDIA API key invalid or expired. Update NVIDIA_API_KEY in .env")
-                if e.code == 429:
-                    wait = 15 * (attempt + 1)
-                    log.warning(f"NVIDIA rate limit hit — waiting {wait}s (attempt {attempt+1}/{max_retries})")
-                    time.sleep(wait)
-                    # Rebuild request (body already encoded)
-                    req = urllib.request.Request(url, data=payload,
-                        headers={"Content-Type": "application/json", "Authorization": f"Bearer {self.api_key}"},
-                        method="POST")
-                    continue
-                log.error(f"NVIDIA API HTTP {e.code}: {error_body}")
-                raise RuntimeError(f"❌ NVIDIA API error {e.code}: {error_body[:200]}")
-            except Exception as e:
-                log.error(f"NVIDIA API call failed: {e}")
-                raise
-        raise RuntimeError("❌ NVIDIA API rate limit — all retries exhausted. Try again in a minute.")
+    # ── Try one provider ──────────────────────────────────────────────────────
+
+    async def _try_provider(self, provider: dict, model_type: str,
+                             messages: list, max_tokens: int,
+                             temperature: float) -> Tuple[str, str]:
+        """
+        Try a single provider. Returns (result, provider_name).
+        Raises:
+          - asyncio.TimeoutError  → caller should try next
+          - RuntimeError("skip")  → optional provider has no key, skip silently
+          - RuntimeError(...)     → rate limit / auth / HTTP error
+        """
+        name    = provider["name"]
+        api_key = self._keys.get(name, "")
+
+        # Optional providers: skip silently if key not set
+        if not api_key:
+            if provider.get("optional"):
+                raise RuntimeError(f"skip:{name}")
+            raise RuntimeError(f"No API key for {name} — add {provider['key_env']} to .env")
+
+        # Rate-limit cooldown
+        cooldown = self._rate_limited_until.get(name, 0)
+        if time.time() < cooldown:
+            remaining = int(cooldown - time.time())
+            raise RuntimeError(f"{name} rate-limited for {remaining}s more")
+
+        model   = provider["models"].get(model_type, provider["models"]["default"])
+        timeout = provider["timeout"]
+
+        log.info(f"LLM → {name} | {model} | {model_type} | {max_tokens}tok | timeout={timeout}s")
+        t0 = time.time()
+
+        loop = asyncio.get_event_loop()
+        try:
+            result = await asyncio.wait_for(
+                loop.run_in_executor(
+                    None,
+                    self._http_call,
+                    provider["base_url"], api_key, model,
+                    messages, max_tokens, temperature,
+                ),
+                timeout=timeout,
+            )
+            elapsed = round(time.time() - t0, 1)
+            log.info(f"✅ {name} responded in {elapsed}s")
+            return result, name
+
+        except asyncio.TimeoutError:
+            elapsed = round(time.time() - t0, 1)
+            log.warning(f"⏱ {name} timed out after {elapsed}s — switching provider")
+            raise
+
+        except urllib.error.HTTPError as e:
+            if e.code == 429:
+                self._rate_limited_until[name] = time.time() + 60
+                log.warning(f"🚫 {name} rate limited — cooling down 60s, switching provider")
+                raise RuntimeError(f"{name} rate limited")
+            if e.code == 401:
+                log.error(f"🔑 {name} API key invalid")
+                raise RuntimeError(f"{name} auth failed — check {provider['key_env']}")
+            body = e.read().decode("utf-8") if e.fp else str(e)
+            raise RuntimeError(f"{name} HTTP {e.code}: {body[:200]}")
+
+    # ── Main generate ─────────────────────────────────────────────────────────
 
     async def generate(
         self,
@@ -106,38 +252,78 @@ class LLMManager:
         context: Optional[Dict[str, Any]] = None,
         max_tokens: int = 2000,
         temperature: float = 0.7,
-        system_prompt: str = "You are JARVIS, an expert AI sales assistant specializing in enterprise B2B sales. Generate professional, detailed, actionable output in markdown format.",
-        **kwargs
+        system_prompt: str = (
+            "You are JARVIS, an expert AI sales assistant. "
+            "Generate professional, detailed, actionable output in markdown format."
+        ),
+        **kwargs,
     ) -> str:
-        """Generate text using NVIDIA NIM API."""
-        model = self.models.get(model_type, self.models["default"])
-        log.info(f"LLM generate: model={model} type={model_type} tokens={max_tokens}")
-
         messages = [
             {"role": "system", "content": system_prompt},
             {"role": "user",   "content": prompt},
         ]
 
-        # Run blocking HTTP call in a thread pool so we don't block the event loop
-        loop = asyncio.get_event_loop()
-        try:
-            result = await loop.run_in_executor(
-                None,
-                self._call_api_sync,
-                model, messages, max_tokens, temperature
-            )
-        except RuntimeError as e:
-            # Rate limit / auth errors — propagate as string so callers can decide
-            # whether to write to file. execute() in BaseSkill will return this as error.
-            return str(e)
-        return result
+        if model_type in ("fast", "quick"):
+            order = _ORDER_FAST
+        elif model_type in ("text", "summary"):
+            order = _ORDER_TEXT
+        else:
+            order = _ORDER_DEFAULT
+
+        errors = []
+
+        for provider_name in order:
+            provider = _PROVIDER_MAP.get(provider_name)
+            if not provider:
+                continue
+            try:
+                result, used = await self._try_provider(
+                    provider, model_type, messages, max_tokens, temperature
+                )
+                if used != order[0]:
+                    log.info(f"ℹ️  Used fallback provider: {used}")
+                return result
+
+            except RuntimeError as e:
+                err_str = str(e)
+                if err_str.startswith("skip:"):
+                    # Optional provider with no key — silently skip
+                    continue
+                errors.append(f"{provider_name}: {err_str}")
+                continue
+
+            except (asyncio.TimeoutError, Exception) as e:
+                errors.append(f"{provider_name}: {e}")
+                continue
+
+        error_summary = " | ".join(errors)
+        log.error(f"All providers failed: {error_summary}")
+        return f"❌ All LLM providers unavailable: {error_summary}"
+
+    # ── Parallel batch ────────────────────────────────────────────────────────
 
     async def batch_generate(
         self,
         prompts: List[str],
         model_type: str = "default",
-        **kwargs
+        **kwargs,
     ) -> List[str]:
-        """Generate multiple responses concurrently."""
+        """Run multiple prompts in parallel."""
         tasks = [self.generate(p, model_type=model_type, **kwargs) for p in prompts]
         return await asyncio.gather(*tasks)
+
+    # ── Status ────────────────────────────────────────────────────────────────
+
+    def provider_status(self) -> Dict[str, str]:
+        status = {}
+        for p in _PROVIDERS:
+            name = p["name"]
+            key  = self._keys.get(name, "")
+            if not key:
+                status[name] = "no key (optional)" if p.get("optional") else "no key ⚠️"
+            elif time.time() < self._rate_limited_until.get(name, 0):
+                remaining = int(self._rate_limited_until[name] - time.time())
+                status[name] = f"rate-limited ({remaining}s)"
+            else:
+                status[name] = "ready"
+        return status

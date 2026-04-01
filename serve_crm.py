@@ -313,7 +313,7 @@ def load_account(folder, name, parent=None):
         "parent": parent,
         "stage": deal.get("stage", "Unknown"),
         "probability": deal.get("probability", 0),
-        "deal_size": deal.get("deal_size", 0),
+        "deal_size": deal.get("deal_size") or deal.get("arr", 0),
         "timeline": deal.get("timeline", "TBD"),
         "last_updated": deal.get("last_updated", "Unknown"),
         "stakeholders": stakeholders,
