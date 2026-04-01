@@ -24,23 +24,11 @@ import os
 import json
 import asyncio
 import logging
-import ssl
 import time
-import urllib.request
-import urllib.error
 from typing import Dict, Any, Optional, List, Tuple
+from openai import OpenAI, APIConnectionError, RateLimitError, APIError
 
 log = logging.getLogger(__name__)
-
-# ── SSL context ───────────────────────────────────────────────────────────────
-def _ssl_ctx():
-    try:
-        import certifi
-        return ssl.create_default_context(cafile=certifi.where())
-    except ImportError:
-        return ssl.create_default_context()
-
-_SSL_CTX = _ssl_ctx()
 
 # ── Provider definitions ──────────────────────────────────────────────────────
 # optional=True → silently skipped if key not set (no error logged)
@@ -138,77 +126,51 @@ class LLMManager:
             if self._keys.get(name):
                 log.info(f"Optional provider '{name}' is active (key found).")
 
-    # ── Internal HTTP call (sync, runs in executor) ───────────────────────────
+    # ── Internal LLM call (sync, runs in executor) using OpenAI SDK ───────────
 
-    def _http_call(self, base_url: str, api_key: str, model: str,
-                   messages: list, max_tokens: int, temperature: float,
-                   is_reasoning: bool = False) -> str:
-        url = f"{base_url}/chat/completions"
+    def _llm_call(self, base_url: str, api_key: str, model: str,
+                  messages: list, max_tokens: int, temperature: float,
+                  is_reasoning: bool = False) -> str:
+        """Call NVIDIA LLM via OpenAI SDK with streaming."""
+        client = OpenAI(base_url=base_url, api_key=api_key)
 
-        # Build payload matching NVIDIA API spec exactly
-        payload_dict = {
-            "model":       model,
-            "messages":    messages,
-            "max_tokens":  max_tokens,
+        # Build request params
+        params = {
+            "model": model,
+            "messages": messages,
+            "max_tokens": max_tokens,
             "temperature": temperature,
-            "top_p":       0.9,           # NVIDIA API parameter
-            "seed":        42,            # Reproducibility
-            "stream":      True,          # Enable streaming
+            "top_p": 0.9,
+            "seed": 42,
+            "stream": True,
         }
 
-        # Add thinking mode for reasoning + nemotron models
+        # Add thinking mode for reasoning tasks
         if is_reasoning and "nemotron" in model.lower():
-            payload_dict["reasoning_budget"] = 4096  # Balanced reasoning budget
-            payload_dict["chat_template_kwargs"] = {
-                "enable_thinking": True,
-            }
+            params["reasoning_budget"] = 4096
+            params["chat_template_kwargs"] = {"enable_thinking": True}
 
-        payload = json.dumps(payload_dict).encode("utf-8")
-        req = urllib.request.Request(
-            url, data=payload,
-            headers={
-                "Content-Type":  "application/json",
-                "Authorization": f"Bearer {api_key}",
-            },
-            method="POST",
-        )
-
-        # Read streaming response and collect all chunks
+        # Stream and collect response
         result = []
         try:
-            with urllib.request.urlopen(req, timeout=120, context=_SSL_CTX) as resp:
-                for line in resp:
-                    line = line.decode("utf-8").strip()
-                    if not line or line.startswith(":"):
-                        continue
-                    if line.startswith("data: "):
-                        data = line[6:]
-                        if data == "[DONE]":
-                            break
-                        try:
-                            chunk = json.loads(data)
-                            delta = chunk.get("choices", [{}])[0].get("delta", {})
-                            if "content" in delta:
-                                result.append(delta["content"])
-                        except json.JSONDecodeError:
-                            pass
+            completion = client.chat.completions.create(**params)
+            for chunk in completion:
+                if not hasattr(chunk, "choices") or not chunk.choices:
+                    continue
+                # Extract reasoning if present
+                reasoning = getattr(chunk.choices[0].delta, "reasoning_content", None)
+                if reasoning:
+                    result.append(reasoning)
+                # Extract content
+                content = getattr(chunk.choices[0].delta, "content", None)
+                if content:
+                    result.append(content)
             return "".join(result)
         except Exception as e:
-            # Fallback: try non-streaming for compatibility
-            log.debug(f"Streaming failed, retrying without stream: {e}")
-            payload_dict["stream"] = False
-            payload = json.dumps(payload_dict).encode("utf-8")
-            req = urllib.request.Request(
-                url, data=payload,
-                headers={
-                    "Content-Type":  "application/json",
-                    "Authorization": f"Bearer {api_key}",
-                },
-                method="POST",
-            )
-            with urllib.request.urlopen(req, timeout=120, context=_SSL_CTX) as resp:
-                body = json.loads(resp.read().decode("utf-8"))
-                return body["choices"][0]["message"]["content"]
+            log.debug(f"Streaming failed: {e}, retrying without stream")
+            params["stream"] = False
+            completion = client.chat.completions.create(**params)
+            return completion.choices[0].message.content
 
     # ── Try one provider ──────────────────────────────────────────────────────
 
@@ -249,7 +211,7 @@ class LLMManager:
             result = await asyncio.wait_for(
                 loop.run_in_executor(
                     None,
-                    self._http_call,
+                    self._llm_call,
                     provider["base_url"], api_key, model,
                     messages, max_tokens, temperature,
                     is_reasoning,
@@ -265,21 +227,25 @@ class LLMManager:
             log.warning(f"⏱ {name} timed out after {elapsed}s — switching provider")
             raise
 
-        except urllib.error.HTTPError as e:
-            if e.code == 429:
-                self._rate_limited_until[name] = time.time() + 60
-                log.warning(f"🚫 {name} rate limited — cooling down 60s, switching provider")
-                raise RuntimeError(f"{name} rate limited")
-            if e.code == 401:
+        except RateLimitError:
+            self._rate_limited_until[name] = time.time() + 60
+            log.warning(f"🚫 {name} rate limited — cooling down 60s, switching provider")
+            raise RuntimeError(f"{name} rate limited")
+
+        except APIConnectionError as e:
+            log.error(f"❌ {name} connection failed: {str(e)[:100]}")
+            raise RuntimeError(f"{name} connection error")
+
+        except APIError as e:
+            error_msg = str(e)
+            if "401" in error_msg or "Unauthorized" in error_msg:
                 log.error(f"🔑 {name} API key invalid — check {provider['key_env']}")
                 raise RuntimeError(f"{name} auth failed")
-            if e.code == 404:
-                log.error(f"❌ {name} model '{model}' not found (404)")
+            if "404" in error_msg or "not found" in error_msg.lower():
+                log.error(f"❌ {name} model '{model}' not found")
                 raise RuntimeError(f"{name} model not found")
-            body = e.read().decode("utf-8") if e.fp else str(e)
-            err_msg = body[:150] if body else f"HTTP {e.code}"
-            log.error(f"❌ {name} HTTP {e.code}: {err_msg}")
-            raise RuntimeError(f"{name} HTTP {e.code}")
+            log.error(f"❌ {name} API error: {error_msg[:100]}")
+            raise RuntimeError(f"{name} API error")
 
     # ── Main generate ─────────────────────────────────────────────────────────
 
