@@ -77,21 +77,6 @@ _PROVIDERS = [
         "timeout": 10,
     },
     {
-        "name":     "nvidia-8b",
-        "base_url": "https://integrate.api.nvidia.com/v1",
-        "key_env":  "NVIDIA_API_KEY",
-        "optional": False,
-        "models": {
-            "default":   "meta/llama-3.1-8b-instruct",
-            "reasoning": "meta/llama-3.1-8b-instruct",
-            "text":      "meta/llama-3.1-8b-instruct",
-            "summary":   "meta/llama-3.1-8b-instruct",
-            "fast":      "meta/llama-3.1-8b-instruct",
-            "quick":     "meta/llama-3.1-8b-instruct",
-        },
-        "timeout": 12,
-    },
-    {
         "name":     "groq",
         "base_url": "https://api.groq.com/openai/v1",
         "key_env":  "GROQ_API_KEY",
@@ -125,9 +110,9 @@ _PROVIDERS = [
 
 # Provider order by model_type
 # NVIDIA models first — groq/together are just safety nets if all NVIDIA is down
-_ORDER_DEFAULT  = ["nvidia-llama70b", "nvidia-flash", "nvidia-8b", "groq", "together"]
-_ORDER_TEXT     = ["nvidia-flash",     "nvidia-llama70b", "nvidia-8b", "groq", "together"]
-_ORDER_FAST     = ["nvidia-flash",     "nvidia-8b", "nvidia-llama70b", "groq", "together"]
+_ORDER_DEFAULT  = ["nvidia-llama70b", "nvidia-flash", "groq", "together"]
+_ORDER_TEXT     = ["nvidia-flash",     "nvidia-llama70b", "groq", "together"]
+_ORDER_FAST     = ["nvidia-flash",     "nvidia-llama70b", "groq", "together"]
 
 _PROVIDER_MAP = {p["name"]: p for p in _PROVIDERS}
 
