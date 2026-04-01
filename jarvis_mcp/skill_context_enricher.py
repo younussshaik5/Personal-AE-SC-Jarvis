@@ -21,7 +21,9 @@ class SkillContextEnricher:
         """Load complete account context"""
         if account_name in self.aggregator_cache:
             aggregator = self.aggregator_cache[account_name]
-            return aggregator.aggregate_all_context()
+            context = aggregator.aggregate_all_context()
+            context['account_path'] = str(aggregator.account_path)
+            return context
 
         account_path = self.hierarchy.get_account_path(account_name)
         if not account_path:
@@ -32,6 +34,7 @@ class SkillContextEnricher:
         self.aggregator_cache[account_name] = aggregator
 
         context = aggregator.aggregate_all_context()
+        context['account_path'] = str(account_path)
         self.logger.debug(f"✓ Loaded context for {account_name}")
         return context
 

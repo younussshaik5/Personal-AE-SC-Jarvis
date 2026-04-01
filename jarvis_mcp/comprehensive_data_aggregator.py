@@ -43,13 +43,26 @@ class ComprehensiveDataAggregator:
         return context
 
     def _load_company_profile(self) -> Dict[str, Any]:
-        """Load company research"""
+        """Load company research from .md or .json"""
         profile = {}
+
+        # Try company_research.md first
         research_file = self.account_path / "company_research.md"
         if research_file.exists():
             content = research_file.read_text()
             profile['overview'] = content
             profile['parsed'] = True
+            return profile
+
+        # Try company_profile.json second
+        profile_file = self.account_path / "company_profile.json"
+        if profile_file.exists():
+            try:
+                profile = json.loads(profile_file.read_text())
+                profile['parsed'] = True
+            except Exception as e:
+                self.logger.warning(f"Could not load company_profile.json: {e}")
+
         return profile
 
     def _load_discovery_notes(self) -> List[Dict[str, Any]]:
@@ -75,7 +88,12 @@ class ComprehensiveDataAggregator:
         deal_file = self.account_path / "deal_stage.json"
         if deal_file.exists():
             try:
-                pipeline = json.loads(deal_file.read_text())
+                data = json.loads(deal_file.read_text())
+                # If data has a "deals" wrapper, extract it
+                if isinstance(data, dict) and "deals" in data:
+                    pipeline = data["deals"]
+                else:
+                    pipeline = data
             except Exception as e:
                 self.logger.warning(f"Could not load deal_stage.json: {e}")
         return pipeline
