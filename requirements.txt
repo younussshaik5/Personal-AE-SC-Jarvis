@@ -1,20 +1,6 @@
-# JARVIS v2.0 Dependencies
-
-# No external MCP library needed - uses asyncio and stdio directly
-# Python 3.8+ required for async/await support
-
-# Anthropic SDK (for Claude integration)
+mcp>=0.1.0
 anthropic>=0.25.0
-
-# OpenAI SDK (for future multi-provider support)
-openai>=1.0.0
-
-# Async support
-anyio>=4.0.0
-
-# Logging & monitoring
-python-json-logger>=2.0.0
-
-# Utilities
-python-dotenv>=1.0.0
 pydantic>=2.0.0
+pydantic-settings>=2.0.0
+aiofiles>=23.0.0
+python-dotenv>=1.0.0

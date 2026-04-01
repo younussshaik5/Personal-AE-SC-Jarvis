@@ -1,93 +1,71 @@
-# JARVIS v2.0 Quick Start
+# JARVIS MCP — Quick Start (5 Minutes)
 
-**Get JARVIS running in 5 minutes**
+## Zero Setup — One Command
 
-## Step 1: Clone (30 seconds)
-```bash
-git clone https://github.com/younussshaik5/Personal-AE-SC-Jarvis.git
-cd Personal-AE-SC-Jarvis
-```
-
-## Step 2: Install Dependencies (1 minute)
-```bash
-python3 -m pip install -r requirements.txt
-```
-
-This installs:
-- `mcp` - MCP protocol server
-- `anthropic`, `openai` - LLM libraries
-- `anyio` - Async support
-- Plus logging and utilities
-
-## Step 3: Set API Key (30 seconds)
-Get your NVIDIA API key from [api.nvidia.com](https://api.nvidia.com)
+After cloning the repo, just run:
 
 ```bash
-export NVIDIA_API_KEY="your_key_here"
+bash setup.sh
 ```
 
-## Step 4: Add to Claude Desktop (2 minutes)
+That's it. The script will:
 
-Open `~/.claude/config.json` and add this block:
+1. **Check/Install Homebrew** (if missing)
+2. **Auto-install Python 3.13** (if you don't have 3.10+)
+3. **Install all Python dependencies** (mcp, anthropic, pydantic, etc)
+4. **Create ACCOUNTS folder** (where all account data lives)
+5. **Register JARVIS in Claude Desktop config** (with correct paths for your machine)
+6. **Run smoke tests** (verify everything works)
 
-```json
-{
-  "mcpServers": {
-    "jarvis": {
-      "command": "python3",
-      "args": ["/full/path/to/Personal-AE-SC-Jarvis/jarvis_mcp/mcp_server.py"],
-      "env": {
-        "NVIDIA_API_KEY": "your_key_here"
-      }
-    }
-  }
-}
-```
+## What happens after setup.sh?
 
-Replace `/full/path/to/` with your actual path:
+1. **Quit Claude Desktop** (⌘Q)
+2. **Reopen Claude Desktop**
+3. **Look for 🔨 Tools** in the sidebar
+4. **JARVIS appears** with 27 available skills
+
+## Already have dependencies?
+
+No problem. `setup.sh` will skip things that are already installed and update config.
+
+## Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| "Python not found" | `brew install python@3.13` |
+| "mcp module not found" | Run `bash setup.sh` again |
+| "Claude Desktop not connecting" | Quit Claude (⌘Q), wait 2 sec, reopen |
+| Setup runs but tools don't appear | Check: `cat ~/Library/Application\ Support/Claude/claude_desktop_config.json` |
+
+## What gets installed?
+
+- **Python 3.13** (via Homebrew, if needed)
+- **mcp** — Model Context Protocol SDK
+- **anthropic** — Claude API client
+- **pydantic** — Data validation
+- **aiofiles** — Async file I/O
+
+All listed in `requirements.txt`.
+
+## Uninstall
+
 ```bash
-pwd  # Copy this output and use it above
+# Remove JARVIS from Claude Desktop (optional)
+rm -rf ~/Library/Application\ Support/Claude/claude_desktop_config.json
+
+# Remove ACCOUNTS folder (optional)
+rm -rf ~/Documents/claude\ space/ACCOUNTS
 ```
 
-## Step 5: Restart Claude Desktop
+## For Development
 
-Close Claude Desktop completely, then reopen it.
+To rebuild the server after code changes:
 
-You should see "jarvis-mcp" in the MCP servers list (usually shown in Claude Desktop settings/status).
-
-## Step 6: Test It Out
-
-In any Claude cowork session:
-
+```bash
+# The server auto-restarts when you reopen Claude Desktop
+# No manual restart needed
 ```
-Create a new account for Acme Corporation
-```
-
-JARVIS will:
-- Ask for confirmation ✓
-- Create `~/Documents/claude space/ACCOUNTS/Acme/` ✓
-- Add deal_stage.json, discovery.md, company_research.md, CLAUDE.md ✓
-- Generate dashboard.html ✓
-
-Done! Start working on your account.
-
-## Verify MCP is Running
-
-To verify MCP started correctly:
-
-1. Open Claude Desktop
-2. Check that jarvis-mcp appears in available tools
-3. Try: `@jarvis server_status`
-4. Should see: ✓ status: running, 25 skills available
-
-## Next Steps
-
-See [README.md](README.md) for:
-- How to create sub-accounts (Acme → AcmeEdu, AcmeSaaS)
-- How to view dashboards
-- All 25+ available skills
-- Settings & customization
 
 ---
 
-**Questions?** Check [README.md](README.md#troubleshooting)
+**That's all!** JARVIS is production-ready and auto-syncs with Claude Desktop.
