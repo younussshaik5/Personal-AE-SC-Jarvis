@@ -66,3 +66,14 @@ tmp/
 .ui.pid
 jarvis.log
 mcp.log
+
+# Account data — never commit customer deal data
+ACCOUNTS/
+accounts/
+
+# Queue and runtime state
+.jarvis_queue.json
+.jarvis_state.json
+
+# Claude Code local settings (user-specific)
+.claude/settings.json

@@ -1,53 +1,34 @@
-"""
-Competitor Research Skill
-"""
-
+"""Competitive Intelligence Skill"""
 from jarvis_mcp.skills.base_skill import BaseSkill
 
 
 class CompetitiveIntelligenceSkill(BaseSkill):
-    """Competitor research"""
-
     async def generate(self, account_name: str, **kwargs) -> str:
-        """
-        Generate competitive_intelligence.
-
-        Args:
-            account_name: Account name (e.g., 'Acme Corp')
-
-        Returns:
-            Generated content (markdown)
-        """
-        # Read account context
         context = await self.read_account_files(account_name)
+        ctx = self.build_context_block(context, account_name)
 
-        # Build prompt
-        prompt = f"""Generate competitor research for {account_name}.
+        prompt = f"""Build competitive intelligence for {account_name}.
 
-Account Context:
-- Company: {context.get('company_research', '')[:500]}...
-- Discovery: {context.get('discovery', '')[:500]}...
-- Deal Stage: {context.get('deal_stage', 'Unknown')}
-- MEDDPICC: {context.get('meddpicc', '')[:300]}...
+ACCOUNT DATA:
+{ctx}
 
-Create a comprehensive competitor research that:
-1. Addresses specific account needs
-2. References discovery insights
-3. Includes actionable recommendations
-4. Uses clear formatting (markdown)
+Using ONLY the data above, analyse the competitive situation:
+1. Confirmed competitor(s): names and roles (incumbent, shortlisted, etc.) from deal data
+2. Why the customer is evaluating alternatives — their stated reason from discovery
+3. Competitor's likely strengths in this account (based on why they're incumbent or chosen)
+4. Competitor's weaknesses tied to what this customer wants
+5. Our differentiated position for THIS customer's specific requirements
+6. Counter-positioning: how to reframe the evaluation criteria in our favour
+7. Questions to ask that expose the competitor's gap without naming them
+8. Risk: could the customer stay with the incumbent? What would cause that?
 
-Format as professional markdown."""
+If only one competitor is in the data, focus only on that one. Do NOT add competitors not mentioned in the data."""
 
-        # Call NVIDIA
         response = await self.llm.generate(
-            model_type="reasoning",
             prompt=prompt,
-            context={"account": account_name},
-            max_tokens=3000,
+            model_type="reasoning",
+            system_prompt=self.grounded_system_prompt(),
+            max_tokens=2500,
         )
-
-        # Write output
-        filename = "competitive_intelligence.md"
-        await self.write_output(account_name, filename, response)
-
+        await self.write_output(account_name, "competitive_intelligence.md", response)
         return response

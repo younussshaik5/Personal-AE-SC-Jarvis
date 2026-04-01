@@ -1,53 +1,34 @@
-"""
-Competitor Pricing Analysis Skill
-"""
-
+"""Competitor Pricing Analysis Skill"""
 from jarvis_mcp.skills.base_skill import BaseSkill
 
 
 class CompetitorPricingSkill(BaseSkill):
-    """Competitor pricing analysis"""
-
-    async def generate(self, account_name: str, **kwargs) -> str:
-        """
-        Generate competitor_pricing.
-
-        Args:
-            account_name: Account name (e.g., 'Acme Corp')
-
-        Returns:
-            Generated content (markdown)
-        """
-        # Read account context
+    async def generate(self, account_name: str, competitor: str = "", **kwargs) -> str:
         context = await self.read_account_files(account_name)
+        ctx = self.build_context_block(context, account_name)
+        comp = competitor or (context.get("_deal", {}) or {}).get("competitive_situation", {}).get("primary_competitor", "the incumbent")
 
-        # Build prompt
-        prompt = f"""Generate competitor pricing analysis for {account_name}.
+        prompt = f"""Analyse pricing and commercial positioning for {account_name} vs {comp}.
 
-Account Context:
-- Company: {context.get('company_research', '')[:500]}...
-- Discovery: {context.get('discovery', '')[:500]}...
-- Deal Stage: {context.get('deal_stage', 'Unknown')}
-- MEDDPICC: {context.get('meddpicc', '')[:300]}...
+ACCOUNT DATA:
+{ctx}
 
-Create a comprehensive competitor pricing analysis that:
-1. Addresses specific account needs
-2. References discovery insights
-3. Includes actionable recommendations
-4. Uses clear formatting (markdown)
+Using ONLY the data above plus general knowledge of {comp}'s public pricing model:
+1. Our pricing for this deal: actual ARR, per-agent cost, plan from deal data
+2. Estimated competitor pricing (use public knowledge for {comp} — clearly label as estimate)
+3. TCO comparison over 1 year and 3 years
+4. Where we are more expensive and how to justify it
+5. Where we are cheaper — use this proactively
+6. Discount strategy: what to offer and when (tied to their deadline from deal data)
+7. Commercial objection handlers for this deal
 
-Format as professional markdown."""
+Clearly separate facts from the account data vs general market knowledge."""
 
-        # Call NVIDIA
         response = await self.llm.generate(
-            model_type="text",
             prompt=prompt,
-            context={"account": account_name},
-            max_tokens=3000,
+            model_type="reasoning",
+            system_prompt=self.grounded_system_prompt(),
+            max_tokens=2500,
         )
-
-        # Write output
-        filename = "competitor_pricing.md"
-        await self.write_output(account_name, filename, response)
-
+        await self.write_output(account_name, "competitor_pricing.md", response)
         return response

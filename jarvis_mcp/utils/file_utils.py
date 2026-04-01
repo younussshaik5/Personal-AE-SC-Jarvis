@@ -2,14 +2,14 @@
 
 import asyncio
 from pathlib import Path
-from typing import Optional
 
 
 async def read_file(path: Path) -> str:
     """Read file content asynchronously."""
     try:
         loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(None, path.read_text, encoding='utf-8')
+        # run_in_executor only accepts positional args — use a lambda to pass encoding
+        return await loop.run_in_executor(None, lambda: path.read_text(encoding='utf-8'))
     except Exception as e:
         print(f"Error reading {path}: {e}")
         return ""
@@ -20,7 +20,7 @@ async def write_file(path: Path, content: str) -> bool:
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         loop = asyncio.get_event_loop()
-        await loop.run_in_executor(None, path.write_text, content, 'utf-8')
+        await loop.run_in_executor(None, lambda: path.write_text(content, encoding='utf-8'))
         return True
     except Exception as e:
         print(f"Error writing {path}: {e}")

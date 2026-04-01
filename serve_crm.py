@@ -50,13 +50,14 @@ logging.basicConfig(level=logging.INFO, format="[CRM] %(message)s", stream=sys.s
 log = logging.getLogger(__name__)
 
 # ── ACCOUNTS root ─────────────────────────────────────────────────────────────
+_env_root = os.getenv("ACCOUNTS_ROOT", "")
 _candidates = [
-    Path(os.getenv("ACCOUNTS_ROOT", "")),
+    Path(_env_root) if _env_root else None,
     _here / "ACCOUNTS",
     Path.home() / "Documents" / "claude space" / "ACCOUNTS",
     Path.cwd() / "ACCOUNTS",
 ]
-ACCOUNTS_ROOT = next((p for p in _candidates if p.exists()), _here / "ACCOUNTS")
+ACCOUNTS_ROOT = next((p for p in _candidates if p and p.exists()), _here / "ACCOUNTS")
 
 # ── Skill output file registry ────────────────────────────────────────────────
 SKILL_FILES = {
@@ -184,7 +185,13 @@ def compute_meddpicc(deal, disc_sec, claude_sec, stakeholders):
     success = disc_sec.get('Success Criteria', '')
     score['metrics'] = min(10, len(extract_bullets(success)) * 2) if success else 0
 
-    has_budget_holder = any(k in s.lower() for s in stakeholders for k in ['cfo', 'budget', 'finance', 'ceo', 'president'])
+    # Stakeholders can be list of strings OR list of dicts — handle both
+    def _s_str(s):
+        if isinstance(s, dict):
+            return ' '.join(str(v) for v in s.values()).lower()
+        return str(s).lower()
+
+    has_budget_holder = any(k in _s_str(s) for s in stakeholders for k in ['cfo', 'budget', 'finance', 'ceo', 'president'])
     score['economic_buyer'] = 10 if has_budget_holder else (3 if stakeholders else 0)
 
     criteria = disc_sec.get('Key Pain Points to Address', '') or disc_sec.get('Key Challenges', '') or disc_sec.get('Business Drivers', '')
@@ -194,7 +201,7 @@ def compute_meddpicc(deal, disc_sec, claude_sec, stakeholders):
     score['decision_process'] = 8 if process else 2
 
     stage = deal.get('stage', '').lower()
-    has_legal = any(k in s.lower() for s in stakeholders for k in ['procurement', 'legal', 'contract'])
+    has_legal = any(k in _s_str(s) for s in stakeholders for k in ['procurement', 'legal', 'contract'])
     score['paper_process'] = 9 if 'negotiate' in stage or 'close' in stage else (6 if has_legal else 2)
 
     pain = disc_sec.get('Business Drivers', '') or disc_sec.get('Key Challenges', '')

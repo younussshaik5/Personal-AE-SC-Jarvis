@@ -1,53 +1,32 @@
-"""
-Quick Deal Insights Skill
-"""
-
+"""Quick Deal Insights Skill"""
 from jarvis_mcp.skills.base_skill import BaseSkill
 
 
 class QuickInsightsSkill(BaseSkill):
-    """Quick deal insights"""
-
     async def generate(self, account_name: str, **kwargs) -> str:
-        """
-        Generate quick_insights.
-
-        Args:
-            account_name: Account name (e.g., 'Acme Corp')
-
-        Returns:
-            Generated content (markdown)
-        """
-        # Read account context
         context = await self.read_account_files(account_name)
+        ctx = self.build_context_block(context, account_name)
 
-        # Build prompt
-        prompt = f"""Generate quick deal insights for {account_name}.
+        prompt = f"""Give quick deal insights for {account_name}.
 
-Account Context:
-- Company: {context.get('company_research', '')[:500]}...
-- Discovery: {context.get('discovery', '')[:500]}...
-- Deal Stage: {context.get('deal_stage', 'Unknown')}
-- MEDDPICC: {context.get('meddpicc', '')[:300]}...
+ACCOUNT DATA:
+{ctx}
 
-Create a comprehensive quick deal insights that:
-1. Addresses specific account needs
-2. References discovery insights
-3. Includes actionable recommendations
-4. Uses clear formatting (markdown)
+Using ONLY the data above, provide:
+1. Deal snapshot: stage, ARR, win prob, forecast date — actual numbers from data
+2. Top 3 buying signals confirmed so far
+3. Top 3 risks right now (RED items first)
+4. #1 next action with a specific date and owner
+5. MEDDPICC gaps: list the dimensions that are RED or missing
+6. Competitive threat: incumbent name, their strength, our counter
 
-Format as professional markdown."""
+Keep it to bullet points. No padding. No invented facts."""
 
-        # Call NVIDIA
         response = await self.llm.generate(
-            model_type="quick",
             prompt=prompt,
-            context={"account": account_name},
-            max_tokens=3000,
+            model_type="fast",
+            system_prompt=self.grounded_system_prompt(),
+            max_tokens=1500,
         )
-
-        # Write output
-        filename = "quick_insights.md"
-        await self.write_output(account_name, filename, response)
-
+        await self.write_output(account_name, "quick_insights.md", response)
         return response

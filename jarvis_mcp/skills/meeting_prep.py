@@ -1,53 +1,37 @@
-"""
-Meeting Preparation Briefs Skill
-"""
-
+"""Meeting Preparation Skill"""
 from jarvis_mcp.skills.base_skill import BaseSkill
 
 
 class MeetingPrepSkill(BaseSkill):
-    """Meeting preparation briefs"""
-
     async def generate(self, account_name: str, **kwargs) -> str:
-        """
-        Generate meeting_prep.
-
-        Args:
-            account_name: Account name (e.g., 'Acme Corp')
-
-        Returns:
-            Generated content (markdown)
-        """
-        # Read account context
         context = await self.read_account_files(account_name)
+        ctx = self.build_context_block(context, account_name)
+        meeting_type = kwargs.get("meeting_type", "")
 
-        # Build prompt
-        prompt = f"""Generate meeting preparation briefs for {account_name}.
+        prompt = f"""Generate a meeting prep brief for {account_name}{' — ' + meeting_type if meeting_type else ''}.
 
-Account Context:
-- Company: {context.get('company_research', '')[:500]}...
-- Discovery: {context.get('discovery', '')[:500]}...
-- Deal Stage: {context.get('deal_stage', 'Unknown')}
-- MEDDPICC: {context.get('meddpicc', '')[:300]}...
+ACCOUNT DATA:
+{ctx}
 
-Create a comprehensive meeting preparation briefs that:
-1. Addresses specific account needs
-2. References discovery insights
-3. Includes actionable recommendations
-4. Uses clear formatting (markdown)
+Using ONLY the data above, build a pre-meeting runsheet:
 
-Format as professional markdown."""
+1. Meeting context: who is attending (from stakeholders in data), purpose, stage
+2. What we know: confirmed pain points, requirements, buying signals from discovery
+3. What we still need to find out: MEDDPICC gaps, missing information
+4. Agenda (ordered by priority — address biggest unknown first):
+   - Each agenda item with time allocation and goal
+5. Discovery questions to ask — specific to this deal's confirmed pain points
+6. Objections to expect — based on concerns mentioned in the data, with handlers
+7. Hard ask: what commitment to get by end of this meeting
+8. Red flags to watch for
 
-        # Call NVIDIA
+Use the actual stakeholder names and roles from the data. Do NOT invent agenda items not relevant to this deal."""
+
         response = await self.llm.generate(
-            model_type="text",
             prompt=prompt,
-            context={"account": account_name},
+            model_type="reasoning",
+            system_prompt=self.grounded_system_prompt(),
             max_tokens=3000,
         )
-
-        # Write output
-        filename = "meeting_prep.md"
-        await self.write_output(account_name, filename, response)
-
+        await self.write_output(account_name, "meeting_prep.md", response)
         return response

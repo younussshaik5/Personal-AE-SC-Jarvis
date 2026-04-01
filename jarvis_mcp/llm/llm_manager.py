@@ -4,9 +4,22 @@ import os
 import json
 import asyncio
 import logging
+import ssl
+import time
 import urllib.request
 import urllib.error
 from typing import Dict, Any, Optional, List
+
+# Build a verified SSL context using certifi if available, else system default
+def _ssl_ctx():
+    try:
+        import certifi
+        ctx = ssl.create_default_context(cafile=certifi.where())
+    except ImportError:
+        ctx = ssl.create_default_context()
+    return ctx
+
+_SSL_CTX = _ssl_ctx()
 
 log = logging.getLogger(__name__)
 
@@ -59,21 +72,32 @@ class LLMManager:
             method="POST",
         )
 
-        try:
-            with urllib.request.urlopen(req, timeout=60) as resp:
-                body = json.loads(resp.read().decode("utf-8"))
-                return body["choices"][0]["message"]["content"]
-        except urllib.error.HTTPError as e:
-            error_body = e.read().decode("utf-8") if e.fp else str(e)
-            log.error(f"NVIDIA API HTTP {e.code}: {error_body}")
-            if e.code == 401:
-                return "❌ NVIDIA API key invalid or expired. Update NVIDIA_API_KEY in .env"
-            if e.code == 429:
-                return "❌ NVIDIA API rate limit hit. Wait a moment and retry."
-            return f"❌ NVIDIA API error {e.code}: {error_body[:200]}"
-        except Exception as e:
-            log.error(f"NVIDIA API call failed: {e}")
-            return f"❌ LLM call failed: {e}"
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                with urllib.request.urlopen(req, timeout=90, context=_SSL_CTX) as resp:
+                    body = json.loads(resp.read().decode("utf-8"))
+                    return body["choices"][0]["message"]["content"]
+            except urllib.error.HTTPError as e:
+                error_body = e.read().decode("utf-8") if e.fp else str(e)
+                if e.code == 401:
+                    log.error("NVIDIA API key invalid or expired")
+                    raise RuntimeError("❌ NVIDIA API key invalid or expired. Update NVIDIA_API_KEY in .env")
+                if e.code == 429:
+                    wait = 15 * (attempt + 1)
+                    log.warning(f"NVIDIA rate limit hit — waiting {wait}s (attempt {attempt+1}/{max_retries})")
+                    time.sleep(wait)
+                    # Rebuild request (body already encoded)
+                    req = urllib.request.Request(url, data=payload,
+                        headers={"Content-Type": "application/json", "Authorization": f"Bearer {self.api_key}"},
+                        method="POST")
+                    continue
+                log.error(f"NVIDIA API HTTP {e.code}: {error_body}")
+                raise RuntimeError(f"❌ NVIDIA API error {e.code}: {error_body[:200]}")
+            except Exception as e:
+                log.error(f"NVIDIA API call failed: {e}")
+                raise
+        raise RuntimeError("❌ NVIDIA API rate limit — all retries exhausted. Try again in a minute.")
 
     async def generate(
         self,
@@ -96,11 +120,16 @@ class LLMManager:
 
         # Run blocking HTTP call in a thread pool so we don't block the event loop
         loop = asyncio.get_event_loop()
-        result = await loop.run_in_executor(
-            None,
-            self._call_api_sync,
-            model, messages, max_tokens, temperature
-        )
+        try:
+            result = await loop.run_in_executor(
+                None,
+                self._call_api_sync,
+                model, messages, max_tokens, temperature
+            )
+        except RuntimeError as e:
+            # Rate limit / auth errors — propagate as string so callers can decide
+            # whether to write to file. execute() in BaseSkill will return this as error.
+            return str(e)
         return result
 
     async def batch_generate(

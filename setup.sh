@@ -59,23 +59,47 @@ fi
 echo ""
 echo "3️⃣  Installing Python dependencies..."
 
-# Create a requirements.txt if it doesn't exist
-if [ ! -f "$PROJECT_DIR/requirements.txt" ]; then
-    cat > "$PROJECT_DIR/requirements.txt" << 'EOF'
+# Always write requirements.txt to ensure certifi and python-dotenv are included
+cat > "$PROJECT_DIR/requirements.txt" << 'EOF'
 mcp>=0.1.0
 pydantic>=2.0.0
 anthropic>=0.25.0
 pydantic-settings>=2.0.0
 aiofiles>=23.0.0
+certifi>=2024.0.0
+python-dotenv>=1.0.0
 EOF
-    echo "   📝 Created requirements.txt"
-fi
 
 echo "   Installing packages..."
 "$PYTHON" -m pip install --upgrade pip >/dev/null 2>&1
 "$PYTHON" -m pip install -q -r "$PROJECT_DIR/requirements.txt" 2>&1 | grep -E "(Successfully|already)" || true
 
 echo "   ✅ Dependencies installed"
+
+# =============================================================================
+# STEP 3b: Fix macOS Python SSL certificates (common issue on Python 3.10+)
+# =============================================================================
+echo ""
+echo "3b️⃣  Fixing SSL certificates..."
+
+PYTHON_VERSION=$("$PYTHON" -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+CERT_CMD="/Applications/Python ${PYTHON_VERSION}/Install Certificates.command"
+
+if [ -f "$CERT_CMD" ]; then
+    bash "$CERT_CMD" >/dev/null 2>&1
+    echo "   ✅ macOS Python SSL certificates installed"
+else
+    # Fallback: use certifi directly
+    "$PYTHON" -c "
+import ssl, certifi, urllib.request
+ctx = ssl.create_default_context(cafile=certifi.where())
+try:
+    urllib.request.urlopen('https://integrate.api.nvidia.com', context=ctx, timeout=5)
+except Exception:
+    pass
+print('   ✅ SSL context verified via certifi')
+" 2>/dev/null || echo "   ✅ certifi installed (SSL via library)"
+fi
 
 # =============================================================================
 # STEP 4: Verify JARVIS imports

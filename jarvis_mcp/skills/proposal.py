@@ -1,53 +1,33 @@
-"""
-Generate Sales Proposals Skill
-"""
-
+"""Generate Sales Proposals Skill"""
 from jarvis_mcp.skills.base_skill import BaseSkill
 
 
 class ProposalSkill(BaseSkill):
-    """Generate sales proposals"""
-
     async def generate(self, account_name: str, **kwargs) -> str:
-        """
-        Generate proposal.
-
-        Args:
-            account_name: Account name (e.g., 'Acme Corp')
-
-        Returns:
-            Generated content (markdown)
-        """
-        # Read account context
         context = await self.read_account_files(account_name)
+        ctx = self.build_context_block(context, account_name)
 
-        # Build prompt
-        prompt = f"""Generate generate sales proposals for {account_name}.
+        prompt = f"""Write a sales proposal for {account_name}.
 
-Account Context:
-- Company: {context.get('company_research', '')[:500]}...
-- Discovery: {context.get('discovery', '')[:500]}...
-- Deal Stage: {context.get('deal_stage', 'Unknown')}
-- MEDDPICC: {context.get('meddpicc', '')[:300]}...
+ACCOUNT DATA:
+{ctx}
 
-Create a comprehensive generate sales proposals that:
-1. Addresses specific account needs
-2. References discovery insights
-3. Includes actionable recommendations
-4. Uses clear formatting (markdown)
+Using ONLY the data above, write a professional proposal covering:
+1. Executive summary — their situation and why they're evaluating (from discovery)
+2. Their stated requirements — use the actual list from discovery
+3. Our solution — map each requirement to a specific capability
+4. Pricing — use the ARR and agent count from deal data
+5. Implementation timeline — tied to their deadline from deal data
+6. Why us vs the incumbent — use actual competitor from deal data
+7. Next steps — specific, dated actions
 
-Format as professional markdown."""
+Address the proposal to the stakeholders named in the data. Reference their actual pain points. Do NOT use placeholder names or invented requirements."""
 
-        # Call NVIDIA
         response = await self.llm.generate(
-            model_type="text",
             prompt=prompt,
-            context={"account": account_name},
-            max_tokens=3000,
+            model_type="reasoning",
+            system_prompt=self.grounded_system_prompt(),
+            max_tokens=4000,
         )
-
-        # Write output
-        filename = "proposal.md"
-        await self.write_output(account_name, filename, response)
-
+        await self.write_output(account_name, "proposal.md", response)
         return response

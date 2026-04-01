@@ -1,53 +1,38 @@
-"""
-Deal Risk Assessment Skill
-"""
-
+"""Deal Risk Assessment Skill"""
 from jarvis_mcp.skills.base_skill import BaseSkill
 
 
 class RiskReportSkill(BaseSkill):
-    """Deal risk assessment"""
-
     async def generate(self, account_name: str, **kwargs) -> str:
-        """
-        Generate risk_report.
-
-        Args:
-            account_name: Account name (e.g., 'Acme Corp')
-
-        Returns:
-            Generated content (markdown)
-        """
-        # Read account context
         context = await self.read_account_files(account_name)
+        ctx = self.build_context_block(context, account_name)
 
-        # Build prompt
-        prompt = f"""Generate deal risk assessment for {account_name}.
+        prompt = f"""Generate a deal risk report for {account_name}.
 
-Account Context:
-- Company: {context.get('company_research', '')[:500]}...
-- Discovery: {context.get('discovery', '')[:500]}...
-- Deal Stage: {context.get('deal_stage', 'Unknown')}
-- MEDDPICC: {context.get('meddpicc', '')[:300]}...
+ACCOUNT DATA:
+{ctx}
 
-Create a comprehensive deal risk assessment that:
-1. Addresses specific account needs
-2. References discovery insights
-3. Includes actionable recommendations
-4. Uses clear formatting (markdown)
+Using ONLY the data above, identify every risk present in this deal. For each risk:
+- Risk name
+- Severity: RED / AMBER / GREEN
+- Category: Stakeholder | Competitive | Technical | Timeline | Commercial | Process
+- Evidence: what in the data signals this risk
+- Mitigation: specific action with owner and deadline
 
-Format as professional markdown."""
+Order risks by severity (RED first).
 
-        # Call NVIDIA
+Then provide:
+- Overall risk rating: RED / AMBER / GREEN
+- Must-resolve before close: the 2–3 risks that will kill the deal if unaddressed
+- Risk trend: improving or worsening based on deal progression
+
+Do NOT invent risks not evidenced in the data."""
+
         response = await self.llm.generate(
-            model_type="reasoning",
             prompt=prompt,
-            context={"account": account_name},
+            model_type="reasoning",
+            system_prompt=self.grounded_system_prompt(),
             max_tokens=3000,
         )
-
-        # Write output
-        filename = "risk_report.md"
-        await self.write_output(account_name, filename, response)
-
+        await self.write_output(account_name, "risk_report.md", response)
         return response
