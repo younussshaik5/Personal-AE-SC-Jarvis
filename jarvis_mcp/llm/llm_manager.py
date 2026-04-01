@@ -55,8 +55,8 @@ _PROVIDERS = [
             "reasoning": "meta/llama-3.3-70b-instruct",
             "text":      "meta/llama-3.3-70b-instruct",
             "summary":   "meta/llama-3.3-70b-instruct",
-            "fast":      "meta/llama-3.1-8b-instruct",
-            "quick":     "meta/llama-3.1-8b-instruct",
+            "fast":      "stepfun-ai/step-3.5-flash",
+            "quick":     "stepfun-ai/step-3.5-flash",
         },
         "timeout": 12,
     },
@@ -65,17 +65,33 @@ _PROVIDERS = [
         "base_url": "https://integrate.api.nvidia.com/v1",
         "key_env":  "NVIDIA_API_KEY",
         "optional": False,
-        # nemotron-3-nano-30b: long context, no hallucination, great for text gen / rephrase / summary
-        # NOT for creative tasks or open-ended search — use llama70b for those
+        # nemotron-3-nano-30b: long context, great for text gen / summary / rephrase
+        # nemotron-70b: NVIDIA-tuned reasoning model for complex analysis
         "models": {
-            "default":   "nvidia/llama-3.1-nemotron-70b-instruct",
+            "default":   "nvidia/nemotron-3-nano-30b-a3b",
             "reasoning": "nvidia/llama-3.1-nemotron-70b-instruct",
-            "text":      "nvidia/llama-3.1-nemotron-70b-instruct",
-            "summary":   "nvidia/llama-3.1-nemotron-70b-instruct",
-            "fast":      "nvidia/llama-3.1-nemotron-70b-instruct",
-            "quick":     "meta/llama-3.1-8b-instruct",
+            "text":      "nvidia/nemotron-3-nano-30b-a3b",
+            "summary":   "nvidia/nemotron-3-nano-30b-a3b",
+            "fast":      "stepfun-ai/step-3.5-flash",
+            "quick":     "stepfun-ai/step-3.5-flash",
         },
-        "timeout": 15,
+        "timeout": 20,
+    },
+    {
+        "name":     "nvidia-flash",
+        "base_url": "https://integrate.api.nvidia.com/v1",
+        "key_env":  "NVIDIA_API_KEY",
+        "optional": False,
+        # step-3.5-flash: fast, low-latency — default for all fast/quick tasks
+        "models": {
+            "default":   "stepfun-ai/step-3.5-flash",
+            "reasoning": "stepfun-ai/step-3.5-flash",
+            "text":      "stepfun-ai/step-3.5-flash",
+            "summary":   "stepfun-ai/step-3.5-flash",
+            "fast":      "stepfun-ai/step-3.5-flash",
+            "quick":     "stepfun-ai/step-3.5-flash",
+        },
+        "timeout": 10,
     },
     {
         "name":     "nvidia-8b",
@@ -126,9 +142,9 @@ _PROVIDERS = [
 
 # Provider order by model_type
 # NVIDIA models first — groq/together are just safety nets if all NVIDIA is down
-_ORDER_DEFAULT  = ["nvidia-llama70b", "nvidia-nemotron", "nvidia-8b", "groq", "together"]
-_ORDER_TEXT     = ["nvidia-nemotron",  "nvidia-llama70b", "nvidia-8b", "groq", "together"]
-_ORDER_FAST     = ["nvidia-8b",        "nvidia-nemotron", "nvidia-llama70b", "groq", "together"]
+_ORDER_DEFAULT  = ["nvidia-llama70b", "nvidia-nemotron", "nvidia-flash", "nvidia-8b", "groq", "together"]
+_ORDER_TEXT     = ["nvidia-nemotron",  "nvidia-llama70b", "nvidia-flash", "nvidia-8b", "groq", "together"]
+_ORDER_FAST     = ["nvidia-flash",     "nvidia-8b", "nvidia-llama70b", "nvidia-nemotron", "groq", "together"]
 
 _PROVIDER_MAP = {p["name"]: p for p in _PROVIDERS}
 
