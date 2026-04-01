@@ -8,6 +8,30 @@ The user is a Sales Professional handling both Account Executive (AE) and Soluti
 
 ---
 
+## API KEY SETUP (Auto-Guide Users)
+
+### If user hasn't set NVIDIA API key yet:
+1. **Detect:** Check if JARVIS is trying to use skills — if LLM calls fail, API key might be missing
+2. **Guide:** Tell user:
+   ```
+   📝 To get your NVIDIA API key:
+   1. Go to https://build.nvidia.com/
+   2. Sign up (free tier available)
+   3. Get your API key
+   4. Edit .env file: open the JARVIS folder, find .env
+   5. Replace NVIDIA_API_KEY value with your key
+   6. Restart Claude Desktop (⌘Q, then reopen)
+   ```
+3. **Verify:** After user adds key, test with a simple skill call: "Create a test account for verification"
+4. **Confirm:** "✅ API key working! JARVIS is now fully operational"
+
+### If user doesn't have .env file:
+- They likely didn't run setup.sh properly
+- Guide them: `bash setup.sh` will create .env automatically
+- Then add the API key as above
+
+---
+
 ## AUTOMATIC RULES — Do These Without Being Asked
 
 ### When you read a Gmail email:
