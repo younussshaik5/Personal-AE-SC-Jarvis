@@ -270,3 +270,147 @@ class JarvisServer:
                 "scaffolder": True,
             }
         }
+
+
+# ============================================================================
+# MCP PROTOCOL IMPLEMENTATION - Server Startup
+# ============================================================================
+
+import asyncio
+from mcp.server import Server
+from mcp.types import Tool, TextContent, ToolResult
+
+
+def create_mcp_server():
+    """Create and configure MCP server with all tools"""
+    server = Server("jarvis-mcp")
+    jarvis = JarvisServer()
+
+    # Register all skills as MCP tools
+    @server.list_tools()
+    async def list_tools():
+        """List all available JARVIS skills as MCP tools"""
+        tools = []
+        for skill_name in jarvis.skills.keys():
+            tools.append(
+                Tool(
+                    name=skill_name,
+                    description=f"JARVIS skill: {skill_name}",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "account": {
+                                "type": "string",
+                                "description": "Account name (optional, auto-detected if in account folder)"
+                            }
+                        }
+                    }
+                )
+            )
+        
+        # Add system tools
+        system_tools = [
+            Tool(
+                name="list_accounts",
+                description="List all accounts and their paths",
+                inputSchema={"type": "object", "properties": {}}
+            ),
+            Tool(
+                name="get_account_info",
+                description="Get detailed information about an account",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "account_name": {
+                            "type": "string",
+                            "description": "Name of the account"
+                        }
+                    }
+                }
+            ),
+            Tool(
+                name="server_status",
+                description="Get JARVIS server status and statistics",
+                inputSchema={"type": "object", "properties": {}}
+            )
+        ]
+        
+        return tools + system_tools
+
+    @server.call_tool()
+    async def call_tool(name: str, arguments: dict) -> ToolResult:
+        """Execute a tool/skill"""
+        try:
+            # System tools
+            if name == "list_accounts":
+                accounts = jarvis.list_accounts()
+                return ToolResult(
+                    content=[TextContent(type="text", text=json.dumps(accounts, indent=2))],
+                    is_error=False
+                )
+            
+            elif name == "get_account_info":
+                account_name = arguments.get("account_name")
+                info = jarvis.get_account_info(account_name)
+                if info:
+                    return ToolResult(
+                        content=[TextContent(type="text", text=json.dumps(info, indent=2))],
+                        is_error=False
+                    )
+                else:
+                    return ToolResult(
+                        content=[TextContent(type="text", text=f"Account not found: {account_name}")],
+                        is_error=True
+                    )
+            
+            elif name == "server_status":
+                status = jarvis.get_server_status()
+                return ToolResult(
+                    content=[TextContent(type="text", text=json.dumps(status, indent=2))],
+                    is_error=False
+                )
+            
+            # Skill tools
+            elif name in jarvis.skills:
+                account = arguments.get("account")
+                result = await jarvis.handle_tool_call(name, account=account, **arguments)
+                return ToolResult(
+                    content=[TextContent(type="text", text=result)],
+                    is_error=False
+                )
+            
+            else:
+                return ToolResult(
+                    content=[TextContent(type="text", text=f"Unknown tool: {name}")],
+                    is_error=True
+                )
+        
+        except Exception as e:
+            logger.error(f"Tool call error: {e}")
+            return ToolResult(
+                content=[TextContent(type="text", text=f"Error: {str(e)}")],
+                is_error=True
+            )
+
+    return server
+
+
+async def main():
+    """Start the MCP server"""
+    logger.info("Starting JARVIS MCP Server...")
+    
+    server = create_mcp_server()
+    
+    # Run on stdio
+    async with server.stdio_server() as streams:
+        logger.info("✓ JARVIS MCP Server running on stdio")
+        logger.info("✓ Waiting for Claude Desktop to connect...")
+        await server.wait_for_shutdown()
+    
+    logger.info("JARVIS MCP Server shutdown")
+
+
+if __name__ == "__main__":
+    # When run as: python3 mcp_server.py
+    # Claude Desktop will use stdio for communication
+    asyncio.run(main())

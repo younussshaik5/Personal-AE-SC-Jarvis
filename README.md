@@ -2,7 +2,7 @@
 
 **Production-ready autonomous AI sales assistant for presales & AE workflows**
 
-Zero manual setup. Just clone, set API key, and go.
+Zero manual setup. Just clone, install, set API key, and go.
 
 ## What is JARVIS v2.0?
 
@@ -24,7 +24,14 @@ git clone https://github.com/younussshaik5/Personal-AE-SC-Jarvis.git
 cd Personal-AE-SC-Jarvis
 ```
 
-### 2. Set API Key
+### 2. Install Dependencies
+```bash
+python3 -m pip install -r requirements.txt
+```
+
+This installs the MCP protocol library and all required dependencies.
+
+### 3. Set API Key
 ```bash
 export NVIDIA_API_KEY="your_nvidia_api_key_here"
 ```
@@ -35,7 +42,7 @@ echo 'export NVIDIA_API_KEY="your_key"' >> ~/.zshrc
 source ~/.zshrc
 ```
 
-### 3. Setup Claude Desktop (MCP)
+### 4. Setup Claude Desktop (MCP)
 
 Edit `~/.claude/config.json` and add:
 
@@ -48,30 +55,58 @@ Edit `~/.claude/config.json` and add:
         "/path/to/Personal-AE-SC-Jarvis/jarvis_mcp/mcp_server.py"
       ],
       "env": {
-        "NVIDIA_API_KEY": "your_nvidia_api_key",
-        "ACCOUNTS_ROOT": "/Users/YOUR_USERNAME/Documents/claude space/ACCOUNTS"
+        "NVIDIA_API_KEY": "your_nvidia_api_key"
       }
     }
   }
 }
 ```
 
-### 4. Restart Claude Desktop
+Get the full path:
+```bash
+pwd  # Copy this, use above
+```
 
-Close and reopen Claude Desktop. You should see "jarvis-mcp" in the available tools.
+### 5. Restart Claude Desktop
 
-### 5. Try It Out
+Close and reopen Claude Desktop. The MCP server will start automatically.
+
+### 6. Try It Out
 
 In any cowork session:
 ```
-@jarvis create account for Tata
+@jarvis server_status
 
 or
 
-I'm working on discovering Tata's technical architecture
-→ Claude auto-detects you're in Tata account context
-→ Recommends relevant skills
-→ Loads hierarchical settings
+Create account for Tata Corporation
+```
+
+## How It Works
+
+### Lifecycle
+- **MCP Starts**: When Claude Desktop opens
+- **Server Runs**: Listens on stdio for Claude's commands
+- **Skills Available**: All 25+ tools ready to use
+- **MCP Stops**: When Claude Desktop closes (automatic)
+
+### Architecture
+```
+Claude Desktop Opens
+    ↓
+Reads ~/.claude/config.json
+    ↓
+Launches: python3 /path/to/jarvis_mcp/mcp_server.py
+    ↓
+MCP Server Starts (stdio mode)
+    ↓
+Registers 25+ tools (skills)
+    ↓
+Waits for Claude to send commands
+    ↓
+Claude Closes
+    ↓
+MCP Server Exits (automatic)
 ```
 
 ## Project Structure
@@ -84,7 +119,7 @@ Personal-AE-SC-Jarvis/
 │   ├── utils/                  # Logging, file utilities
 │   ├── safety/                 # Safety guards & killswitch
 │   ├── skills/                 # 25+ presales skills
-│   ├── mcp_server.py           # Main MCP entry point
+│   ├── mcp_server.py           # Main MCP entry point ← Claude Desktop runs this
 │   ├── account_hierarchy.py    # Parent/child account management
 │   ├── context_detector.py     # Auto-detect current account
 │   ├── claude_md_loader.py     # Hierarchical settings loading
@@ -101,17 +136,19 @@ Personal-AE-SC-Jarvis/
 │   │   ├── dashboard.html      # Tata's CRM dashboard
 │   │   ├── TataTele/           # Sub-account (inherits parent research)
 │   │   │   ├── deal_stage.json
-│   │   │   ├── discovery.md    # Own discovery (not inherited)
+│   │   │   ├── discovery.md
 │   │   │   ├── CLAUDE.md
 │   │   │   └── dashboard.html
 │   │   └── TataSky/            # Another sub-account
-│   │       ├── deal_stage.json
-│   │       ├── discovery.md
-│   │       ├── CLAUDE.md
-│   │       └── dashboard.html
+│   │       └── ...
 │   └── [Other Accounts]/
 │
-└── README.md (this file)
+├── requirements.txt            # Python dependencies
+├── README.md                   # This file
+├── QUICKSTART.md               # 5-minute setup
+├── ACCOUNT_CREATION.md         # Account workflows
+├── DEPLOYMENT_READY.md         # Deployment status
+└── test_integration.py         # Test suite (100% passing)
 ```
 
 ## Core Features
@@ -279,36 +316,6 @@ NVIDIA_MODEL=meta/llama-3.1-405b    # Model choice
 4. Generate: Professional SOW ready for editing
 ```
 
-## API Key Setup
-
-### Option 1: Environment Variable (Recommended)
-
-```bash
-export NVIDIA_API_KEY="nvidia-xxx-xxx"
-```
-
-### Option 2: .env File
-
-Create `~/.claude/.env`:
-```
-NVIDIA_API_KEY=nvidia-xxx-xxx
-```
-
-### Option 3: Claude Desktop Config
-
-Edit `~/.claude/config.json`:
-```json
-{
-  "mcpServers": {
-    "jarvis": {
-      "env": {
-        "NVIDIA_API_KEY": "nvidia-xxx-xxx"
-      }
-    }
-  }
-}
-```
-
 ## Troubleshooting
 
 ### MCP Not Appearing in Claude Desktop
@@ -318,18 +325,20 @@ Edit `~/.claude/config.json`:
    ls ~/Personal-AE-SC-Jarvis/jarvis_mcp/mcp_server.py
    ```
 
-2. Verify Python path:
+2. Verify dependencies are installed:
    ```bash
-   which python3
+   python3 -m pip install -r requirements.txt
    ```
 
-3. Test MCP directly:
+3. Test MCP server directly:
    ```bash
    cd ~/Personal-AE-SC-Jarvis
-   python3 -c "from jarvis_mcp.mcp_server import JarvisServer; print('OK')"
+   python3 -c "from jarvis_mcp.mcp_server import main, create_mcp_server; print('OK')"
    ```
 
-4. Restart Claude Desktop
+4. Check Claude Desktop logs for errors
+
+5. Restart Claude Desktop completely
 
 ### Accounts Folder Not Found
 
@@ -345,33 +354,16 @@ export ACCOUNTS_ROOT="/your/custom/path"
 
 ```bash
 cd ~/Personal-AE-SC-Jarvis
-python3 -c "from jarvis_mcp.skills import SKILL_REGISTRY; print(len(SKILL_REGISTRY))"
-# Should output: 25
+python3 -c "from jarvis_mcp.skills import SKILL_REGISTRY; print(f'Loaded {len(SKILL_REGISTRY)} skills')"
+# Should output: Loaded 25 skills
 ```
 
-## Architecture
+### MCP Server Not Starting
 
-### MCP Server
-- **Entry**: `mcp_server.py` - Runs when Claude Desktop opens
-- **Lifecycle**: Starts when Claude boots, stops when Claude closes
-- **Transport**: stdio (built-in to MCP)
-- **Skills**: 25+ registered as MCP tools
-
-### Infrastructure
-- **ConfigManager**: Loads settings from environment + CLAUDE.md
-- **ContextDetector**: Detects current account from cwd
-- **AccountHierarchy**: Manages parent/child relationships
-- **ClaudeMDLoader**: Hierarchical settings (account → parent → global)
-- **ClaudeMDEvolve**: Self-learning system
-- **Scaffolder**: Auto-creates accounts with templates
-- **AccountDashboard**: Generates HTML dashboards
-
-### Data Structure
-- **deal_stage.json**: Account metrics (stage, probability, deal_size, stakeholders, etc.)
-- **company_research.md**: Shared research (inherited by children)
-- **discovery.md**: Account-specific discovery notes
-- **CLAUDE.md**: Settings & preferences (hierarchical)
-- **dashboard.html**: CRM view (auto-generated)
+1. Check Python version: `python3 --version` (should be 3.8+)
+2. Verify mcp is installed: `python3 -c "import mcp; print('OK')"`
+3. Check ~/.claude/config.json syntax (must be valid JSON)
+4. Restart Claude Desktop
 
 ## FAQ
 
@@ -391,13 +383,16 @@ A: JARVIS uses ACCOUNTS_ROOT env var. You can work from anywhere.
 A: Yes. Edit the HTML template in `account_dashboard.py` and regenerate.
 
 **Q: Is this production-ready?**
-A: Yes. Tested with 25+ skills, account hierarchies, and MCP integration.
+A: Yes. Tested with 25+ skills, account hierarchies, and MCP integration. All tests passing.
+
+**Q: Does MCP really start when Claude opens and stop when it closes?**
+A: Yes. Claude Desktop manages the MCP server lifecycle automatically. When Claude closes, the Python process exits.
 
 ## Support
 
-- **Issues**: Report on GitHub
-- **Features**: Suggest improvements
-- **Questions**: Check troubleshooting section
+- **Documentation**: See QUICKSTART.md, ACCOUNT_CREATION.md
+- **Issues**: Check [Troubleshooting](#troubleshooting) section
+- **Tests**: Run `python3 test_integration.py` to verify installation
 
 ## License
 
@@ -405,4 +400,4 @@ Internal tool for yellow.ai sales team. All rights reserved.
 
 ---
 
-**Ready to use. Just set your NVIDIA_API_KEY and go.**
+**Ready to use. Install requirements, set your NVIDIA_API_KEY, configure Claude Desktop, and go.**
