@@ -3,7 +3,7 @@ LLM Manager for JARVIS — NVIDIA-first multi-model with automatic fallback.
 
 NVIDIA Model Chain (per call):
   1. nvidia-llama70b   meta/llama-3.3-70b-instruct        (12s — best reasoning)
-  2. nvidia-nemotron   nvidia/nemotron-3-nano-30b-a3b      (15s — long context, text gen/summary)
+  2. nvidia-nemotron   nvidia/llama-3.1-nemotron-70b-instruct      (15s — long context, text gen/summary)
   3. nvidia-8b         meta/llama-3.1-8b-instruct          (12s — fastest)
   4. groq              llama-3.3-70b-versatile             (30s — optional, if GROQ_API_KEY set)
   5. together          Llama-3.3-70B-Instruct-Turbo        (30s — optional, if TOGETHER_API_KEY set)
@@ -68,11 +68,11 @@ _PROVIDERS = [
         # nemotron-3-nano-30b: long context, no hallucination, great for text gen / rephrase / summary
         # NOT for creative tasks or open-ended search — use llama70b for those
         "models": {
-            "default":   "nvidia/nemotron-3-nano-30b-a3b",
+            "default":   "nvidia/llama-3.1-nemotron-70b-instruct",
             "reasoning": "nvidia/llama-3.1-nemotron-70b-instruct",
-            "text":      "nvidia/nemotron-3-nano-30b-a3b",
-            "summary":   "nvidia/nemotron-3-nano-30b-a3b",
-            "fast":      "nvidia/nemotron-3-nano-30b-a3b",
+            "text":      "nvidia/llama-3.1-nemotron-70b-instruct",
+            "summary":   "nvidia/llama-3.1-nemotron-70b-instruct",
+            "fast":      "nvidia/llama-3.1-nemotron-70b-instruct",
             "quick":     "meta/llama-3.1-8b-instruct",
         },
         "timeout": 15,
