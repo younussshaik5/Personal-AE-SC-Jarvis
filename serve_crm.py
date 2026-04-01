@@ -13,7 +13,15 @@ import threading
 import webbrowser
 import time
 
-ACCOUNTS_ROOT = Path.cwd() / "ACCOUNTS"
+# Find ACCOUNTS folder - look in parent and current directory
+script_dir = Path(__file__).parent
+ACCOUNTS_ROOT = script_dir / "ACCOUNTS"
+if not ACCOUNTS_ROOT.exists():
+    # Try looking in parent directory (~/Documents/claude space/ACCOUNTS)
+    ACCOUNTS_ROOT = script_dir.parent / "ACCOUNTS"
+if not ACCOUNTS_ROOT.exists():
+    # Fallback to absolute path
+    ACCOUNTS_ROOT = Path.home() / "Documents" / "claude space" / "ACCOUNTS"
 
 class CRMHandler(SimpleHTTPRequestHandler):
     """HTTP handler for CRM dashboard"""
@@ -33,13 +41,39 @@ class CRMHandler(SimpleHTTPRequestHandler):
 
         # Serve crm.html for root
         if self.path == "/" or self.path == "":
-            self.path = "/crm.html"
+            try:
+                crm_file = Path(__file__).parent / "crm.html"
+                with open(crm_file, 'r') as f:
+                    self.send_response(200)
+                    self.send_header("Content-type", "text/html")
+                    self.end_headers()
+                    self.wfile.write(f.read().encode())
+                return
+            except:
+                self.send_error(404)
+                return
 
-        # Default behavior for other files
+        # Try to serve other files from script directory
         try:
-            super().do_GET()
-        except Exception as e:
-            self.send_error(404)
+            file_path = Path(__file__).parent / self.path.lstrip('/')
+            if file_path.exists() and file_path.is_file():
+                with open(file_path, 'rb') as f:
+                    self.send_response(200)
+                    if str(file_path).endswith('.html'):
+                        self.send_header("Content-type", "text/html")
+                    elif str(file_path).endswith('.js'):
+                        self.send_header("Content-type", "application/javascript")
+                    elif str(file_path).endswith('.css'):
+                        self.send_header("Content-type", "text/css")
+                    elif str(file_path).endswith('.json'):
+                        self.send_header("Content-type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(f.read())
+                return
+        except:
+            pass
+
+        self.send_error(404)
 
     def do_OPTIONS(self):
         """Handle CORS preflight"""
