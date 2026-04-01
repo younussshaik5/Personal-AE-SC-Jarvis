@@ -61,23 +61,6 @@ _PROVIDERS = [
         "timeout": 12,
     },
     {
-        "name":     "nvidia-nemotron",
-        "base_url": "https://integrate.api.nvidia.com/v1",
-        "key_env":  "NVIDIA_API_KEY",
-        "optional": False,
-        # nemotron-3-nano-30b: long context, great for text gen / summary / rephrase
-        # nemotron-70b: NVIDIA-tuned reasoning model for complex analysis
-        "models": {
-            "default":   "nvidia/nemotron-3-nano-30b-a3b",
-            "reasoning": "nvidia/llama-3.1-nemotron-70b-instruct",
-            "text":      "nvidia/nemotron-3-nano-30b-a3b",
-            "summary":   "nvidia/nemotron-3-nano-30b-a3b",
-            "fast":      "stepfun-ai/step-3.5-flash",
-            "quick":     "stepfun-ai/step-3.5-flash",
-        },
-        "timeout": 20,
-    },
-    {
         "name":     "nvidia-flash",
         "base_url": "https://integrate.api.nvidia.com/v1",
         "key_env":  "NVIDIA_API_KEY",
@@ -142,9 +125,9 @@ _PROVIDERS = [
 
 # Provider order by model_type
 # NVIDIA models first — groq/together are just safety nets if all NVIDIA is down
-_ORDER_DEFAULT  = ["nvidia-llama70b", "nvidia-nemotron", "nvidia-flash", "nvidia-8b", "groq", "together"]
-_ORDER_TEXT     = ["nvidia-nemotron",  "nvidia-llama70b", "nvidia-flash", "nvidia-8b", "groq", "together"]
-_ORDER_FAST     = ["nvidia-flash",     "nvidia-8b", "nvidia-llama70b", "nvidia-nemotron", "groq", "together"]
+_ORDER_DEFAULT  = ["nvidia-llama70b", "nvidia-flash", "nvidia-8b", "groq", "together"]
+_ORDER_TEXT     = ["nvidia-flash",     "nvidia-llama70b", "nvidia-8b", "groq", "together"]
+_ORDER_FAST     = ["nvidia-flash",     "nvidia-8b", "nvidia-llama70b", "groq", "together"]
 
 _PROVIDER_MAP = {p["name"]: p for p in _PROVIDERS}
 
