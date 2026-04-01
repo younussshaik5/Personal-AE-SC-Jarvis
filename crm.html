@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>JARVIS — Deal Intelligence</title>
-    <script src="https://cdn.jsdelivr.net/npm/marked@9/marked.min.js"></script>
     <style>
         :root {
             --bg:#0f1117; --s1:#1a1d27; --s2:#232736; --bdr:#2d3148;
@@ -194,6 +193,37 @@
 </div>
 
 <script>
+// Inline markdown → HTML renderer (no CDN dependency)
+function mdToHtml(src){
+    if(!src)return'';
+    function esc(t){return(t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+    function inl(t){
+        t=esc(t);
+        t=t.replace(/\*\*\*(.+?)\*\*\*/g,'<strong><em>$1</em></strong>');
+        t=t.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
+        t=t.replace(/\*([^*\n]+?)\*/g,'<em>$1</em>');
+        t=t.replace(/`([^`\n]+)`/g,'<code>$1</code>');
+        return t;
+    }
+    var lines=src.split('\n'),out=[],inUl=false,inOl=false,inTbl=false,tblRows=[],m;
+    function flushTbl(){if(!tblRows.length)return;var h='<table>',isHdr=true;tblRows.forEach(function(r){if(/^[\s\-:|]+$/.test(r.replace(/\|/g,''))){isHdr=false;return;}var tag=isHdr?'th':'td',cells=r.replace(/^\||\|$/g,'').split('|');h+='<tr>'+cells.map(function(c){return'<'+tag+'>'+inl(c.trim())+'</'+tag+'>'}).join('')+'</tr>';if(isHdr)isHdr=false;});out.push(h+'</table>');tblRows=[];inTbl=false;}
+    function flushUl(){if(inUl){out.push('</ul>');inUl=false;}}
+    function flushOl(){if(inOl){out.push('</ol>');inOl=false;}}
+    lines.forEach(function(line){
+        if(/^\|/.test(line)){flushUl();flushOl();inTbl=true;tblRows.push(line.trim());return;}
+        if(inTbl)flushTbl();
+        if((m=line.match(/^(#{1,6}) (.+)$/))){flushUl();flushOl();out.push('<h'+m[1].length+'>'+inl(m[2])+'</h'+m[1].length+'>');return;}
+        if(/^-{3,}\s*$/.test(line)){flushUl();flushOl();out.push('<hr>');return;}
+        if((m=line.match(/^[*\-] (.+)/))){flushOl();if(!inUl){out.push('<ul>');inUl=true;}out.push('<li>'+inl(m[1])+'</li>');return;}
+        if((m=line.match(/^\d+\. (.+)/))){flushUl();if(!inOl){out.push('<ol>');inOl=true;}out.push('<li>'+inl(m[1])+'</li>');return;}
+        flushUl();flushOl();
+        if(line.trim()===''){out.push('<br>');return;}
+        out.push('<p>'+inl(line)+'</p>');
+    });
+    flushUl();flushOl();if(inTbl)flushTbl();
+    return out.join('');
+}
+
 let D=null,REG=null,cur=null,Q=null,_qPoll=null;
 
 async function init(){
@@ -313,7 +343,7 @@ function openAcct(id){
     document.getElementById('dash').classList.add('off');
     document.getElementById('detail').classList.add('on');
     window.scrollTo(0,0);
-    renderReport(a);
+    try{renderReport(a);}catch(e){document.getElementById('detailContent').innerHTML='<div style="color:var(--r);padding:20px;font-size:12px">Render error: '+e.message+'</div>';console.error('renderReport failed:',e);}
 }
 
 function renderReport(a){
@@ -384,7 +414,7 @@ function renderReport(a){
 
 function skillBlock(key,a,title,standalone){
     var content=a.skill_outputs[key];
-    if(content)return'<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--bdr)"><span class="jarvis-tag">'+title+'</span><div class="skill-md md-body" style="margin-top:6px">'+(typeof marked!=='undefined'?marked.parse(content):esc(content))+'</div></div>';
+    if(content)return'<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--bdr)"><span class="jarvis-tag">'+title+'</span><div class="skill-md md-body" style="margin-top:6px">'+mdToHtml(content)+'</div></div>';
     if(standalone){var info=REG[key]||{cmd:key};return'<div class="skill-empty"><div class="se-title">Not Generated Yet</div><div class="se-desc">Ask JARVIS:</div><div class="se-cmd" onclick="copyCmd(this)">"Run '+info.cmd+' for '+a.name+'"</div></div>'}
     return'';
 }
