@@ -23,7 +23,7 @@ class OnboardingSkill(BaseSkill):
 
     def __init__(self, llm_manager, config):
         """Initialize onboarding skill"""
-        super().__init__("onboarding", llm_manager, config)
+        super().__init__(llm_manager, config)
         self.extractor = OnboardingInfoExtractor()
         self.scaffolder = AccountScaffolder()
         self.hierarchy = AccountHierarchy()
