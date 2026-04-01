@@ -141,16 +141,28 @@ class LLMManager:
     # ── Internal HTTP call (sync, runs in executor) ───────────────────────────
 
     def _http_call(self, base_url: str, api_key: str, model: str,
-                   messages: list, max_tokens: int, temperature: float) -> str:
+                   messages: list, max_tokens: int, temperature: float,
+                   is_reasoning: bool = False) -> str:
         url = f"{base_url}/chat/completions"
-        payload = json.dumps({
+
+        # Build payload with streaming + thinking for better reliability
+        payload_dict = {
             "model":       model,
             "messages":    messages,
             "max_tokens":  max_tokens,
             "temperature": temperature,
-            "stream":      False,
-        }).encode("utf-8")
+            "stream":      True,  # Enable streaming for reliability
+        }
 
+        # Add thinking mode for reasoning tasks (helps with complex analysis)
+        if is_reasoning and "nemotron" in model.lower():
+            payload_dict["chat_template_kwargs"] = {
+                "enable_thinking": True,
+            }
+            # Small reasoning budget for speed
+            payload_dict["reasoning_budget"] = 1000
+
+        payload = json.dumps(payload_dict).encode("utf-8")
         req = urllib.request.Request(
             url, data=payload,
             headers={
@@ -159,9 +171,43 @@ class LLMManager:
             },
             method="POST",
         )
-        with urllib.request.urlopen(req, timeout=120, context=_SSL_CTX) as resp:
-            body = json.loads(resp.read().decode("utf-8"))
-            return body["choices"][0]["message"]["content"]
+
+        # Read streaming response and collect all chunks
+        result = []
+        try:
+            with urllib.request.urlopen(req, timeout=120, context=_SSL_CTX) as resp:
+                for line in resp:
+                    line = line.decode("utf-8").strip()
+                    if not line or line.startswith(":"):
+                        continue
+                    if line.startswith("data: "):
+                        data = line[6:]
+                        if data == "[DONE]":
+                            break
+                        try:
+                            chunk = json.loads(data)
+                            delta = chunk.get("choices", [{}])[0].get("delta", {})
+                            if "content" in delta:
+                                result.append(delta["content"])
+                        except json.JSONDecodeError:
+                            pass
+            return "".join(result)
+        except Exception as e:
+            # Fallback: try non-streaming for compatibility
+            log.debug(f"Streaming failed, trying non-streaming: {e}")
+            payload_dict["stream"] = False
+            payload = json.dumps(payload_dict).encode("utf-8")
+            req = urllib.request.Request(
+                url, data=payload,
+                headers={
+                    "Content-Type":  "application/json",
+                    "Authorization": f"Bearer {api_key}",
+                },
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=120, context=_SSL_CTX) as resp:
+                body = json.loads(resp.read().decode("utf-8"))
+                return body["choices"][0]["message"]["content"]
 
     # ── Try one provider ──────────────────────────────────────────────────────
 
@@ -197,6 +243,7 @@ class LLMManager:
         t0 = time.time()
 
         loop = asyncio.get_event_loop()
+        is_reasoning = model_type in ("default", "reasoning")
         try:
             result = await asyncio.wait_for(
                 loop.run_in_executor(
@@ -204,6 +251,7 @@ class LLMManager:
                     self._http_call,
                     provider["base_url"], api_key, model,
                     messages, max_tokens, temperature,
+                    is_reasoning,
                 ),
                 timeout=timeout,
             )
