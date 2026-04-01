@@ -254,10 +254,15 @@ class LLMManager:
                 log.warning(f"🚫 {name} rate limited — cooling down 60s, switching provider")
                 raise RuntimeError(f"{name} rate limited")
             if e.code == 401:
-                log.error(f"🔑 {name} API key invalid")
-                raise RuntimeError(f"{name} auth failed — check {provider['key_env']}")
+                log.error(f"🔑 {name} API key invalid — check {provider['key_env']}")
+                raise RuntimeError(f"{name} auth failed")
+            if e.code == 404:
+                log.error(f"❌ {name} model '{model}' not found (404)")
+                raise RuntimeError(f"{name} model not found")
             body = e.read().decode("utf-8") if e.fp else str(e)
-            raise RuntimeError(f"{name} HTTP {e.code}: {body[:200]}")
+            err_msg = body[:150] if body else f"HTTP {e.code}"
+            log.error(f"❌ {name} HTTP {e.code}: {err_msg}")
+            raise RuntimeError(f"{name} HTTP {e.code}")
 
     # ── Main generate ─────────────────────────────────────────────────────────
 
@@ -343,3 +348,63 @@ class LLMManager:
             else:
                 status[name] = "ready"
         return status
+
+    # ── Health check ──────────────────────────────────────────────────────────
+
+    async def health_check(self) -> Dict[str, Any]:
+        """Test each provider with a minimal request. Returns status for all models."""
+        results = {}
+        test_prompt = "Hi"
+        test_messages = [{"role": "user", "content": test_prompt}]
+
+        for p in _PROVIDERS:
+            name = p["name"]
+            key = self._keys.get(name, "")
+
+            if not key:
+                results[name] = {"status": "skip", "reason": "no api key"}
+                continue
+
+            # Test default model
+            model = p["models"].get("default", "unknown")
+            try:
+                log.info(f"Health check: {name} + {model}")
+                result = await asyncio.wait_for(
+                    asyncio.get_event_loop().run_in_executor(
+                        None,
+                        self._http_call,
+                        p["base_url"], key, model,
+                        test_messages, 50, 0.7,
+                    ),
+                    timeout=p["timeout"],
+                )
+                results[name] = {
+                    "status": "ok",
+                    "model": model,
+                    "response_len": len(result),
+                }
+                log.info(f"✅ {name} health check passed")
+            except asyncio.TimeoutError:
+                results[name] = {
+                    "status": "timeout",
+                    "model": model,
+                    "timeout_s": p["timeout"],
+                }
+                log.warning(f"⏱ {name} timed out ({p['timeout']}s)")
+            except urllib.error.HTTPError as e:
+                results[name] = {
+                    "status": "http_error",
+                    "model": model,
+                    "code": e.code,
+                    "error": str(e)[:100],
+                }
+                log.error(f"🔴 {name} HTTP {e.code}")
+            except Exception as e:
+                results[name] = {
+                    "status": "error",
+                    "model": model,
+                    "error": str(e)[:100],
+                }
+                log.error(f"🔴 {name} error: {e}")
+
+        return results
