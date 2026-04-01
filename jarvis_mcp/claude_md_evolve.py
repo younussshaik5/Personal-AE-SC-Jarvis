@@ -18,6 +18,7 @@ class ClaudeMdEvolution:
         self.metadata_file = account_path / ".claude_metadata.json"
         self.claude_md_file = account_path / "CLAUDE.md"
         self.metadata = self._load_metadata()
+        self.guardrails = EvolutionGuardrails()
 
     def _load_metadata(self) -> Dict[str, Any]:
         """Load interaction metadata"""
@@ -117,7 +118,13 @@ class ClaudeMdEvolution:
             # Check if pattern is consistent (used same model 60%+ of time)
             model_consistency = model_counts[best_model] / len(models)
 
-            if model_consistency >= 0.6 and avg_quality >= 4.0:
+            if self.guardrails.validate_evolution(
+                skill=skill,
+                action=f'Use {best_model}',
+                quality=avg_quality,
+                consistency=model_consistency,
+                usage_count=len(models),
+            ) and avg_quality >= 4.0:
                 # High quality, consistent usage - auto-apply
                 pref_line = f"- **{skill}**: {best_model} (quality: {avg_quality:.1f}/5)"
                 self._add_learned_preference(skill, pref_line)
@@ -229,3 +236,6 @@ class ClaudeMdEvolution:
                 summary += f"  • {pref}\n"
 
         return summary
+
+# Import guardrails
+from .claude_md_guardrails import EvolutionGuardrails
