@@ -145,22 +145,23 @@ class LLMManager:
                    is_reasoning: bool = False) -> str:
         url = f"{base_url}/chat/completions"
 
-        # Build payload with streaming + thinking for better reliability
+        # Build payload matching NVIDIA API spec exactly
         payload_dict = {
             "model":       model,
             "messages":    messages,
             "max_tokens":  max_tokens,
             "temperature": temperature,
-            "stream":      True,  # Enable streaming for reliability
+            "top_p":       0.9,           # NVIDIA API parameter
+            "seed":        42,            # Reproducibility
+            "stream":      True,          # Enable streaming
         }
 
-        # Add thinking mode for reasoning tasks (helps with complex analysis)
+        # Add thinking mode for reasoning + nemotron models
         if is_reasoning and "nemotron" in model.lower():
+            payload_dict["reasoning_budget"] = 4096  # Balanced reasoning budget
             payload_dict["chat_template_kwargs"] = {
                 "enable_thinking": True,
             }
-            # Small reasoning budget for speed
-            payload_dict["reasoning_budget"] = 1000
 
         payload = json.dumps(payload_dict).encode("utf-8")
         req = urllib.request.Request(
@@ -194,7 +195,7 @@ class LLMManager:
             return "".join(result)
         except Exception as e:
             # Fallback: try non-streaming for compatibility
-            log.debug(f"Streaming failed, trying non-streaming: {e}")
+            log.debug(f"Streaming failed, retrying without stream: {e}")
             payload_dict["stream"] = False
             payload = json.dumps(payload_dict).encode("utf-8")
             req = urllib.request.Request(
