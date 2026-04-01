@@ -1,220 +1,300 @@
 #!/usr/bin/env python3
 """
-JARVIS MCP Server - Proper MCP Protocol Implementation
-Communicates with Claude Desktop via stdio using MCP protocol
+JARVIS MCP Server — Official MCP SDK implementation
+Runs automatically with Claude Desktop via stdio.
 """
 
-import json
 import sys
 import asyncio
-from typing import Any, Optional
 import logging
+from pathlib import Path
 
-# Setup logging (writes to stderr, doesn't interfere with MCP protocol on stdout)
+# Add project root so jarvis_mcp imports work
+PROJECT_ROOT = Path(__file__).parent
+sys.path.insert(0, str(PROJECT_ROOT))
+
+import mcp.types as types
+from mcp.server import Server
+from mcp.server.stdio import stdio_server
+
+# Log to stderr only — stdout is reserved for MCP protocol
 logging.basicConfig(
     level=logging.INFO,
-    format='[JARVIS MCP] %(levelname)s: %(message)s',
+    format="[JARVIS] %(message)s",
     stream=sys.stderr
 )
-logger = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 
-from jarvis_mcp.mcp_server import JarvisServer
+# ---------------------------------------------------------------------------
+# Boot JARVIS
+# ---------------------------------------------------------------------------
+log.info("Starting JARVIS MCP server…")
+try:
+    from jarvis_mcp.mcp_server import JarvisServer
+    _jarvis = JarvisServer()
+    log.info(f"✅ {len(_jarvis.skills)} skills loaded")
+except Exception as exc:
+    log.error(f"Failed to load JARVIS: {exc}")
+    _jarvis = None
+
+# ---------------------------------------------------------------------------
+# Tool definitions — maps MCP tool name → (handler, description, schema)
+# ---------------------------------------------------------------------------
+
+TOOLS: list[types.Tool] = []
+
+def _tool(name: str, description: str, properties: dict, required: list[str] | None = None) -> types.Tool:
+    return types.Tool(
+        name=name,
+        description=description,
+        inputSchema={
+            "type": "object",
+            "properties": properties,
+            "required": required or []
+        }
+    )
 
 
-class MCPServerProtocol:
-    """Implements MCP protocol for Claude Desktop communication"""
+# ── Onboarding ──────────────────────────────────────────────────────────────
+TOOLS.append(_tool(
+    "onboarding_start",
+    "Begin JARVIS onboarding — learns who you are, your company, and your role.",
+    {"message": {"type": "string", "description": "Anything about yourself or your company"}}
+))
 
-    def __init__(self):
-        self.server = None
-        self.request_id_counter = 0
-        logger.info("Initializing JARVIS MCP Server Protocol...")
+TOOLS.append(_tool(
+    "onboarding_next",
+    "Continue the onboarding conversation.",
+    {"message": {"type": "string", "description": "Your reply"}}
+))
 
-    async def initialize(self):
-        """Initialize the JARVIS server"""
-        try:
-            self.server = JarvisServer()
-            logger.info(f"✅ JARVIS Server initialized with {len(self.server.skills)} skills")
-            return True
-        except Exception as e:
-            logger.error(f"Failed to initialize server: {e}")
-            return False
+# ── Account Management ───────────────────────────────────────────────────────
+TOOLS.append(_tool(
+    "scaffold_account",
+    "Create a new account folder with all JARVIS sections pre-scaffolded.",
+    {
+        "account_name": {"type": "string", "description": "Company / account name"},
+        "company_info": {"type": "string", "description": "Any info about the company (freeform)"}
+    },
+    required=["account_name"]
+))
 
-    def write_response(self, response: dict) -> None:
-        """Write MCP response to stdout"""
-        try:
-            json.dump(response, sys.stdout)
-            sys.stdout.write('\n')
-            sys.stdout.flush()
-        except Exception as e:
-            logger.error(f"Failed to write response: {e}")
+# ── Core Sales Skills ────────────────────────────────────────────────────────
+_account_arg = {"account_name": {"type": "string", "description": "Account name"}}
 
-    async def handle_initialize(self, params: dict) -> dict:
-        """Handle MCP initialize request"""
-        logger.info("Received initialize request")
+TOOLS.append(_tool("get_proposal",            "Generate or retrieve the account proposal.",              _account_arg, ["account_name"]))
+TOOLS.append(_tool("get_battlecard",          "Get competitive battlecard for this account.",             _account_arg, ["account_name"]))
+TOOLS.append(_tool("get_demo_strategy",       "Build a demo strategy and script.",                       _account_arg, ["account_name"]))
+TOOLS.append(_tool("get_risk_report",         "Generate a risk assessment report.",                      _account_arg, ["account_name"]))
+TOOLS.append(_tool("get_value_architecture",  "Build ROI model / value architecture.",                   _account_arg, ["account_name"]))
+TOOLS.append(_tool("get_discovery",           "Get discovery prep questions and saved notes.",            _account_arg, ["account_name"]))
+TOOLS.append(_tool("get_competitive_intelligence", "Deep competitive intelligence for the account.",      _account_arg, ["account_name"]))
+TOOLS.append(_tool("get_meeting_prep",        "Generate a meeting prep brief.",                          _account_arg, ["account_name"]))
+TOOLS.append(_tool("get_account_summary",     "Full account dossier / 360 summary.",                     _account_arg, ["account_name"]))
+TOOLS.append(_tool("generate_sow",           "Generate a Statement of Work.",                            _account_arg, ["account_name"]))
+TOOLS.append(_tool("generate_architecture",  "Generate a Mermaid.js solution architecture diagram.",     _account_arg, ["account_name"]))
+TOOLS.append(_tool("track_meddpicc",         "Score and update MEDDPICC for the deal.",                  _account_arg, ["account_name"]))
 
-        return {
-            "protocolVersion": "2024-11-05",
-            "serverInfo": {
-                "name": "jarvis",
-                "version": "1.0.0"
-            },
-            "capabilities": {
-                "tools": {}
-            }
+TOOLS.append(_tool(
+    "update_deal_stage",
+    "Move a deal to a new stage.",
+    {
+        "account_name": {"type": "string"},
+        "stage": {"type": "string", "description": "discovery | qualify | demo | negotiate | close | won | lost"},
+        "notes": {"type": "string", "description": "Optional context"}
+    },
+    required=["account_name", "stage"]
+))
+
+# ── Communication & Intelligence ─────────────────────────────────────────────
+TOOLS.append(_tool(
+    "process_meeting",
+    "Process a meeting transcript or notes and save to account.",
+    {
+        "account_name": {"type": "string"},
+        "transcript": {"type": "string", "description": "Meeting notes or transcript text"}
+    },
+    required=["account_name", "transcript"]
+))
+
+TOOLS.append(_tool(
+    "summarize_conversation",
+    "Summarize a conversation or email thread.",
+    {
+        "account_name": {"type": "string"},
+        "text": {"type": "string", "description": "The conversation or email text"}
+    },
+    required=["account_name", "text"]
+))
+
+TOOLS.append(_tool(
+    "extract_intelligence",
+    "Extract structured sales intelligence from any text.",
+    {
+        "account_name": {"type": "string"},
+        "text": {"type": "string", "description": "Email, notes, or transcript"}
+    },
+    required=["account_name", "text"]
+))
+
+TOOLS.append(_tool(
+    "generate_followup",
+    "Draft a follow-up email for this account.",
+    {
+        "account_name": {"type": "string"},
+        "context": {"type": "string", "description": "What happened / what to follow up on"}
+    },
+    required=["account_name"]
+))
+
+TOOLS.append(_tool(
+    "analyze_competitor_pricing",
+    "Analyze competitor pricing and positioning.",
+    {
+        "account_name": {"type": "string"},
+        "competitor": {"type": "string", "description": "Competitor name"}
+    },
+    required=["account_name"]
+))
+
+TOOLS.append(_tool(
+    "assess_technical_risk",
+    "Assess technical risks for the deal.",
+    _account_arg,
+    required=["account_name"]
+))
+
+TOOLS.append(_tool(
+    "quick_insights",
+    "Get quick insights and next best action for an account.",
+    _account_arg,
+    required=["account_name"]
+))
+
+TOOLS.append(_tool(
+    "build_knowledge_graph",
+    "Build or update the knowledge graph for an account.",
+    _account_arg,
+    required=["account_name"]
+))
+
+TOOLS.append(_tool(
+    "generate_documentation",
+    "Generate technical or sales documentation.",
+    {
+        "account_name": {"type": "string"},
+        "doc_type": {"type": "string", "description": "Type of document to generate"}
+    },
+    required=["account_name"]
+))
+
+TOOLS.append(_tool(
+    "generate_custom_template",
+    "Generate a custom document from a template.",
+    {
+        "account_name": {"type": "string"},
+        "template_name": {"type": "string"},
+        "context": {"type": "string"}
+    },
+    required=["account_name", "template_name"]
+))
+
+TOOLS.append(_tool(
+    "generate_html_report",
+    "Generate an HTML report for the account.",
+    _account_arg,
+    required=["account_name"]
+))
+
+log.info(f"Registered {len(TOOLS)} MCP tools")
+
+# ---------------------------------------------------------------------------
+# MCP Server
+# ---------------------------------------------------------------------------
+server = Server("jarvis")
+
+
+@server.list_tools()
+async def list_tools() -> list[types.Tool]:
+    return TOOLS
+
+
+@server.call_tool()
+async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
+    """Route tool calls to JARVIS skills."""
+    log.info(f"Tool called: {name} — args: {list(arguments.keys())}")
+
+    if _jarvis is None:
+        return [types.TextContent(type="text", text="❌ JARVIS server failed to initialize. Check logs.")]
+
+    account = arguments.get("account_name", "")
+
+    try:
+        # ── Route to the right skill ──────────────────────────────────────────
+        skill = _jarvis.skills.get(name)
+        if skill:
+            result = await skill.execute(arguments)
+            return [types.TextContent(type="text", text=str(result))]
+
+        # ── Fallbacks for tools with different internal names ────────────────
+        alias_map = {
+            "get_proposal":             "proposal",
+            "get_battlecard":           "battlecard",
+            "get_demo_strategy":        "demo_strategy",
+            "get_risk_report":          "risk_report",
+            "get_value_architecture":   "value_architecture",
+            "get_discovery":            "discovery",
+            "get_competitive_intelligence": "competitive_intelligence",
+            "get_meeting_prep":         "meeting_prep",
+            "get_account_summary":      "account_summary",
+            "generate_sow":             "sow",
+            "generate_architecture":    "architecture_diagram",
+            "track_meddpicc":           "meddpicc",
+            "update_deal_stage":        "deal_stage_tracker",
+            "process_meeting":          "meeting_summary",
+            "summarize_conversation":   "conversation_summarizer",
+            "extract_intelligence":     "conversation_extractor",
+            "generate_followup":        "followup_email",
+            "analyze_competitor_pricing": "competitor_pricing",
+            "assess_technical_risk":    "technical_risk",
+            "quick_insights":           "quick_insights",
+            "build_knowledge_graph":    "knowledge_builder",
+            "generate_documentation":   "documentation",
+            "generate_custom_template": "custom_template",
+            "generate_html_report":     "html_generator",
         }
 
-    async def handle_list_tools(self, params: Optional[dict]) -> dict:
-        """Handle list tools request"""
-        if not self.server:
-            return {"tools": []}
+        internal_name = alias_map.get(name)
+        if internal_name:
+            skill = _jarvis.skills.get(internal_name)
+            if skill:
+                result = await skill.execute(arguments)
+                return [types.TextContent(type="text", text=str(result))]
 
-        tools = []
-        tool_list = self.server._get_tool_list()
+        # ── Special: onboarding ──────────────────────────────────────────────
+        if name in ("onboarding_start", "onboarding_next"):
+            msg = arguments.get("message", "")
+            result = f"JARVIS Onboarding: received '{msg}'. Onboarding skill initializing…"
+            return [types.TextContent(type="text", text=result)]
 
-        for tool_name in tool_list:
-            tools.append({
-                "name": tool_name,
-                "description": f"JARVIS skill: {tool_name}",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {
-                        "account_name": {
-                            "type": "string",
-                            "description": "Account name"
-                        },
-                        "input": {
-                            "type": "string",
-                            "description": "Skill input"
-                        }
-                    },
-                    "required": []
-                }
-            })
+        return [types.TextContent(type="text", text=f"⚠️ Tool '{name}' is registered but has no handler yet.")]
 
-        logger.info(f"Listed {len(tools)} tools")
-        return {"tools": tools}
-
-    async def handle_call_tool(self, params: dict) -> dict:
-        """Handle tool call request"""
-        tool_name = params.get("name")
-        tool_input = params.get("input", {})
-
-        logger.info(f"Calling tool: {tool_name}")
-
-        if not self.server:
-            return {
-                "type": "text",
-                "text": "Server not initialized"
-            }
-
-        try:
-            # Execute the skill
-            if hasattr(self.server, tool_name):
-                skill_method = getattr(self.server, tool_name)
-                result = await skill_method(tool_input) if asyncio.iscoroutinefunction(skill_method) else skill_method(tool_input)
-
-                return {
-                    "type": "text",
-                    "text": str(result)
-                }
-            else:
-                return {
-                    "type": "text",
-                    "text": f"Tool '{tool_name}' not found"
-                }
-        except Exception as e:
-            logger.error(f"Error calling tool {tool_name}: {e}")
-            return {
-                "type": "text",
-                "text": f"Error: {str(e)}"
-            }
-
-    async def process_request(self, request: dict) -> dict:
-        """Process incoming MCP request"""
-        method = request.get("method")
-        params = request.get("params", {})
-        request_id = request.get("id")
-
-        logger.info(f"Processing: {method}")
-
-        try:
-            if method == "initialize":
-                result = await self.handle_initialize(params)
-            elif method == "tools/list":
-                result = await self.handle_list_tools(params)
-            elif method == "tools/call":
-                result = await self.handle_call_tool(params)
-            else:
-                result = {"error": f"Unknown method: {method}"}
-
-            response = {
-                "jsonrpc": "2.0",
-                "id": request_id,
-                "result": result
-            }
-        except Exception as e:
-            logger.error(f"Error processing request: {e}")
-            response = {
-                "jsonrpc": "2.0",
-                "id": request_id,
-                "error": {
-                    "code": -32603,
-                    "message": str(e)
-                }
-            }
-
-        return response
-
-    async def run(self):
-        """Main server loop - read from stdin, write to stdout"""
-        # Initialize server
-        if not await self.initialize():
-            logger.error("Failed to initialize, exiting")
-            return
-
-        logger.info("JARVIS MCP Server ready, listening for requests...")
-
-        # Process requests from stdin
-        loop = asyncio.get_event_loop()
-
-        while True:
-            try:
-                # Read line from stdin
-                line = await loop.run_in_executor(None, sys.stdin.readline)
-
-                if not line:
-                    logger.info("EOF on stdin, shutting down")
-                    break
-
-                line = line.strip()
-                if not line:
-                    continue
-
-                # Parse JSON request
-                try:
-                    request = json.loads(line)
-                except json.JSONDecodeError as e:
-                    logger.error(f"Invalid JSON: {e}")
-                    continue
-
-                # Process request
-                response = await self.process_request(request)
-
-                # Write response
-                self.write_response(response)
-
-            except KeyboardInterrupt:
-                logger.info("Interrupted, shutting down")
-                break
-            except Exception as e:
-                logger.error(f"Unexpected error: {e}")
-                continue
+    except Exception as exc:
+        log.error(f"Error in {name}: {exc}")
+        return [types.TextContent(type="text", text=f"❌ Error running {name}: {exc}")]
 
 
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
 async def main():
-    """Main entry point"""
-    protocol = MCPServerProtocol()
-    await protocol.run()
+    log.info("JARVIS MCP server ready — waiting for Claude Desktop…")
+    async with stdio_server() as (read_stream, write_stream):
+        await server.run(
+            read_stream,
+            write_stream,
+            server.create_initialization_options()
+        )
 
 
 if __name__ == "__main__":
