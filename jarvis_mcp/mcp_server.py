@@ -42,6 +42,7 @@ class JarvisServer:
         self.account_hierarchy = AccountHierarchy()
         self.account_scaffolder = AccountScaffolder()
         self.claude_loader = ClaudeMdLoader()
+        self.enricher = SkillContextEnricher()  # Context enricher for skills
         
         # Initialize skill instances
         self.skills = {}
