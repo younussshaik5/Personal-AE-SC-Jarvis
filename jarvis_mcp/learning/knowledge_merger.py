@@ -82,15 +82,20 @@ class KnowledgeMerger:
             self._locks[account_name] = asyncio.Lock()
         return self._locks[account_name]
 
+    @staticmethod
+    def _safe_name(account_name: str) -> str:
+        return account_name.replace(" ", "_").replace("/", "_")
+
     def _account_path(self, account_name: str) -> Optional[Path]:
-        direct = self.accounts_root / account_name
+        # Always try sanitized name first (canonical form)
+        safe = self._safe_name(account_name)
+        direct = self.accounts_root / safe
         if direct.exists():
             return direct
-        for parent in self.accounts_root.iterdir():
-            if parent.is_dir():
-                child = parent / account_name
-                if child.exists():
-                    return child
+        # Fallback: raw name (legacy folders created before sanitization fix)
+        raw = self.accounts_root / account_name
+        if raw.exists():
+            return raw
         return None
 
     async def merge(
