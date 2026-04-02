@@ -1,53 +1,37 @@
-"""
-Deal Stage Management Skill
-"""
-
+"""Deal Stage Management Skill — parallel sections"""
 from jarvis_mcp.skills.base_skill import BaseSkill
 
 
 class DealStageTrackerSkill(BaseSkill):
-    """Deal stage management"""
-
     async def generate(self, account_name: str, **kwargs) -> str:
-        """
-        Generate deal_stage_tracker.
-
-        Args:
-            account_name: Account name (e.g., 'Acme Corp')
-
-        Returns:
-            Generated content (markdown)
-        """
-        # Read account context
         context = await self.read_account_files(account_name)
+        ctx = self.build_context_block(context, account_name)
+        new_stage = kwargs.get("stage", "")
+        notes = kwargs.get("notes", "")
 
-        # Build prompt
-        prompt = f"""Generate deal stage management for {account_name}.
+        extra = ""
+        if new_stage:
+            extra += f"\nREQUESTED STAGE CHANGE: {new_stage}"
+        if notes:
+            extra += f"\nNOTES: {notes}"
 
-Account Context:
-- Company: {context.get('company_research', '')[:500]}...
-- Discovery: {context.get('discovery', '')[:500]}...
-- Deal Stage: {context.get('deal_stage', 'Unknown')}
-- MEDDPICC: {context.get('meddpicc', '')[:300]}...
+        base = f"For {account_name}.{extra}\n\nACCOUNT DATA:\n{ctx}\n\nUsing ONLY the data above,"
 
-Create a comprehensive deal stage management that:
-1. Addresses specific account needs
-2. References discovery insights
-3. Includes actionable recommendations
-4. Uses clear formatting (markdown)
+        sections = [
+            {
+                "name": "Current Stage Assessment",
+                "prompt": f"{base} assess the current deal stage:\n1. Current stage and evidence supporting it\n2. Stage progression history from activities\n3. Whether the requested stage change (if any) is justified by the data\n\nGenerate ONLY this section.",
+                "model_type": "reasoning",
+                "max_tokens": 800,
+            },
+            {
+                "name": "Stage Readiness & Blockers",
+                "prompt": f"{base} analyze:\n1. What criteria are met for the current/next stage\n2. What's blocking advancement to the next stage\n3. Specific actions needed to advance, with owners and dates\n\nGenerate ONLY this section.",
+                "model_type": "reasoning",
+                "max_tokens": 800,
+            },
+        ]
 
-Format as professional markdown."""
-
-        # Call NVIDIA
-        response = await self.llm.generate(
-            model_type="text",
-            prompt=prompt,
-            context={"account": account_name},
-            max_tokens=3000,
-        )
-
-        # Write output
-        filename = "deal_stage_tracker.md"
-        await self.write_output(account_name, filename, response)
-
+        response = await self.parallel_sections(sections)
+        await self.write_output(account_name, "deal_stage_tracker.md", response)
         return response

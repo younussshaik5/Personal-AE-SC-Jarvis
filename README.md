@@ -2,313 +2,626 @@
 
 > **Your CRM tells you what happened. JARVIS tells you what to do next.**
 
-JARVIS is an open-source MCP server for Claude Desktop that turns every sales conversation into structured deal intelligence — automatically. No manual data entry. No switching apps. Just talk to Claude and watch your pipeline build itself.
+JARVIS is a free, open-source AI assistant that lives inside Claude Desktop and works 24/7 on your deals. It reads your notes, emails, and transcripts — and automatically generates battlecards, MEDDPICC scores, risk reports, proposals, demo strategies, and 20+ more sales deliverables. No manual data entry. No switching apps. Just talk to Claude.
 
 ---
 
-## Why JARVIS?
+## What Does It Actually Do?
 
-Salesforce costs $300/seat/month and still requires you to manually update every field. HubSpot gives you a pretty pipeline but zero sales intelligence. Your deals are losing because you're spending 40% of your time on admin instead of selling.
+Most sales tools are data *containers*. JARVIS is a deal *engine*.
 
-JARVIS fixes that:
+| Instead of... | JARVIS does this |
+|---|---|
+| Manually updating Salesforce after every call | Auto-extracts deal intel from your notes and updates the pipeline |
+| Spending 2 hours writing a proposal | Generates a grounded proposal from your discovery notes in seconds |
+| Forgetting to prep before a meeting | Automatically queues a meeting brief the morning of |
+| Losing track of MEDDPICC gaps | Scores all 8 dimensions from your notes and flags what's missing |
+| Writing competitive battlecards from scratch | Generates a deal-specific battlecard tied to your actual discovery |
+| Asking your manager "what's the risk on this deal?" | Pulls up a RED/AMBER/GREEN risk report with mitigations |
 
-- **Auto-generates 14 types of deal intelligence** from your conversations — battlecards, risk reports, MEDDPICC scores, demo strategies, proposals, SOWs
-- **Persistent queue** — add files, drop transcripts, update discovery notes even when Claude is closed. Everything processes automatically when Claude opens
-- **CRM dashboard** that auto-starts with Claude — deal pipeline, MEDDPICC scores, competitive intel, win/loss analytics
-- **One PDF export** — share your entire deal story with your manager in one click
-- **25+ skills** that get smarter the more you use them
-
----
-
-## What It Looks Like
-
-```
-You open Claude Desktop
-  → JARVIS starts automatically
-  → CRM dashboard opens at http://localhost:8000
-  → Missing intelligence gets queued and generated in background
-  → You start your day already briefed
-```
-
-**Morning briefing in Claude:**
-```
-"What do I have today?"
-→ Today's meetings + prep for each
-→ Stale deals that need attention
-→ Pipeline alerts (deals at risk, budget signals)
-```
-
-**During a discovery call:**
-```
-"Take notes: Acme Corp, CFO Sarah confirmed $2M budget,
- Q3 timeline, competing with Salesforce"
-→ JARVIS updates deal_stage.json
-→ Queues battlecard, risk report, value architecture for generation
-→ Dashboard refreshes automatically
-```
+Everything is grounded in your actual deal data — not generic templates. If the information isn't in your notes, JARVIS says "TBD — needs discovery" instead of making things up.
 
 ---
 
-## Quick Start
+## Before You Start — What You Need
 
-### 1. Clone
+You need three things. That's it.
+
+**1. A Mac** (Windows support coming — for now, Mac only)
+
+**2. Claude Desktop** (free)
+- Download from [claude.ai/download](https://claude.ai/download)
+- This is the desktop app for Claude — different from the website
+
+**3. An NVIDIA API Key** (free tier available)
+- Go to [build.nvidia.com](https://build.nvidia.com/)
+- Click "Sign In" → create a free account
+- Click your profile → "API Keys" → "Generate Key"
+- Copy the key — it starts with `nvapi-`
+
+> **Why NVIDIA?** JARVIS uses **Kimi K2 Thinking** — a reasoning AI model hosted on NVIDIA's platform. It thinks through your deal before writing, which is why outputs are strategic rather than generic. The free tier gives you enough calls to run JARVIS daily.
+
+> **Why multiple NVIDIA keys?** JARVIS generates multiple sections of a document simultaneously (e.g. MEDDPICC scores all 9 dimensions at once in parallel). With one key you can sometimes hit NVIDIA's rate limits mid-generation. With 2-5 keys, requests automatically rotate across them — no waiting, no failed generations. You can get multiple free keys from the same NVIDIA account.
+
+---
+
+## Installation — Step by Step
+
+### Step 1: Install Claude Desktop
+
+Download from [claude.ai/download](https://claude.ai/download) and open it. Sign in with your Anthropic account (or create one free).
+
+### Step 2: Clone JARVIS
+
+Open Terminal (search "Terminal" in Spotlight — ⌘Space).
+
 ```bash
 git clone https://github.com/younussshaik5/Personal-AE-SC-Jarvis.git
 cd Personal-AE-SC-Jarvis
 ```
 
-### 2. Run Setup (handles everything)
+> **Don't have git?** Run `xcode-select --install` in Terminal first. Or download the ZIP from GitHub and unzip it.
+
+### Step 3: Run Setup
+
+This single command does everything — installs Python dependencies, registers JARVIS with Claude Desktop, creates your accounts folder, and walks you through API key setup.
+
 ```bash
 bash setup.sh
 ```
 
-This installs Python deps, registers JARVIS + CRM sidecar in Claude Desktop, and creates your ACCOUNTS folder.
+**What you'll see:**
 
-### 3. Add Your NVIDIA API Key
-
-Edit `.env` in the project folder:
 ```
-NVIDIA_API_KEY=nvapi-your-key-here
+╔═══════════════════════════════════════════════════╗
+║  JARVIS MCP — Complete Setup (Zero Dependencies)  ║
+╚═══════════════════════════════════════════════════╝
+
+1️⃣  Checking Homebrew... ✅
+2️⃣  Checking Python 3.10+... ✅
+3️⃣  Installing Python dependencies... ✅
+...
+5️⃣  Setting up NVIDIA API keys...
+
+   JARVIS uses Kimi K2 Thinking via NVIDIA NIM for all 24 skills.
+   Get free keys at: https://build.nvidia.com/
+
+   ┌─────────────────────────────────────────────────────────────┐
+   │  WHY MULTIPLE KEYS?                                         │
+   │  JARVIS fires parallel LLM calls per skill. With 1 key you  │
+   │  can hit rate limits. With 5 keys, requests round-robin     │
+   │  automatically — no waiting, no retries.                    │
+   └─────────────────────────────────────────────────────────────┘
+
+   🔑 NVIDIA API Key 1 (required): nvapi-xxxx...
+      ✅ Key 1 accepted
+
+   🔑 NVIDIA API Key 2 (optional — press Enter to skip): nvapi-yyyy...
+      ✅ Key 2 accepted
+
+   🔑 NVIDIA API Key 3 (optional — press Enter to skip): [Enter]
+
+   2 key(s) collected — writing to .env...
+   ✅ .env written
 ```
 
-Get a free key at [build.nvidia.com](https://build.nvidia.com/) — free tier is enough to get started.
+### Step 4: Restart Claude Desktop
 
-### 4. Restart Claude Desktop
+Close Claude Desktop completely (⌘Q on Mac — don't just close the window). Then reopen it.
 
-Close (⌘Q on Mac) and reopen. Done.
+### Step 5: Verify JARVIS Is Running
+
+In Claude Desktop, look for the **🔨 (hammer) icon** in the chat input bar. Click it — you should see JARVIS tools listed. If you see `scaffold_account`, `get_proposal`, `track_meddpicc` etc., you're ready.
+
+You should also see a CRM dashboard open automatically at **http://localhost:8000** in your browser.
 
 ---
 
-## Architecture
+## Your First 5 Minutes With JARVIS
+
+### Create Your First Account
+
+Tell Claude about a deal you're working on:
 
 ```
-Claude Desktop
-├── JARVIS MCP Server        ← 25+ sales intelligence tools
-│   └── Skills: battlecard, MEDDPICC, proposal, risk report...
-│
-└── CRM Sidecar MCP Server   ← auto-starts CRM dashboard
-    └── serve_crm.py         ← http://localhost:8000
-        ├── /api/accounts    ← live pipeline data
-        ├── /api/queue       ← generation queue status
-        └── /api/generate    ← trigger skill generation
-
-~/.jarvis/
-├── queue.json               ← persistent job queue
-└── file_state.json          ← change detection state
-
-ACCOUNTS/
-└── AcmeCorp/
-    ├── deal_stage.json      ← source of truth
-    ├── discovery.md         ← your notes
-    ├── battlecard.md        ← auto-generated by JARVIS
-    ├── risk_report.md       ← auto-generated
-    └── ... (14 skill outputs)
+"Create an account for Acme Corp. They're a 500-person logistics company
+evaluating us to replace their Salesforce Service Cloud. Primary contact is
+Sarah Chen, VP Operations. ARR target is $180k."
 ```
 
-### Queue Bus
+JARVIS will call `scaffold_account` automatically, creating a folder with all the templates pre-filled.
 
-When you're not in Claude:
-1. Drop a transcript in `ACCOUNTS/AcmeCorp/`
-2. Update `discovery.md` with call notes
-3. Close your laptop
+### Add Your Discovery Notes
 
-When Claude opens next time:
-1. JARVIS detects the changed files via mtime comparison
-2. Queues affected skills (discovery change → triggers demo strategy, battlecard, value arch)
-3. Generates everything in background
-4. CRM dashboard shows fresh intelligence
+After a discovery call, paste your notes:
 
-No manual steps. No "run this command." It just happens.
+```
+"Update Acme Corp with these call notes:
+- Sarah confirmed budget is approved: $150-200k range
+- Timeline is Q3 — contract with Salesforce ends June 30
+- Pain: agents spend 40% of time switching between 5 systems
+- They evaluated Zendesk last year, eliminated for pricing
+- Need SSO with Okta and Salesforce integration
+- Champion is Mike Torres, IT Director — very engaged"
+```
+
+JARVIS extracts every MEDDPICC signal, updates the deal stage, and queues relevant skills.
+
+### Generate Intelligence
+
+Now ask for what you need:
+
+```
+"Give me a battlecard for Acme Corp vs Salesforce"
+"What are the top risks on Acme Corp?"
+"Score MEDDPICC for Acme Corp"
+"Prep me for my meeting with Sarah tomorrow"
+```
+
+Each generates in parallel — sections are built simultaneously, not one after another.
 
 ---
 
-## The 25+ Skills
+## Real User Journeys
 
-| Skill | What It Generates | Trigger |
+### Journey 1: AE Working a New Logo
+
+**Monday morning:**
+```
+You: "What's my pipeline look like?"
+JARVIS: [pulls quick_insights for all active deals]
+        → Acme Corp: AMBER — no economic buyer confirmed
+        → TechCo: RED — timeline risk, 3 weeks to close
+        → StartupX: GREEN — strong champion, paper process started
+```
+
+**Tuesday — discovery call with new prospect:**
+```
+You: [after the call] "Create account for RetailCo. Here are my notes:
+     [paste notes]"
+
+JARVIS:
+→ Creates RetailCo account
+→ Extracts: company size, pain, competitors, timeline, stakeholders
+→ Scores MEDDPICC: M=AMBER, E=RED, D=GREEN...
+→ Queues: battlecard, risk report, value architecture
+→ "Economic Buyer is RED — you have a contact but no confirmed budget authority"
+```
+
+**Wednesday — prep for RetailCo demo:**
+```
+You: "Demo strategy for RetailCo"
+
+JARVIS generates in parallel:
+→ Demo objective: get POC approval
+→ Audience breakdown: CTO cares about integrations, CFO cares about ROI
+→ Demo flow: ordered by their confirmed pain points
+→ Wow moment: show the 5-system integration they mentioned
+→ What NOT to show: enterprise features they can't afford yet
+→ Objection handlers for the 3 objections they raised
+→ Hard ask: POC start date
+```
+
+**Thursday — competitive objection raised:**
+```
+You: "RetailCo just told me they're re-evaluating Freshdesk. Battlecard?"
+
+JARVIS:
+→ Competitor profile: Freshdesk's strengths in their segment
+→ Their weaknesses tied to what RetailCo actually said they want
+→ Our differentiated position for this specific deal
+→ Killer questions to expose Freshdesk's gap
+→ Positioning statement (2 sentences)
+```
+
+**Friday — proposal requested:**
+```
+You: "Generate a proposal for RetailCo"
+
+JARVIS fires 4 parallel sections simultaneously:
+→ Executive Summary & Requirements  ← from discovery notes
+→ Proposed Solution                 ← maps each requirement to a feature
+→ Pricing & Timeline                ← uses actual ARR + their deadline
+→ Competitive Positioning & Next Steps ← vs Freshdesk
+```
+
+---
+
+### Journey 2: SC Working a Technical Deal
+
+**Incoming RFP situation:**
+```
+You: "Technical risk assessment for Acme Corp"
+
+JARVIS identifies in parallel:
+→ Integration risks: SSO with Okta, Salesforce API complexity
+→ Security/compliance risks: data residency requirements mentioned
+→ Unknown gaps: no mention of data migration scope
+
+For each: Severity (RED/AMBER/GREEN), Evidence, Pre-sales action, Resolution path
+```
+
+**Architecture review request:**
+```
+You: "Generate solution architecture for Acme Corp"
+
+JARVIS generates in parallel:
+→ Architecture narrative: components + data flows based on their requirements
+→ Mermaid.js diagram: Customer systems → Our platform → Integration points
+   (paste into Mermaid.live for a visual diagram)
+```
+
+**Deal health check before QBR:**
+```
+You: "Full MEDDPICC for Acme Corp"
+
+JARVIS fires all 9 sections simultaneously:
+→ Metrics: AMBER — ROI mentioned but not quantified
+→ Economic Buyer: RED — Sarah confirmed budget but CFO not engaged
+→ Decision Criteria: GREEN — full eval list from RFP
+→ Decision Process: AMBER — steps known, timeline unclear
+→ Paper Process: AMBER — procurement contact unidentified
+→ Implications/Pain: GREEN — 3 confirmed pain points with impact
+→ Champion: GREEN — Mike Torres, strong advocate
+→ Competition: GREEN — Freshdesk eliminated, Zendesk remaining
+→ Overall: AMBER — 2 critical gaps before commit
+```
+
+---
+
+### Journey 3: The Morning Routine
+
+```
+[You open Claude Desktop at 8am]
+
+JARVIS auto-starts:
+→ CRM dashboard opens at http://localhost:8000
+→ Detects files changed since yesterday
+→ Queues missing intelligence for 3 accounts in background
+
+You: "Brief me for today"
+→ 2 meetings today: RetailCo at 10am, Acme Corp at 2pm
+→ RetailCo: last touch was Tuesday, pending technical questions
+   Meeting prep queued — ready in 30 seconds
+→ Acme Corp: risk report went RED overnight (timeline moved)
+   Action: reach out to Sarah about the timeline change today
+→ TechCo: has been silent for 8 days — flag for follow-up
+```
+
+---
+
+## The 24 Skills
+
+Every skill generates clean, grounded markdown — no hallucinated facts, no generic filler. If something isn't in your deal data, JARVIS says "TBD — needs discovery."
+
+All skills with multiple sections generate those sections **in parallel** — so a 7-section proposal takes the same time as generating 1 section.
+
+### Core Deal Intelligence
+
+| Skill | What It Generates | Sections Generated in Parallel |
 |---|---|---|
-| `get_account_summary` | Executive overview + deal health | account created |
-| `quick_insights` | 3 key insights, 3 risks, 3 actions | deal_stage change |
-| `get_battlecard` | Win/loss positioning vs competitors | company_research change |
-| `track_meddpicc` | Full MEDDPICC scoring + gaps | discovery change |
-| `get_risk_report` | Deal risks with mitigation | weekly |
-| `get_value_architecture` | ROI model + TCO + value story | discovery change |
-| `get_competitive_intelligence` | Market position + objection handling | company_research change |
-| `analyze_competitor_pricing` | Pricing comparison + positioning | company_research change |
-| `get_meeting_prep` | Pre-meeting brief + questions | before each meeting |
-| `get_demo_strategy` | Custom demo flow + script | discovery change |
-| `get_proposal` | Full commercial proposal | on demand |
-| `generate_followup` | Stage-appropriate follow-up email | after each meeting |
-| `assess_technical_risk` | Technical blockers + mitigations | discovery change |
-| `generate_sow` | Full Statement of Work | proposal stage |
+| `get_account_summary` | Full deal dossier | Company + Deal, Pain Points, MEDDPICC status, Risks & Actions |
+| `quick_insights` | Fast deal snapshot | Deal snapshot & signals, Risks & next action |
+| `track_meddpicc` | All 8 MEDDPICC dimensions scored | **9 sections simultaneously** — each dimension independently |
+
+### Competitive & Positioning
+
+| Skill | What It Generates | Sections Generated in Parallel |
+|---|---|---|
+| `get_battlecard` | Win/loss positioning vs incumbent | Competitor profile, Our differentiators, Objection handlers |
+| `get_competitive_intelligence` | Deep competitive analysis | Competitor profile, Weaknesses & positioning, Questions & risk |
+| `analyze_competitor_pricing` | Pricing comparison + commercial strategy | Pricing comparison, Price positioning, Objection handlers |
+
+### Deal Execution
+
+| Skill | What It Generates | Sections Generated in Parallel |
+|---|---|---|
+| `get_proposal` | Full commercial proposal | Executive summary, Solution, Pricing & timeline, Competitive positioning |
+| `generate_sow` | Statement of Work | Project overview & scope, Deliverables & timeline, Responsibilities & terms |
+| `get_value_architecture` | ROI model + TCO + value case | Business problems & value, ROI model & TCO, Executive value statement |
+| `generate_followup` | 2 follow-up email options | Option A (direct) + Option B (consultative) — both simultaneously |
+
+### Risk & Discovery
+
+| Skill | What It Generates | Sections Generated in Parallel |
+|---|---|---|
+| `get_risk_report` | RED/AMBER/GREEN risk report | Stakeholder risks, Technical risks, Commercial risks, Overall assessment |
+| `assess_technical_risk` | Technical blocker analysis | Integration risks, Security & compliance risks |
+| `get_discovery` | Discovery framework + gaps | Questions by MEDDPICC dimension, Pain mapping & gaps |
+| `get_meeting_prep` | Pre-meeting brief | Context & what we know, Agenda & questions, Objections & hard ask |
+
+### Meeting & Communication
+
+| Skill | What It Generates | Sections Generated in Parallel |
+|---|---|---|
+| `process_meeting` | Meeting summary + deal impact | Meeting summary, Deal impact & MEDDPICC signals |
+| `summarize_conversation` | Conversation analysis | Summary, Impact on deal & next steps |
+| `extract_intelligence` | MEDDPICC signals from any text | MEDDPICC signals, Key intel & action items |
+| `get_demo_strategy` | Demo flow + script | Objective & audience, Demo flow & wow moment, Objections & close |
+
+### Technical & Documentation
+
+| Skill | What It Generates | Sections Generated in Parallel |
+|---|---|---|
+| `generate_architecture` | Mermaid.js solution diagram | Architecture overview, Mermaid.js diagram |
+| `build_knowledge_graph` | Stakeholder + deal knowledge map | Stakeholder map, Deal knowledge graph |
+| `generate_sow` | Statement of Work | Project overview, Deliverables, Responsibilities |
+| `generate_documentation` | Technical/sales documentation | Overview & requirements, Technical details |
+| `generate_html_report` | HTML report for stakeholders | Executive dashboard, Risk & action report |
+| `generate_custom_template` | Any custom document | Part 1 (overview), Part 2 (details) |
 
 ---
 
-## Account Structure
+## How Parallel Generation Works (Non-Technical)
 
-JARVIS supports parent/child account hierarchies for enterprise accounts with multiple business units:
+Think of it like a kitchen vs a single chef.
 
-```
-ACCOUNTS/
-├── Tata/                         ← parent (shared research)
-│   ├── deal_stage.json
-│   ├── company_research.md       ← inherited by children
-│   ├── TataTele/                 ← child deal
-│   │   ├── deal_stage.json       ← TataTele-specific
-│   │   └── discovery.md
-│   └── TataSky/                  ← another child deal
-│       └── deal_stage.json
-└── AcmeCorp/
-    └── deal_stage.json
-```
+**Old way (one LLM call):** One chef cooks the whole meal course by course. Appetizer done → main course → dessert. Everything waits.
 
-Each child inherits parent `company_research.md` but has its own deal metrics, discovery notes, and skill outputs.
+**JARVIS way (parallel sections):** You have a full brigade. The appetizer chef, main course chef, and dessert chef all start at the same time. Everything's ready together.
 
----
+When you ask for MEDDPICC, JARVIS doesn't score Metrics → then Economic Buyer → then Decision Criteria one by one. It fires all 9 scoring requests simultaneously across your NVIDIA API keys. The result arrives in the time it takes to score *one* dimension, not nine.
 
-## CRM Dashboard
-
-Auto-starts at `http://localhost:8000` when Claude Desktop opens.
-
-**What you see:**
-- 12 KPI cards: open pipeline, weighted pipeline, closed won/lost, win rate, avg deal size, MEDDPICC health
-- 7-stage pipeline funnel with deal counts and values
-- Full pipeline table with MEDDPICC scores, risk indicators, skill coverage
-- One-click drill-down into any account — full scrollable intelligence report
-
-**Per-account report includes:**
-- Deal overview + stakeholders
-- MEDDPICC scoring (all 8 dimensions with bars)
-- Risk analysis (high/medium/low with categories)
-- Competitive intel + battlecard
-- Discovery completeness tracker
-- All 14 AI-generated skill outputs
-- One-click PDF export for sharing with management
-
-**Auto-generation:**
-- Click "⚡ Generate All Intelligence" to queue all missing skills
-- Or click "⚡ Generate" on any individual card
-- Queue processes in background — dashboard updates automatically
-- Status badge shows generation progress in real-time
+This is why multiple NVIDIA keys matter. If you have 5 keys and fire 9 parallel requests, each key handles 1-2 requests at once, and none of them hit rate limits.
 
 ---
 
 ## MEDDPICC Framework
 
-Every deal is scored across 8 dimensions:
+JARVIS uses MEDDPICC as the backbone for deal qualification. Every skill output references MEDDPICC status.
 
-| Dimension | What JARVIS Tracks |
-|---|---|
-| **M**etrics | ROI numbers, cost savings, efficiency gains |
-| **E**conomic Buyer | CFO/VP/budget holder identified |
-| **D**ecision Criteria | Evaluation criteria documented |
-| **D**ecision Process | Procurement steps mapped |
-| **P**aper Process | Legal/security/contract status |
-| **I**mplications | Pain points and business impact |
-| **C**hampion | Internal advocate identified |
-| **C**ompetition | Competitive landscape documented |
+| Dimension | What JARVIS Looks For | Why It Matters |
+|---|---|---|
+| **M**etrics | ROI numbers, cost savings, productivity gains | No metrics = no business case |
+| **E**conomic Buyer | CFO/VP/person with budget authority confirmed | Wrong sponsor = deal dies in procurement |
+| **D**ecision Criteria | Evaluation requirements documented | Don't know criteria = can't win evaluation |
+| **D**ecision Process | Procurement steps, approval chain mapped | Surprises in process = timeline slips |
+| **P**aper Process | Legal, security review, MSA status | Paper process = months of surprise delays |
+| **I**mplications | Pain points with business impact | No pain = no urgency |
+| **C**hampion | Internal advocate selling on your behalf | No champion = no inside track |
+| **C**ompetition | Competitors named, status known | Blind to competition = ambushed at close |
 
-Score below 40%? JARVIS flags it as under-qualified. Above 70%? Deal is in good shape.
+**Score:**
+- **GREEN** — confirmed, documented, evidence in notes
+- **AMBER** — partial, unverified, or assumed
+- **RED** — missing or known gap
+
+Overall deal health: below 40% GREEN = under-qualified. Above 70% = well qualified.
 
 ---
 
-## Configuration
+## Your Account Data
 
-### Environment Variables
+Everything JARVIS generates is saved to a folder on your computer:
+
+```
+~/JARVIS/ACCOUNTS/
+└── AcmeCorp/
+    ├── deal_stage.json          ← source of truth: stage, ARR, stakeholders, activities
+    ├── company_research.md      ← company background, tech stack, news
+    ├── discovery.md             ← your discovery notes + MEDDPICC signals
+    ├── CLAUDE.md                ← account-specific instructions for JARVIS
+    │
+    ├── [auto-generated by JARVIS]
+    ├── account_summary.md
+    ├── battlecard.md
+    ├── meddpicc.md
+    ├── risk_report.md
+    ├── value_architecture.md
+    ├── demo_strategy.md
+    ├── meeting_prep.md
+    ├── proposal.md
+    ├── sow.md
+    ├── competitive_intelligence.md
+    └── ... (all 24 skill outputs)
+```
+
+**The richer your notes, the better the outputs.** JARVIS only generates from data that's actually in your files — it never invents facts. So if you want a grounded proposal with real pricing, make sure your `deal_stage.json` has the ARR. If you want a battlecard with real competitive intel, make sure `discovery.md` has the competitor name.
+
+### Enterprise Accounts (Parent/Child)
+
+For large accounts with multiple business units:
+
+```
+ACCOUNTS/
+└── Tata/                         ← parent (shared company research)
+    ├── company_research.md       ← shared across all Tata deals
+    ├── TataTeleservices/         ← child deal
+    │   ├── deal_stage.json
+    │   └── discovery.md
+    └── TataSky/                  ← different Tata deal
+        ├── deal_stage.json
+        └── discovery.md
+```
+
+Each child deal inherits the parent's company research but has its own pipeline, discovery, and skill outputs. Run `scaffold_account` with a parent name to create this structure.
+
+---
+
+## CRM Dashboard
+
+Auto-starts at **http://localhost:8000** every time you open Claude Desktop.
+
+**What you see:**
+
+```
+Pipeline Overview
+├── Open Pipeline: $2.4M
+├── Weighted Pipeline: $980k
+├── Closed Won (QTD): $430k
+├── Win Rate: 34%
+├── Avg Deal Size: $87k
+└── MEDDPICC Health: 58% (AMBER)
+
+Deal Stage Funnel
+Discovery (3) → Qualify (2) → Demo (4) → Negotiate (1) → Close (2)
+
+Pipeline Table
+Account      │ Stage    │ ARR     │ MEDDPICC │ Risk │ Skills
+AcmeCorp     │ Demo     │ $180k   │ 62% 🟡   │ 🟡   │ 14/24
+RetailCo     │ Qualify  │ $95k    │ 38% 🔴   │ 🔴   │ 6/24
+TechCo       │ Negotiate│ $240k   │ 78% 🟢   │ 🟢   │ 22/24
+```
+
+**Per-account drill-down:**
+- Click any account → full scrollable intelligence report
+- MEDDPICC scorecard with all 8 dimensions visualized
+- Risk breakdown (HIGH/MEDIUM/LOW with evidence)
+- All 24 skill outputs with generation status
+- "⚡ Generate All" button — queues all missing skills in background
+- "📄 Export PDF" — one-click full deal story for manager or QBR
+
+---
+
+## NVIDIA Keys — How To Get More
+
+You can get multiple free keys from NVIDIA's platform:
+
+1. Go to [build.nvidia.com](https://build.nvidia.com/)
+2. Sign in → click your profile picture → "API Keys"
+3. Click "Generate Key" — you can generate multiple keys
+4. Add each one to your `.env` file:
 
 ```bash
-# Required
-NVIDIA_API_KEY=nvapi-your-key
-
-# Optional overrides
-ACCOUNTS_ROOT=/custom/path/to/accounts   # default: ~/Documents/claude space/ACCOUNTS
-CRM_PORT=8000                            # default: 8000
-NVIDIA_MODEL=meta/llama-3.3-70b-instruct # default model
-NVIDIA_FAST_MODEL=meta/llama-3.1-8b-instruct
+# In your .env file:
+NVIDIA_API_KEY=nvapi-key1...
+NVIDIA_API_KEY_2=nvapi-key2...
+NVIDIA_API_KEY_3=nvapi-key3...
+NVIDIA_API_KEY_4=nvapi-key4...
+NVIDIA_API_KEY_5=nvapi-key5...
 ```
 
-### Per-Account Settings (CLAUDE.md)
+After editing `.env`, restart Claude Desktop (⌘Q → reopen) for the keys to load.
 
-Each account folder can have a `CLAUDE.md` that overrides global behavior:
-
-```markdown
-# Account: AcmeCorp
-
-## Notes
-- Primary contact: Sarah (CFO) — direct line to budget
-- Champion: Mike (VP Engineering) — strong advocate
-- Competitor: Salesforce (incumbent, 3-year contract ending Q2)
-- Key pain: Manual invoice processing, 40hrs/week wasted
-
-## Next Actions
-- Send ROI calculator by Thursday
-- Schedule technical deep-dive with IT team
-- Identify procurement contact before end of month
-```
-
-JARVIS reads this on every skill call, so your notes automatically enrich every generated output.
+**How many do you need?**
+- 1 key: works fine for moderate use
+- 2-3 keys: recommended for daily use with multiple accounts
+- 5 keys: ideal if you're running JARVIS heavily or sharing with a team
 
 ---
 
 ## Troubleshooting
 
-**JARVIS not showing in Claude Desktop tools?**
+### JARVIS not showing in Claude Desktop tools (no 🔨 icon)
+
 ```bash
-bash setup.sh  # re-run setup
-# Then: ⌘Q Claude Desktop, reopen
+# Re-run setup
+bash setup.sh
+# Then quit Claude Desktop (⌘Q) and reopen — don't just close the window
 ```
 
-**NVIDIA API errors?**
+### "All NVIDIA keys exhausted" or API errors
+
+1. Check your key is correct: open `.env` and verify `NVIDIA_API_KEY=nvapi-...`
+2. Test the key at [build.nvidia.com](https://build.nvidia.com/) → try a model in the playground
+3. If rate-limited: wait 60 seconds (JARVIS auto-recovers), or add more keys
+4. Keys must be in `.env` file — not just set in terminal. Claude Desktop doesn't read shell env vars.
+
+### Skills returning "TBD — needs discovery"
+
+This is correct behavior, not an error. JARVIS only generates from your actual data. Fix: add more notes to `discovery.md` or `deal_stage.json` for that account. The more context you give, the more grounded and useful the output.
+
+### CRM dashboard not loading at http://localhost:8000
+
 ```bash
-python3 check_api_key.py  # validates your key
+# Check if the CRM sidecar is registered
+cat "$HOME/Library/Application Support/Claude/claude_desktop_config.json" | grep jarvis-crm
+
+# If missing, re-run setup
+bash setup.sh
 ```
 
-**CRM dashboard not loading?**
+### Queue not processing (skills queued but not generating)
+
 ```bash
-# Check if server is running
-curl http://localhost:8000/api/accounts
-# If not, start manually:
-python3 serve_crm.py
+# Inspect the queue
+cat ~/.jarvis/queue.json
+
+# If stuck, clear it and regenerate manually
+echo '{"queue":[]}' > ~/.jarvis/queue.json
+# Then ask Claude to generate the skill you need
 ```
 
-**Skills returning placeholder text?**
-- Make sure `NVIDIA_API_KEY` is in `.env` file (not just exported in shell)
-- Claude Desktop doesn't inherit shell env vars — `.env` file is required
+### Python or import errors after setup
 
-**Queue not processing?**
 ```bash
-cat ~/.jarvis/queue.json  # inspect queue
-cat ~/.jarvis/file_state.json  # inspect file state
+# Reinstall dependencies
+bash setup.sh
+# setup.sh is safe to re-run — it won't overwrite your .env or account data
 ```
 
 ---
 
-## Contributing
+## Adding Your Own Skills
 
-JARVIS is designed to be extended. Each skill is an independent Python class:
+Each skill is one Python file. Here's the minimal template:
 
 ```python
 # jarvis_mcp/skills/my_skill.py
-from .base_skill import BaseSkill
+from jarvis_mcp.skills.base_skill import BaseSkill
 
 class MySkill(BaseSkill):
     async def generate(self, account_name: str, **kwargs) -> str:
         context = await self.read_account_files(account_name)
-        result = await self.llm.generate(
-            f"Analyze {account_name}: {context}",
-            model_type="default"
-        )
-        await self.write_output(account_name, "my_skill.md", result)
-        return result
+        ctx = self.build_context_block(context, account_name)
+
+        sections = [
+            {
+                "name": "Section One",
+                "prompt": f"For {account_name}.\n\nACCOUNT DATA:\n{ctx}\n\nWrite section one...",
+                "max_tokens": 800,
+            },
+            {
+                "name": "Section Two",
+                "prompt": f"For {account_name}.\n\nACCOUNT DATA:\n{ctx}\n\nWrite section two...",
+                "max_tokens": 800,
+            },
+        ]
+
+        response = await self.parallel_sections(sections)
+        await self.write_output(account_name, "my_skill.md", response)
+        return response
 ```
 
-Register it in `jarvis_mcp/skills/__init__.py` and add the MCP tool definition in `jarvis_mcp_server.py`. That's it.
+Then:
+1. Register it in `jarvis_mcp/skills/__init__.py`: `"my_skill": MySkill`
+2. Add the MCP tool in `jarvis_mcp_server.py` (copy any existing tool definition)
+3. Restart Claude Desktop
+
+That's it. Your skill is live with parallel generation built in.
+
+---
+
+## Technical Stack
+
+For those who want to understand what's running:
+
+| Component | What It Is |
+|---|---|
+| **Claude Desktop** | The UI — where you chat. Acts as the MCP client |
+| **JARVIS MCP Server** | A Python process that runs alongside Claude, exposes 24 tools |
+| **MCP Protocol** | How Claude and JARVIS communicate — think of it as a plugin API |
+| **Kimi K2 Thinking** | The AI model doing the actual generation — hosted on NVIDIA NIM |
+| **NVIDIA NIM** | NVIDIA's hosted inference API — OpenAI-compatible endpoint |
+| **CRM Sidecar** | A separate Python process that serves the web dashboard |
+| **asyncio.gather** | Python's parallel execution — fires multiple LLM calls simultaneously |
+
+The model: **moonshotai/kimi-k2-thinking** via `https://integrate.api.nvidia.com/v1`. It's a thinking model — it reasons through the deal before writing, which is why outputs are strategic rather than surface-level.
 
 ---
 
 ## License
 
-MIT — fork it, customize it, make it yours.
+MIT — fork it, customize it, use it commercially, make it yours.
 
 ---
 
-**Built for the AE/SC who does both jobs. One tool. Zero admin.**
+## Contributing
+
+PRs welcome. If you add a skill that works well, open a PR — other AEs/SCs will benefit.
+
+The codebase is intentionally simple: 24 skill files, one base class, one LLM manager. No frameworks, no abstractions beyond what's needed. You don't need to understand MCP or async Python to add a skill — just copy an existing one and change the prompts.
+
+---
+
+**Built by an AE/SC who was tired of doing both jobs manually. One tool. Zero admin. Everything grounded in real deal data.**

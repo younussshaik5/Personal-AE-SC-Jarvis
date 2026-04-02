@@ -9,14 +9,19 @@ Sales professional handling both AE and SC responsibilities. One person, both ro
 
 ## NVIDIA API Key Setup (Guide New Users)
 
-If JARVIS skill calls return errors about API key:
+JARVIS uses **Kimi K2 Thinking** via NVIDIA NIM. All skills require an NVIDIA API key.
+
+**If JARVIS skill calls return key errors:**
 1. Go to https://build.nvidia.com/ → sign up (free tier available)
-2. Copy API key
+2. Copy your API key (starts with `nvapi-`)
 3. Edit `.env` in the JARVIS project folder
 4. Set `NVIDIA_API_KEY=nvapi-your-key-here`
 5. Restart Claude Desktop (⌘Q → reopen)
 
-If `.env` doesn't exist: user needs to run `bash setup.sh` first.
+**If `.env` doesn't exist:** user needs to run `bash setup.sh` first — it will interactively ask for keys.
+
+**Why multiple keys?**
+JARVIS fires parallel LLM calls per skill (e.g. MEDDPICC generates 9 dimensions simultaneously). With 1 key you can hit NVIDIA rate limits mid-generation. With multiple keys, requests round-robin automatically — no retries, no waiting. Add up to 5 keys as `NVIDIA_API_KEY`, `NVIDIA_API_KEY_2` ... `NVIDIA_API_KEY_5` in `.env`.
 
 ---
 

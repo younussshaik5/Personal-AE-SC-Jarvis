@@ -1,53 +1,30 @@
-"""
-Documentation Generation Skill
-"""
-
+"""Documentation Generation Skill — parallel sections"""
 from jarvis_mcp.skills.base_skill import BaseSkill
 
 
 class DocumentationSkill(BaseSkill):
-    """Documentation generation"""
-
     async def generate(self, account_name: str, **kwargs) -> str:
-        """
-        Generate documentation.
-
-        Args:
-            account_name: Account name (e.g., 'Acme Corp')
-
-        Returns:
-            Generated content (markdown)
-        """
-        # Read account context
         context = await self.read_account_files(account_name)
+        ctx = self.build_context_block(context, account_name)
+        doc_type = kwargs.get("doc_type", "technical documentation")
 
-        # Build prompt
-        prompt = f"""Generate documentation generation for {account_name}.
+        base = f"For {account_name} — {doc_type}.\n\nACCOUNT DATA:\n{ctx}\n\nUsing ONLY the data above,"
 
-Account Context:
-- Company: {context.get('company_research', '')[:500]}...
-- Discovery: {context.get('discovery', '')[:500]}...
-- Deal Stage: {context.get('deal_stage', 'Unknown')}
-- MEDDPICC: {context.get('meddpicc', '')[:300]}...
+        sections = [
+            {
+                "name": "Overview & Requirements",
+                "prompt": f"{base} write the overview section of {doc_type}:\n1. Purpose and scope\n2. Requirements addressed (from discovery)\n3. Audience and prerequisites\n\nGenerate ONLY this section.",
+                "model_type": "text",
+                "max_tokens": 800,
+            },
+            {
+                "name": "Technical Details & Implementation",
+                "prompt": f"{base} write the technical details section of {doc_type}:\n1. Architecture and components\n2. Integration points (from discovery requirements)\n3. Implementation steps and configuration\n\nGenerate ONLY this section.",
+                "model_type": "text",
+                "max_tokens": 1200,
+            },
+        ]
 
-Create a comprehensive documentation generation that:
-1. Addresses specific account needs
-2. References discovery insights
-3. Includes actionable recommendations
-4. Uses clear formatting (markdown)
-
-Format as professional markdown."""
-
-        # Call NVIDIA
-        response = await self.llm.generate(
-            model_type="text",
-            prompt=prompt,
-            context={"account": account_name},
-            max_tokens=3000,
-        )
-
-        # Write output
-        filename = "documentation.md"
-        await self.write_output(account_name, filename, response)
-
+        response = await self.parallel_sections(sections)
+        await self.write_output(account_name, "documentation.md", response)
         return response

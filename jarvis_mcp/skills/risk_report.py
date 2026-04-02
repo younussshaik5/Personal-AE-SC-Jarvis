@@ -1,4 +1,4 @@
-"""Deal Risk Assessment Skill"""
+"""Deal Risk Assessment Skill — parallel sections"""
 from jarvis_mcp.skills.base_skill import BaseSkill
 
 
@@ -7,32 +7,31 @@ class RiskReportSkill(BaseSkill):
         context = await self.read_account_files(account_name)
         ctx = self.build_context_block(context, account_name)
 
-        prompt = f"""Generate a deal risk report for {account_name}.
+        base = f"For {account_name}.\n\nACCOUNT DATA:\n{ctx}\n\nUsing ONLY the data above,"
 
-ACCOUNT DATA:
-{ctx}
+        sections = [
+            {
+                "name": "Stakeholder & Competitive Risks",
+                "prompt": f"{base} identify risks in the Stakeholder and Competitive categories. For each risk:\n- Risk name\n- Severity: RED / AMBER / GREEN\n- Category\n- Evidence: what in the data signals this risk\n- Mitigation: specific action with owner and deadline\n\nOrder by severity (RED first). Do NOT invent risks not in the data. Generate ONLY this section.",
+                "max_tokens": 1000,
+            },
+            {
+                "name": "Technical & Timeline Risks",
+                "prompt": f"{base} identify risks in the Technical and Timeline categories. For each risk:\n- Risk name\n- Severity: RED / AMBER / GREEN\n- Category\n- Evidence: what in the data signals this risk\n- Mitigation: specific action with owner and deadline\n\nOrder by severity (RED first). Do NOT invent risks not in the data. Generate ONLY this section.",
+                "max_tokens": 1000,
+            },
+            {
+                "name": "Commercial & Process Risks",
+                "prompt": f"{base} identify risks in the Commercial and Process categories. For each risk:\n- Risk name\n- Severity: RED / AMBER / GREEN\n- Category\n- Evidence: what in the data signals this risk\n- Mitigation: specific action with owner and deadline\n\nOrder by severity (RED first). Do NOT invent risks not in the data. Generate ONLY this section.",
+                "max_tokens": 1000,
+            },
+            {
+                "name": "Overall Risk Assessment",
+                "prompt": f"{base} provide:\n- Overall risk rating: RED / AMBER / GREEN\n- Must-resolve before close: the 2–3 risks that will kill the deal if unaddressed\n- Risk trend: improving or worsening based on deal progression\n\nGenerate ONLY this summary section.",
+                "max_tokens": 600,
+            },
+        ]
 
-Using ONLY the data above, identify every risk present in this deal. For each risk:
-- Risk name
-- Severity: RED / AMBER / GREEN
-- Category: Stakeholder | Competitive | Technical | Timeline | Commercial | Process
-- Evidence: what in the data signals this risk
-- Mitigation: specific action with owner and deadline
-
-Order risks by severity (RED first).
-
-Then provide:
-- Overall risk rating: RED / AMBER / GREEN
-- Must-resolve before close: the 2–3 risks that will kill the deal if unaddressed
-- Risk trend: improving or worsening based on deal progression
-
-Do NOT invent risks not evidenced in the data."""
-
-        response = await self.llm.generate(
-            prompt=prompt,
-            model_type="reasoning",
-            system_prompt=self.grounded_system_prompt(),
-            max_tokens=3000,
-        )
+        response = await self.parallel_sections(sections)
         await self.write_output(account_name, "risk_report.md", response)
         return response

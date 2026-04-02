@@ -1,53 +1,29 @@
-"""
-Html Report Generation Skill
-"""
-
+"""HTML Report Generation Skill — parallel sections"""
 from jarvis_mcp.skills.base_skill import BaseSkill
 
 
 class HtmlGeneratorSkill(BaseSkill):
-    """HTML report generation"""
-
     async def generate(self, account_name: str, **kwargs) -> str:
-        """
-        Generate html_generator.
-
-        Args:
-            account_name: Account name (e.g., 'Acme Corp')
-
-        Returns:
-            Generated content (markdown)
-        """
-        # Read account context
         context = await self.read_account_files(account_name)
+        ctx = self.build_context_block(context, account_name)
 
-        # Build prompt
-        prompt = f"""Generate html report generation for {account_name}.
+        base = f"For {account_name}.\n\nACCOUNT DATA:\n{ctx}\n\nUsing ONLY the data above,"
 
-Account Context:
-- Company: {context.get('company_research', '')[:500]}...
-- Discovery: {context.get('discovery', '')[:500]}...
-- Deal Stage: {context.get('deal_stage', 'Unknown')}
-- MEDDPICC: {context.get('meddpicc', '')[:300]}...
+        sections = [
+            {
+                "name": "Executive Dashboard (HTML)",
+                "prompt": f"{base} generate an HTML section with inline CSS for an executive dashboard showing:\n- Deal snapshot: stage, ARR, probability, timeline\n- Stakeholder table\n- MEDDPICC scorecard (RED/AMBER/GREEN badges)\n\nOutput valid HTML with inline styles. Generate ONLY this section.",
+                "model_type": "text",
+                "max_tokens": 1500,
+            },
+            {
+                "name": "Risk & Action Report (HTML)",
+                "prompt": f"{base} generate an HTML section with inline CSS showing:\n- Top risks with severity badges\n- Competitive positioning summary\n- Next actions table with dates and owners\n\nOutput valid HTML with inline styles. Generate ONLY this section.",
+                "model_type": "text",
+                "max_tokens": 1200,
+            },
+        ]
 
-Create a comprehensive html report generation that:
-1. Addresses specific account needs
-2. References discovery insights
-3. Includes actionable recommendations
-4. Uses clear formatting (markdown)
-
-Format as professional markdown."""
-
-        # Call NVIDIA
-        response = await self.llm.generate(
-            model_type="text",
-            prompt=prompt,
-            context={"account": account_name},
-            max_tokens=3000,
-        )
-
-        # Write output
-        filename = "html_generator.md"
-        await self.write_output(account_name, filename, response)
-
+        response = await self.parallel_sections(sections)
+        await self.write_output(account_name, "html_report.md", response)
         return response

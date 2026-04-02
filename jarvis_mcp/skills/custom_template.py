@@ -1,53 +1,34 @@
-"""
-Custom Template Generation Skill
-"""
-
+"""Custom Template Generation Skill — parallel sections"""
 from jarvis_mcp.skills.base_skill import BaseSkill
 
 
 class CustomTemplateSkill(BaseSkill):
-    """Custom template generation"""
-
     async def generate(self, account_name: str, **kwargs) -> str:
-        """
-        Generate custom_template.
-
-        Args:
-            account_name: Account name (e.g., 'Acme Corp')
-
-        Returns:
-            Generated content (markdown)
-        """
-        # Read account context
         context = await self.read_account_files(account_name)
+        ctx = self.build_context_block(context, account_name)
+        template_name = kwargs.get("template_name", "custom document")
+        template_context = kwargs.get("context", "")
 
-        # Build prompt
-        prompt = f"""Generate custom template generation for {account_name}.
+        base = f"For {account_name} — {template_name}.\n\nACCOUNT DATA:\n{ctx}"
+        if template_context:
+            base += f"\n\nADDITIONAL CONTEXT:\n{template_context}"
+        base += "\n\nUsing ONLY the data above,"
 
-Account Context:
-- Company: {context.get('company_research', '')[:500]}...
-- Discovery: {context.get('discovery', '')[:500]}...
-- Deal Stage: {context.get('deal_stage', 'Unknown')}
-- MEDDPICC: {context.get('meddpicc', '')[:300]}...
+        sections = [
+            {
+                "name": f"{template_name} — Part 1: Overview & Context",
+                "prompt": f"{base} write the first half of {template_name}:\n- Introduction and purpose\n- Account context and background\n- Key requirements or objectives\n\nGenerate ONLY this section.",
+                "model_type": "text",
+                "max_tokens": 1200,
+            },
+            {
+                "name": f"{template_name} — Part 2: Details & Recommendations",
+                "prompt": f"{base} write the second half of {template_name}:\n- Detailed analysis or content\n- Actionable recommendations\n- Next steps\n\nGenerate ONLY this section.",
+                "model_type": "text",
+                "max_tokens": 1200,
+            },
+        ]
 
-Create a comprehensive custom template generation that:
-1. Addresses specific account needs
-2. References discovery insights
-3. Includes actionable recommendations
-4. Uses clear formatting (markdown)
-
-Format as professional markdown."""
-
-        # Call NVIDIA
-        response = await self.llm.generate(
-            model_type="text",
-            prompt=prompt,
-            context={"account": account_name},
-            max_tokens=3000,
-        )
-
-        # Write output
-        filename = "custom_template.md"
-        await self.write_output(account_name, filename, response)
-
+        response = await self.parallel_sections(sections)
+        await self.write_output(account_name, "custom_template.md", response)
         return response

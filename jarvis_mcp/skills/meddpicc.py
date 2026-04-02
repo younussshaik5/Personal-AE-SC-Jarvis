@@ -1,4 +1,4 @@
-"""MEDDPICC Tracking Skill"""
+"""MEDDPICC Tracking Skill — parallel sections (8 dimensions fired simultaneously)"""
 from jarvis_mcp.skills.base_skill import BaseSkill
 
 
@@ -7,32 +7,58 @@ class MeddpiccSkill(BaseSkill):
         context = await self.read_account_files(account_name)
         ctx = self.build_context_block(context, account_name)
 
-        prompt = f"""Score and analyse MEDDPICC for {account_name}.
+        base = f"For {account_name}.\n\nACCOUNT DATA:\n{ctx}\n\nUsing ONLY the data above,"
 
-ACCOUNT DATA:
-{ctx}
+        dim_instruction = "For this dimension provide:\n- Score: RED / AMBER / GREEN\n- Evidence: direct quote or reference from the data\n- Gap: what is unconfirmed or missing\n- Next action: specific question or task to advance this dimension\n\nDo NOT invent names, competitors, metrics, or timelines not in the data. Generate ONLY this dimension."
 
-Using ONLY the data above, score each of the 8 MEDDPICC dimensions:
-Metrics | Economic Buyer | Decision Criteria | Decision Process | Paper Process | Implications/Pain | Champion | Competition
+        sections = [
+            {
+                "name": "Metrics",
+                "prompt": f"{base} score the MEDDPICC dimension **Metrics** — quantified business outcomes, ROI, cost savings.\n\n{dim_instruction}",
+                "max_tokens": 500,
+            },
+            {
+                "name": "Economic Buyer",
+                "prompt": f"{base} score the MEDDPICC dimension **Economic Buyer** — who has budget authority, final sign-off power.\n\n{dim_instruction}",
+                "max_tokens": 500,
+            },
+            {
+                "name": "Decision Criteria",
+                "prompt": f"{base} score the MEDDPICC dimension **Decision Criteria** — what requirements they're evaluating against.\n\n{dim_instruction}",
+                "max_tokens": 500,
+            },
+            {
+                "name": "Decision Process",
+                "prompt": f"{base} score the MEDDPICC dimension **Decision Process** — steps, timeline, approvals needed to buy.\n\n{dim_instruction}",
+                "max_tokens": 500,
+            },
+            {
+                "name": "Paper Process",
+                "prompt": f"{base} score the MEDDPICC dimension **Paper Process** — legal, security review, procurement, contract.\n\n{dim_instruction}",
+                "max_tokens": 500,
+            },
+            {
+                "name": "Implications / Pain",
+                "prompt": f"{base} score the MEDDPICC dimension **Implications / Pain** — what happens if they don't act, confirmed pain points.\n\n{dim_instruction}",
+                "max_tokens": 500,
+            },
+            {
+                "name": "Champion",
+                "prompt": f"{base} score the MEDDPICC dimension **Champion** — internal advocate who is selling on our behalf.\n\n{dim_instruction}",
+                "max_tokens": 500,
+            },
+            {
+                "name": "Competition",
+                "prompt": f"{base} score the MEDDPICC dimension **Competition** — who else is being evaluated, incumbent status.\n\n{dim_instruction}",
+                "max_tokens": 500,
+            },
+            {
+                "name": "Overall Deal Health & Action Plan",
+                "prompt": f"{base} provide a MEDDPICC summary:\n- Overall deal health: RED / AMBER / GREEN + one-line reason\n- Top 3 gaps posing the most risk to closing by the forecast date\n- Recommended sequence of actions to close the gaps\n\nGenerate ONLY this summary.",
+                "max_tokens": 600,
+            },
+        ]
 
-For each dimension:
-- Score: RED / AMBER / GREEN
-- Evidence: direct quote or reference from the data
-- Gap: what is unconfirmed or missing
-- Next action: specific question or task to advance this dimension
-
-Then provide:
-- Overall deal health: RED / AMBER / GREEN + one-line reason
-- Top 3 gaps posing the most risk to closing by the forecast date
-- Recommended sequence of actions
-
-Do NOT invent names, competitors, metrics, or timelines not present in the data."""
-
-        response = await self.llm.generate(
-            prompt=prompt,
-            model_type="reasoning",
-            system_prompt=self.grounded_system_prompt(),
-            max_tokens=3000,
-        )
+        response = await self.parallel_sections(sections)
         await self.write_output(account_name, "meddpicc.md", response)
         return response

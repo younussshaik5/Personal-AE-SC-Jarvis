@@ -1,53 +1,29 @@
-"""
-Build Interconnected Knowledge Graphs Skill
-"""
-
+"""Build Interconnected Knowledge Graphs Skill — parallel sections"""
 from jarvis_mcp.skills.base_skill import BaseSkill
 
 
 class KnowledgeBuilderSkill(BaseSkill):
-    """Build interconnected knowledge graphs"""
-
     async def generate(self, account_name: str, **kwargs) -> str:
-        """
-        Generate knowledge_builder.
-
-        Args:
-            account_name: Account name (e.g., 'Acme Corp')
-
-        Returns:
-            Generated content (markdown)
-        """
-        # Read account context
         context = await self.read_account_files(account_name)
+        ctx = self.build_context_block(context, account_name)
 
-        # Build prompt
-        prompt = f"""Generate build interconnected knowledge graphs for {account_name}.
+        base = f"For {account_name}.\n\nACCOUNT DATA:\n{ctx}\n\nUsing ONLY the data above,"
 
-Account Context:
-- Company: {context.get('company_research', '')[:500]}...
-- Discovery: {context.get('discovery', '')[:500]}...
-- Deal Stage: {context.get('deal_stage', 'Unknown')}
-- MEDDPICC: {context.get('meddpicc', '')[:300]}...
+        sections = [
+            {
+                "name": "Stakeholder Map & Relationships",
+                "prompt": f"{base} build a stakeholder knowledge graph:\n- All named people, their roles, and influence\n- Relationships between stakeholders (reports to, influences, blocks)\n- Champion / detractor / neutral classification\n- Power/influence grid\n\nGenerate ONLY this section.",
+                "model_type": "reasoning",
+                "max_tokens": 1000,
+            },
+            {
+                "name": "Deal Knowledge Graph",
+                "prompt": f"{base} build a deal knowledge graph connecting:\n- Pain points → requirements → capabilities → value\n- Competitor → their strengths → our counter\n- Timeline milestones → dependencies → risks\n- MEDDPICC dimensions → evidence → gaps\n\nPresent as structured relationships. Generate ONLY this section.",
+                "model_type": "reasoning",
+                "max_tokens": 1000,
+            },
+        ]
 
-Create a comprehensive build interconnected knowledge graphs that:
-1. Addresses specific account needs
-2. References discovery insights
-3. Includes actionable recommendations
-4. Uses clear formatting (markdown)
-
-Format as professional markdown."""
-
-        # Call NVIDIA
-        response = await self.llm.generate(
-            model_type="reasoning",
-            prompt=prompt,
-            context={"account": account_name},
-            max_tokens=3000,
-        )
-
-        # Write output
-        filename = "knowledge_builder.md"
-        await self.write_output(account_name, filename, response)
-
+        response = await self.parallel_sections(sections)
+        await self.write_output(account_name, "knowledge_builder.md", response)
         return response

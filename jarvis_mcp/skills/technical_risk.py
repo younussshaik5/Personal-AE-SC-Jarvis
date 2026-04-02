@@ -1,4 +1,4 @@
-"""Technical Risk Assessment Skill"""
+"""Technical Risk Assessment Skill — parallel sections"""
 from jarvis_mcp.skills.base_skill import BaseSkill
 
 
@@ -7,31 +7,23 @@ class TechnicalRiskSkill(BaseSkill):
         context = await self.read_account_files(account_name)
         ctx = self.build_context_block(context, account_name)
 
-        prompt = f"""Assess technical risks for {account_name}.
+        base = f"For {account_name}.\n\nACCOUNT DATA:\n{ctx}\n\nUsing ONLY the data above,"
 
-ACCOUNT DATA:
-{ctx}
+        risk_format = "For each risk provide:\n- Risk: specific technical challenge\n- Severity: RED / AMBER / GREEN\n- Evidence: what in the data signals this risk\n- Pre-sales action: what to validate or demo before close\n- Resolution path: how to mitigate\n\nDo NOT invent risks not in the data. Generate ONLY this section."
 
-Using ONLY the data above, identify technical risks specific to this deal. For each risk:
-- Risk: specific technical challenge (e.g. SSO integration, API complexity, data migration)
-- Severity: RED / AMBER / GREEN
-- Evidence: what in the data signals this risk (integration requirement, legacy system, etc.)
-- Pre-sales action: what to validate or demo before close
-- Resolution path: how to mitigate or de-risk
+        sections = [
+            {
+                "name": "Integration & Legacy System Risks",
+                "prompt": f"{base} identify technical risks related to:\n- Integration requirements mentioned in discovery\n- Legacy/incumbent system dependencies\n\n{risk_format}",
+                "max_tokens": 800,
+            },
+            {
+                "name": "Security, Compliance & Technical Unknowns",
+                "prompt": f"{base} identify technical risks related to:\n- Security or compliance requirements (SSO, auth, data residency)\n- Any technical unknowns or gaps in discovery\n\n{risk_format}",
+                "max_tokens": 800,
+            },
+        ]
 
-Focus on:
-- Integration requirements mentioned in discovery
-- Legacy/incumbent system dependencies
-- Security or compliance requirements (SSO, auth, data residency)
-- Any technical unknowns or gaps in discovery
-
-Do NOT invent technical risks not grounded in the account data."""
-
-        response = await self.llm.generate(
-            prompt=prompt,
-            model_type="reasoning",
-            system_prompt=self.grounded_system_prompt(),
-            max_tokens=2500,
-        )
+        response = await self.parallel_sections(sections)
         await self.write_output(account_name, "technical_risk.md", response)
         return response

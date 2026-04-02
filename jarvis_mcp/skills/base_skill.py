@@ -1,9 +1,10 @@
 """BaseSkill - All skills inherit from this"""
 
+import asyncio
 import json
 import logging
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, List
 from jarvis_mcp.utils.file_utils import read_file, write_file
 
 
@@ -137,6 +138,37 @@ class BaseSkill:
         if success:
             self.logger.info(f"Wrote {filename} for {account_name}")
         return success
+
+    async def parallel_sections(self, sections: List[Dict[str, Any]]) -> str:
+        """
+        Fire multiple section prompts in parallel via asyncio.gather.
+
+        sections: list of dicts, each with:
+            - name: section heading
+            - prompt: full prompt including account context
+            - model_type (optional): defaults to "reasoning"
+            - max_tokens (optional): defaults to 1000
+        Returns: assembled markdown string with all sections.
+        """
+        async def _gen(section):
+            return await self.llm.generate(
+                prompt=section["prompt"],
+                model_type=section.get("model_type", "reasoning"),
+                system_prompt=self.grounded_system_prompt(),
+                max_tokens=section.get("max_tokens", 1000),
+            )
+
+        tasks = [asyncio.ensure_future(_gen(s)) for s in sections]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        parts = []
+        for section, result in zip(sections, results):
+            if isinstance(result, Exception):
+                parts.append(f"## {section['name']}\n\n❌ Generation failed: {result}")
+            else:
+                parts.append(f"## {section['name']}\n\n{result}")
+
+        return "\n\n---\n\n".join(parts)
 
     async def generate(self, account_name: str, **kwargs) -> str:
         raise NotImplementedError()

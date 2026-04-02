@@ -1,4 +1,4 @@
-"""Meeting Preparation Skill"""
+"""Meeting Preparation Skill — parallel sections"""
 from jarvis_mcp.skills.base_skill import BaseSkill
 
 
@@ -7,31 +7,28 @@ class MeetingPrepSkill(BaseSkill):
         context = await self.read_account_files(account_name)
         ctx = self.build_context_block(context, account_name)
         meeting_type = kwargs.get("meeting_type", "")
+        mt = f" — {meeting_type}" if meeting_type else ""
 
-        prompt = f"""Generate a meeting prep brief for {account_name}{' — ' + meeting_type if meeting_type else ''}.
+        base = f"For {account_name}{mt}.\n\nACCOUNT DATA:\n{ctx}\n\nUsing ONLY the data above,"
 
-ACCOUNT DATA:
-{ctx}
+        sections = [
+            {
+                "name": "Meeting Context & What We Know",
+                "prompt": f"{base} write:\n1. Meeting context: who is attending (from stakeholders), purpose, current stage\n2. What we know: confirmed pain points, requirements, buying signals from discovery\n3. What we still need to find out: MEDDPICC gaps, missing information\n\nUse actual stakeholder names from the data. Generate ONLY this section.",
+                "max_tokens": 1000,
+            },
+            {
+                "name": "Agenda & Discovery Questions",
+                "prompt": f"{base} write:\n1. Agenda (ordered by priority — address biggest unknown first):\n   - Each agenda item with time allocation and goal\n2. Discovery questions to ask — specific to this deal's confirmed pain points\n\nGenerate ONLY this section.",
+                "max_tokens": 1000,
+            },
+            {
+                "name": "Objection Handlers, Hard Ask & Red Flags",
+                "prompt": f"{base} write:\n1. Objections to expect — based on concerns mentioned in the data, with handlers\n2. Hard ask: what commitment to get by end of this meeting\n3. Red flags to watch for\n\nGenerate ONLY this section.",
+                "max_tokens": 800,
+            },
+        ]
 
-Using ONLY the data above, build a pre-meeting runsheet:
-
-1. Meeting context: who is attending (from stakeholders in data), purpose, stage
-2. What we know: confirmed pain points, requirements, buying signals from discovery
-3. What we still need to find out: MEDDPICC gaps, missing information
-4. Agenda (ordered by priority — address biggest unknown first):
-   - Each agenda item with time allocation and goal
-5. Discovery questions to ask — specific to this deal's confirmed pain points
-6. Objections to expect — based on concerns mentioned in the data, with handlers
-7. Hard ask: what commitment to get by end of this meeting
-8. Red flags to watch for
-
-Use the actual stakeholder names and roles from the data. Do NOT invent agenda items not relevant to this deal."""
-
-        response = await self.llm.generate(
-            prompt=prompt,
-            model_type="reasoning",
-            system_prompt=self.grounded_system_prompt(),
-            max_tokens=3000,
-        )
+        response = await self.parallel_sections(sections)
         await self.write_output(account_name, "meeting_prep.md", response)
         return response

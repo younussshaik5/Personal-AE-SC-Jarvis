@@ -1,4 +1,4 @@
-"""Competitor Pricing Analysis Skill"""
+"""Competitor Pricing Analysis Skill — parallel sections"""
 from jarvis_mcp.skills.base_skill import BaseSkill
 
 
@@ -8,27 +8,26 @@ class CompetitorPricingSkill(BaseSkill):
         ctx = self.build_context_block(context, account_name)
         comp = competitor or (context.get("_deal", {}) or {}).get("competitive_situation", {}).get("primary_competitor", "the incumbent")
 
-        prompt = f"""Analyse pricing and commercial positioning for {account_name} vs {comp}.
+        base = f"For {account_name} vs {comp}.\n\nACCOUNT DATA:\n{ctx}\n\nUsing ONLY the data above plus general knowledge of {comp}'s public pricing model,"
 
-ACCOUNT DATA:
-{ctx}
+        sections = [
+            {
+                "name": "Pricing Comparison",
+                "prompt": f"{base} write:\n1. Our pricing for this deal: actual ARR, per-agent cost, plan from deal data\n2. Estimated competitor pricing (use public knowledge for {comp} — clearly label as estimate)\n3. TCO comparison over 1 year and 3 years\n\nClearly separate facts from account data vs general market knowledge. Generate ONLY this section.",
+                "max_tokens": 1000,
+            },
+            {
+                "name": "Price Positioning & Strategy",
+                "prompt": f"{base} write:\n1. Where we are more expensive and how to justify it\n2. Where we are cheaper — use this proactively\n3. Discount strategy: what to offer and when (tied to their deadline from deal data)\n\nGenerate ONLY this section.",
+                "max_tokens": 800,
+            },
+            {
+                "name": "Commercial Objection Handlers",
+                "prompt": f"{base} write commercial objection handlers specific to this deal and {comp}. Address pricing objections grounded in the account data.\n\nGenerate ONLY this section.",
+                "max_tokens": 600,
+            },
+        ]
 
-Using ONLY the data above plus general knowledge of {comp}'s public pricing model:
-1. Our pricing for this deal: actual ARR, per-agent cost, plan from deal data
-2. Estimated competitor pricing (use public knowledge for {comp} — clearly label as estimate)
-3. TCO comparison over 1 year and 3 years
-4. Where we are more expensive and how to justify it
-5. Where we are cheaper — use this proactively
-6. Discount strategy: what to offer and when (tied to their deadline from deal data)
-7. Commercial objection handlers for this deal
-
-Clearly separate facts from the account data vs general market knowledge."""
-
-        response = await self.llm.generate(
-            prompt=prompt,
-            model_type="reasoning",
-            system_prompt=self.grounded_system_prompt(),
-            max_tokens=2500,
-        )
+        response = await self.parallel_sections(sections)
         await self.write_output(account_name, "competitor_pricing.md", response)
         return response
