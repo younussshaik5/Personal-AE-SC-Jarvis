@@ -1,16 +1,21 @@
 """
 Queue worker — consumes skill jobs from SkillQueue and runs them.
 
-After each skill completes, checks SKILL_CASCADES and queues
-any downstream skills automatically.
+After each skill completes:
+  1. Records in SelfLearner (_skill_timeline + _evolution_log)
+  2. Feedback loop: extracts new intel from output → merges to discovery.md
+     (only for FEEDBACK_SKILLS — meddpicc, risk_report, conversation_extractor, etc.)
+  3. Cascades downstream skills (dependency_graph.SKILL_CASCADES)
 
-One worker runs as a background asyncio task.
+The feedback loop is what makes JARVIS self-evolving:
+  meddpicc output → new intel extracted → discovery.md updated
+  → file watcher detects change → cascade fires again with richer context
 """
 
 import asyncio
 import logging
 import time
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 from .skill_queue import SkillQueue, PRIORITY_MEDIUM, PRIORITY_LOW, PRIORITY_TAIL
 from .dependency_graph import SKILL_CASCADES, SKIP_AUTO_QUEUE
@@ -25,19 +30,28 @@ class QueueWorker:
     Flow per job:
       1. Pull job from queue
       2. Run skill.generate(account_name)
-      3. On success → record in SelfLearner + cascade downstream skills
-      4. On failure → log, mark done, continue (no crash)
+      3. Record in SelfLearner
+      4. Feedback: extract intel from output → merge to discovery.md
+      5. Cascade downstream skills
     """
 
-    def __init__(self, queue: SkillQueue, skills: Dict[str, Any], learner=None):
-        self.queue   = queue
-        self.skills  = skills   # SKILL_REGISTRY instances from JarvisServer
-        self.learner = learner  # Optional SelfLearner — set after init
-        self._running = False
+    def __init__(
+        self,
+        queue: SkillQueue,
+        skills: Dict[str, Any],
+        learner=None,
+        extractor=None,   # IntelligenceExtractor
+        merger=None,      # KnowledgeMerger
+    ):
+        self.queue     = queue
+        self.skills    = skills
+        self.learner   = learner
+        self.extractor = extractor
+        self.merger    = merger
+        self._running  = False
         self._task: asyncio.Task = None
 
-    def start(self, loop: asyncio.AbstractEventLoop = None) -> None:
-        """Start the worker as a background asyncio task."""
+    def start(self) -> None:
         if self._running:
             return
         self._running = True
@@ -51,7 +65,6 @@ class QueueWorker:
         log.info("[worker] Queue worker stopped")
 
     async def _run(self) -> None:
-        """Main loop — process jobs until stopped."""
         while self._running:
             try:
                 job = await asyncio.wait_for(self.queue.get(), timeout=1.0)
@@ -59,7 +72,6 @@ class QueueWorker:
                 continue
             except asyncio.CancelledError:
                 break
-
             await self._process(job)
 
     async def _process(self, job) -> None:
@@ -82,8 +94,18 @@ class QueueWorker:
                     await self.learner.record(job.account_name, job.skill_name, job.trigger, status="error")
             else:
                 log.info(f"[worker] ✓ {job.skill_name} | {job.account_name} | {elapsed}s")
+
+                # 1. Record in evolution log
                 if self.learner:
                     await self.learner.record(job.account_name, job.skill_name, job.trigger, status="ok")
+
+                # 2. Feedback loop — extract new intel from this output
+                if self.extractor and self.merger and result:
+                    asyncio.ensure_future(
+                        self._feedback(job.account_name, job.skill_name, result)
+                    )
+
+                # 3. Cascade downstream skills
                 await self._cascade(job)
 
         except Exception as e:
@@ -93,15 +115,29 @@ class QueueWorker:
         finally:
             await self.queue.done(job)
 
+    async def _feedback(self, account_name: str, skill_name: str, output: str) -> None:
+        """
+        Extract new intel from skill output and merge into discovery.md.
+        Runs async in background — does not block the main queue loop.
+        If new intel is found and written, the file watcher will detect
+        the discovery.md change and re-trigger the cascade automatically.
+        """
+        try:
+            merged = await self.merger.merge_from_skill_output(
+                account_name, skill_name, output, self.extractor
+            )
+            if merged:
+                log.info(f"[worker] feedback loop: new intel from {skill_name} merged into {account_name}/discovery.md")
+        except Exception as e:
+            log.warning(f"[worker] feedback failed ({skill_name}): {e}")
+
     async def _cascade(self, completed_job) -> None:
-        """Queue downstream skills after a skill completes successfully."""
         await self.trigger_cascade(completed_job.account_name, completed_job.skill_name)
 
     async def trigger_cascade(self, account_name: str, skill_name: str) -> None:
         """
-        Public method — trigger cascade for a skill that just completed.
-        Call this after a user-triggered skill succeeds to fire the same
-        downstream chain as the queue worker would.
+        Public — trigger cascade for a completed skill.
+        Call this after a user-triggered skill succeeds.
         """
         cascade = SKILL_CASCADES.get(skill_name)
         if not cascade:

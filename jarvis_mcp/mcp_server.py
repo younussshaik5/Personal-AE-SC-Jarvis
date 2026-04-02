@@ -22,7 +22,7 @@ from .skill_context_enricher import SkillContextEnricher
 from .account_hierarchy import AccountHierarchy
 from .claude_md_loader import ClaudeMdLoader
 from .queue import SkillQueue, QueueWorker, FileWatcher, PRIORITY_HIGH
-from .learning import SelfLearner
+from .learning import SelfLearner, IntelligenceExtractor, KnowledgeMerger
 
 
 # Setup logging
@@ -55,10 +55,21 @@ class JarvisServer:
         self._initialize_orchestrator()
 
         # ── Queue bus + self-learning ────────────────────────────────────────
-        self.learner      = SelfLearner(self.config.accounts_root)
+        self.learner    = SelfLearner(self.config.accounts_root)
+        self.extractor  = IntelligenceExtractor(self.llm)
+        self.merger     = KnowledgeMerger(self.config.accounts_root)
         self.skill_queue  = SkillQueue()
-        self.queue_worker = QueueWorker(self.skill_queue, self.skills, learner=self.learner)
-        self.file_watcher = FileWatcher(self.skill_queue, self.config.accounts_root)
+        self.queue_worker = QueueWorker(
+            self.skill_queue, self.skills,
+            learner=self.learner,
+            extractor=self.extractor,
+            merger=self.merger,
+        )
+        self.file_watcher = FileWatcher(
+            self.skill_queue, self.config.accounts_root,
+            extractor=self.extractor,
+            merger=self.merger,
+        )
 
         # Agent background tasks
         self.agent_task = None
@@ -253,7 +264,13 @@ class JarvisServer:
                     trigger="user",
                     status="ok",
                 )
-                # Fire cascade — same downstream chain as if queue worker ran it
+                # Feedback loop — extract new intel from output, merge to discovery.md
+                asyncio.ensure_future(
+                    self.merger.merge_from_skill_output(
+                        account, skill_name, result, self.extractor
+                    )
+                )
+                # Fire cascade — same downstream chain as queue worker
                 await self.queue_worker.trigger_cascade(account, skill_name)
 
             # Legacy orchestrator outcome recording (no-op if orchestrator absent)
