@@ -15,6 +15,11 @@ class AccountScaffolder:
     def __init__(self, accounts_root: Path):
         self.accounts_root = Path(accounts_root).expanduser()
 
+    @staticmethod
+    def _safe_name(account_name: str) -> str:
+        """Sanitize account name to match config.get_account_path() logic."""
+        return account_name.replace(" ", "_").replace("/", "_")
+
     def scaffold_account(
         self,
         account_name: str,
@@ -32,11 +37,12 @@ class AccountScaffolder:
         Returns:
             Path to newly created account folder
         """
+        safe = self._safe_name(account_name)
         # Determine account folder path
         if parent_path:
-            account_path = parent_path / account_name
+            account_path = parent_path / safe
         else:
-            account_path = self.accounts_root / account_name
+            account_path = self.accounts_root / safe
 
         # Create folder
         account_path.mkdir(parents=True, exist_ok=True)

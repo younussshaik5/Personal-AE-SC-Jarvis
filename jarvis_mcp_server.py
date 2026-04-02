@@ -252,44 +252,10 @@ async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
     if _jarvis is None:
         return [types.TextContent(type="text", text="❌ JARVIS server failed to initialize. Check logs.")]
 
-    account = arguments.get("account_name", "")
-
     try:
-        # ── Route to the right skill ──────────────────────────────────────────
-        skill = _jarvis.skills.get(name)
-        if skill:
-            result = await skill.execute(arguments)
-            return [types.TextContent(type="text", text=str(result))]
-
-        # ── Fallbacks for tools with different internal names ────────────────
-        alias_map = {
-            "get_proposal":             "proposal",
-            "get_battlecard":           "battlecard",
-            "get_demo_strategy":        "demo_strategy",
-            "get_risk_report":          "risk_report",
-            "get_value_architecture":   "value_architecture",
-            "get_discovery":            "discovery",
-            "get_competitive_intelligence": "competitive_intelligence",
-            "get_meeting_prep":         "meeting_prep",
-            "get_account_summary":      "account_summary",
-            "generate_sow":             "sow",
-            "generate_architecture":    "architecture_diagram",
-            "track_meddpicc":           "meddpicc",
-            "update_deal_stage":        "deal_stage_tracker",
-            "process_meeting":          "meeting_summary",
-            "summarize_conversation":   "conversation_summarizer",
-            "extract_intelligence":     "conversation_extractor",
-            "generate_followup":        "followup_email",
-            "analyze_competitor_pricing": "competitor_pricing",
-            "assess_technical_risk":    "technical_risk",
-            "quick_insights":           "quick_insights",
-            "build_knowledge_graph":    "knowledge_builder",
-            "generate_documentation":   "documentation",
-            "generate_custom_template": "custom_template",
-            "generate_html_report":     "html_generator",
-        }
-
-        # Route through handle_tool_call — this runs the skill AND:
+        # All calls go through handle_tool_call which:
+        #   - Uses skill.execute() (correct account_name extraction)
+        #   - Writes skill output to disk
         #   - Records in SelfLearner (_evolution_log, _skill_timeline)
         #   - Runs feedback loop (IntelligenceExtractor → KnowledgeMerger)
         #   - Triggers cascade (downstream skills queued automatically)

@@ -36,14 +36,17 @@ class AccountScaffolder:
         Returns:
             Dict with created paths and status
         """
+        # Sanitize name to match config.get_account_path() logic
+        safe_name = account_name.replace(" ", "_").replace("/", "_")
         # Determine where to create account
         if parent_account:
-            parent_path = self.accounts_root / parent_account
+            safe_parent = parent_account.replace(" ", "_").replace("/", "_")
+            parent_path = self.accounts_root / safe_parent
             if not parent_path.exists():
                 raise ValueError(f"Parent account '{parent_account}' not found")
-            account_path = parent_path / account_name
+            account_path = parent_path / safe_name
         else:
-            account_path = self.accounts_root / account_name
+            account_path = self.accounts_root / safe_name
             
         # Check if already exists
         if account_path.exists():

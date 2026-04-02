@@ -17,10 +17,7 @@ from .safety.guard import SafetyGuard
 from .utils.logger import setup_logger
 from .agents import AgentOrchestrator
 from .context_detector import ContextDetector
-from .account_scaffolder import AccountScaffolder
-from .skill_context_enricher import SkillContextEnricher
 from .account_hierarchy import AccountHierarchy
-from .claude_md_loader import ClaudeMdLoader
 from .queue import SkillQueue, QueueWorker, FileWatcher, PRIORITY_HIGH
 from .learning import SelfLearner, IntelligenceExtractor, KnowledgeMerger
 
@@ -42,9 +39,6 @@ class JarvisServer:
         # Initialize context management
         self.context_detector = ContextDetector()
         self.account_hierarchy = AccountHierarchy()
-        self.account_scaffolder = AccountScaffolder()
-        self.claude_loader = ClaudeMdLoader()
-        self.enricher = SkillContextEnricher()  # Context enricher for skills
 
         # Initialize skill instances
         self.skills = {}
@@ -99,31 +93,6 @@ class JarvisServer:
         except Exception as e:
             self.logger.error(f"Failed to initialize orchestrator: {e}")
 
-    async def auto_scaffold_account_if_needed(self, account_name: str, company_info: Optional[dict] = None) -> dict:
-        """
-        Auto-scaffold a new account if it doesn't exist.
-        
-        Returns:
-            Dict with scaffold result or existing account info
-        """
-        account_path = self.account_hierarchy.get_account_path(account_name)
-        
-        if account_path:
-            self.logger.info(f"Account already exists: {account_name}")
-            return {'status': 'exists', 'path': str(account_path)}
-        else:
-            self.logger.info(f"Creating new account: {account_name}")
-            result = self.account_scaffolder.scaffold_account(account_name, company_info)
-            
-            # Invalidate hierarchy cache
-            self.account_hierarchy._cache_valid = False
-            
-            # Load CLAUDE.md for new account
-            new_account_path = self.account_hierarchy.get_account_path(account_name)
-            if new_account_path:
-                self.claude_loader.load_config(str(new_account_path), force_reload=True)
-                
-            return result
 
     async def start_background_orchestration(self):
         """Start background orchestration with full autonomy and evolution."""
@@ -190,76 +159,95 @@ class JarvisServer:
             "generate_custom_template",
         ]
 
+    # Maps skill name → output filename written to the account folder
+    SKILL_OUTPUT_FILES = {
+        "proposal":               "proposal.md",
+        "battlecard":             "battlecard.md",
+        "demo_strategy":          "demo_strategy.md",
+        "risk_report":            "risk_report.md",
+        "value_architecture":     "value_architecture.md",
+        "discovery":              "discovery.md",
+        "competitive_intelligence": "competitive_intelligence.md",
+        "meeting_prep":           "meeting_prep.md",
+        "meeting_summary":        "meeting_prep.md",
+        "conversation_summarizer": "conversation_summary.md",
+        "meddpicc":               "meddpicc.md",
+        "sow":                    "sow.md",
+        "followup_email":         "followup_email.md",
+        "account_summary":        "account_summary.md",
+        "technical_risk":         "technical_risk.md",
+        "competitor_pricing":     "competitor_pricing.md",
+        "architecture_diagram":   "architecture_diagram.md",
+        "documentation":          "documentation.md",
+        "html_generator":         "report.html",
+        "knowledge_builder":      "knowledge_builder.md",
+        "quick_insights":         "quick_insights.md",
+        "custom_template":        "custom_template.md",
+        # conversation_extractor feeds discovery.md via merger — no direct file write
+        # deal_stage_tracker writes deal_stage.json internally
+    }
+
     async def handle_tool_call(self, tool_name: str, arguments: dict) -> dict:
         """Handle tool call with FULL autonomous evolution and learning."""
-        # Auto-detect account from context if not provided
-        account = arguments.get("account")
-        if not account:
-            context = self.context_detector.detect_context()
-            if context:
-                account = context.get('name')
-                arguments['account'] = account
-                self.logger.info(f"Auto-detected account: {account}")
-
         # Safety check
-        if not self.guard.check_safety(tool_name, account):
+        if not self.guard.is_safe():
             return {"error": "Safety check failed"}
 
         # Handle onboarding tools
         if tool_name.startswith("onboarding_"):
             return await self.handle_onboarding_tool(tool_name, arguments)
 
-        # Handle account scaffolding tool
-        if tool_name == "scaffold_account":
-            return await self.handle_scaffold_account(arguments)
-
-        # Map tool names to skills
+        # Map tool names to skills (scaffold_account is handled directly via SKILL_REGISTRY)
         tool_to_skill = {
-            "get_proposal": "proposal",
-            "get_battlecard": "battlecard",
-            "get_demo_strategy": "demo_strategy",
-            "get_risk_report": "risk_report",
-            "get_value_architecture": "value_architecture",
-            "get_discovery": "discovery",
+            "scaffold_account":             "scaffold_account",
+            "get_proposal":                 "proposal",
+            "get_battlecard":               "battlecard",
+            "get_demo_strategy":            "demo_strategy",
+            "get_risk_report":              "risk_report",
+            "get_value_architecture":       "value_architecture",
+            "get_discovery":                "discovery",
             "get_competitive_intelligence": "competitive_intelligence",
-            "get_meeting_prep": "meeting_prep",
-            "process_meeting": "meeting_summary",
-            "summarize_conversation": "conversation_summarizer",
-            "track_meddpicc": "meddpicc",
-            "generate_sow": "sow",
-            "generate_followup": "followup_email",
-            "get_account_summary": "account_summary",
-            "assess_technical_risk": "technical_risk",
-            "analyze_competitor_pricing": "competitor_pricing",
-            "update_deal_stage": "deal_stage_tracker",
-            "generate_architecture": "architecture_diagram",
-            "generate_documentation": "documentation",
-            "generate_html_report": "html_generator",
-            "extract_intelligence": "conversation_extractor",
-            "build_knowledge_graph": "knowledge_builder",
-            "quick_insights": "quick_insights",
-            "generate_custom_template": "custom_template",
+            "get_meeting_prep":             "meeting_prep",
+            "process_meeting":              "meeting_summary",
+            "summarize_conversation":       "conversation_summarizer",
+            "track_meddpicc":               "meddpicc",
+            "generate_sow":                 "sow",
+            "generate_followup":            "followup_email",
+            "get_account_summary":          "account_summary",
+            "assess_technical_risk":        "technical_risk",
+            "analyze_competitor_pricing":   "competitor_pricing",
+            "update_deal_stage":            "deal_stage_tracker",
+            "generate_architecture":        "architecture_diagram",
+            "generate_documentation":       "documentation",
+            "generate_html_report":         "html_generator",
+            "extract_intelligence":         "conversation_extractor",
+            "build_knowledge_graph":        "knowledge_builder",
+            "quick_insights":               "quick_insights",
+            "generate_custom_template":     "custom_template",
         }
 
         skill_name = tool_to_skill.get(tool_name)
         if not skill_name or skill_name not in self.skills:
             return {"error": f"Unknown tool: {tool_name}"}
 
+        # account_name for logging / learning — skill.execute() extracts it from arguments itself
+        account_name = arguments.get("account_name", "")
+
         try:
             skill = self.skills[skill_name]
 
-            # Enrich context with learned knowledge
-            if self.orchestrator:
-                enriched_context = await self.orchestrator.enrich_skill_context(skill_name, f"{tool_name} for {account}")
-                self.logger.debug(f"✓ Context enriched for {skill_name}")
-
-            # Execute skill
-            result = await skill.generate(account, **arguments)
+            # Execute skill — execute() handles account_name extraction and generate() call
+            result = await skill.execute(arguments)
 
             if result and not result.strip().startswith("❌"):
+                # Persist output to disk so files are always populated
+                output_file = self.SKILL_OUTPUT_FILES.get(skill_name)
+                if output_file and account_name:
+                    await skill.write_output(account_name, output_file, result)
+
                 # Record in evolution log + skill timeline
                 await self.learner.record(
-                    account_name=account,
+                    account_name=account_name,
                     skill_name=skill_name,
                     trigger="user",
                     status="ok",
@@ -267,19 +255,11 @@ class JarvisServer:
                 # Feedback loop — extract new intel from output, merge to discovery.md
                 asyncio.ensure_future(
                     self.merger.merge_from_skill_output(
-                        account, skill_name, result, self.extractor
+                        account_name, skill_name, result, self.extractor
                     )
                 )
-                # Fire cascade — same downstream chain as queue worker
-                await self.queue_worker.trigger_cascade(account, skill_name)
-
-            # Legacy orchestrator outcome recording (no-op if orchestrator absent)
-            if self.orchestrator:
-                await self.orchestrator.record_skill_outcome(
-                    skill_name,
-                    arguments.get("opportunity_id", "unknown"),
-                    {"status": "executed", "quality_score": 4.5, "impact": "high"},
-                )
+                # Fire cascade — queue downstream skills automatically
+                await self.queue_worker.trigger_cascade(account_name, skill_name)
 
             return {"result": result}
         except Exception as e:
@@ -310,43 +290,6 @@ class JarvisServer:
             self.logger.error(f"Onboarding error: {e}")
             return {"error": str(e)}
 
-    async def handle_scaffold_account(self, arguments: dict) -> dict:
-        """Handle account scaffolding request"""
-        account_name = arguments.get("account_name")
-        if not account_name:
-            return {"error": "account_name required"}
-        
-        company_info = arguments.get("company_info")
-        parent_account = arguments.get("parent_account")
-        
-        try:
-            if parent_account:
-                # Create sub-account
-                parent_path = self.account_hierarchy.get_account_path(parent_account)
-                if not parent_path:
-                    return {"error": f"Parent account '{parent_account}' not found"}
-                result = self.account_scaffolder.scaffold_account(
-                    account_name,
-                    company_info,
-                    parent_account
-                )
-            else:
-                # Create top-level account
-                result = self.account_scaffolder.scaffold_account(account_name, company_info)
-            
-            # Invalidate cache and reload config
-            self.account_hierarchy._cache_valid = False
-            new_path = self.account_hierarchy.get_account_path(account_name)
-            if new_path:
-                self.claude_loader.load_config(str(new_path), force_reload=True)
-            
-            return {
-                "result": self.account_scaffolder.format_scaffold_result(result),
-                "metadata": result
-            }
-        except Exception as e:
-            self.logger.error(f"Failed to scaffold account: {e}")
-            return {"error": str(e)}
 
     async def log_conversation(self, user_message: str, assistant_response: str, skill_used: str = None):
         """Log chat for learning - called by Claude after each interaction."""
