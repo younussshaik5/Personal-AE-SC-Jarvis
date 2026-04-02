@@ -1,23 +1,20 @@
 """
-LLM Manager for JARVIS — NVIDIA-first multi-model with automatic fallback.
+LLM Manager for JARVIS — flash-first with parallel batch generation.
 
-NVIDIA Model Chain (per call):
-  1. nvidia-llama70b   meta/llama-3.3-70b-instruct        (12s — best reasoning)
-  2. nvidia-nemotron   nvidia/llama-3.1-nemotron-70b-instruct      (15s — long context, text gen/summary)
-  3. nvidia-8b         meta/llama-3.1-8b-instruct          (12s — fastest)
-  4. groq              llama-3.3-70b-versatile             (30s — optional, if GROQ_API_KEY set)
-  5. together          Llama-3.3-70B-Instruct-Turbo        (30s — optional, if TOGETHER_API_KEY set)
+Model routing:
+  - ALL text tasks     → stepfun-ai/step-3.5-flash  (confirmed working, fast)
+  - reasoning only     → meta/llama-3.3-70b-instruct (complex analysis)
 
-Model type routing:
-  - default / reasoning → start from nvidia-llama70b (strongest)
-  - text / summary      → start from nvidia-nemotron (long context, no hallucination)
-  - fast / quick        → start from nvidia-8b (lowest latency)
+Provider fallback chain:
+  text/default: nvidia-flash → nvidia-llama70b → groq → together
+  reasoning:    nvidia-llama70b → nvidia-flash → groq → together
+
+Parallel: batch_generate fires ALL prompts simultaneously via asyncio.gather.
 
 Rules:
-  - Timeout  → immediately try next provider (no waiting)
-  - 429      → mark provider as rate-limited for 60s, try next
-  - 401      → log error, skip provider (bad key)
-  - optional providers (groq, together) → silently skipped if no key set
+  - Timeout  → immediately try next provider
+  - 429      → cool down 60s, try next
+  - optional providers (groq, together) → skipped silently if no key
 """
 
 import os
@@ -96,11 +93,9 @@ _PROVIDERS = [
     },
 ]
 
-# Provider order by model_type
-# NVIDIA models first — groq/together are just safety nets if all NVIDIA is down
-_ORDER_DEFAULT  = ["nvidia-llama70b", "nvidia-flash", "groq", "together"]
-_ORDER_TEXT     = ["nvidia-flash",     "nvidia-llama70b", "groq", "together"]
-_ORDER_FAST     = ["nvidia-flash",     "nvidia-llama70b", "groq", "together"]
+# flash is primary for all text tasks — llama70b only for reasoning
+_ORDER_TEXT      = ["nvidia-flash", "nvidia-llama70b", "groq", "together"]
+_ORDER_REASONING = ["nvidia-llama70b", "nvidia-flash", "groq", "together"]
 
 _PROVIDER_MAP = {p["name"]: p for p in _PROVIDERS}
 
@@ -267,12 +262,11 @@ class LLMManager:
             {"role": "user",   "content": prompt},
         ]
 
-        if model_type in ("fast", "quick"):
-            order = _ORDER_FAST
-        elif model_type in ("text", "summary"):
-            order = _ORDER_TEXT
+        # reasoning only → llama70b first; everything else → flash first
+        if model_type == "reasoning":
+            order = _ORDER_REASONING
         else:
-            order = _ORDER_DEFAULT
+            order = _ORDER_TEXT
 
         errors = []
 
@@ -304,7 +298,7 @@ class LLMManager:
         log.error(f"All providers failed: {error_summary}")
         return f"❌ All LLM providers unavailable: {error_summary}"
 
-    # ── Parallel batch ────────────────────────────────────────────────────────
+    # ── Parallel batch ─────────────────────────────────────────────────────────
 
     async def batch_generate(
         self,
@@ -312,9 +306,18 @@ class LLMManager:
         model_type: str = "default",
         **kwargs,
     ) -> List[str]:
-        """Run multiple prompts in parallel."""
-        tasks = [self.generate(p, model_type=model_type, **kwargs) for p in prompts]
-        return await asyncio.gather(*tasks)
+        """Fire ALL prompts simultaneously in parallel — each gets its own LLM call."""
+        log.info(f"batch_generate: {len(prompts)} prompts in parallel")
+        tasks = [
+            asyncio.ensure_future(self.generate(p, model_type=model_type, **kwargs))
+            for p in prompts
+        ]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        # Replace any exception with an error string so callers don't crash
+        return [
+            r if not isinstance(r, Exception) else f"❌ Generation failed: {r}"
+            for r in results
+        ]
 
     # ── Status ────────────────────────────────────────────────────────────────
 
