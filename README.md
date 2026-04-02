@@ -574,30 +574,222 @@ TechCo       │ Negotiate│ $240k   │ 78% 🟢   │ 🟢   │ 22/24
 
 ---
 
-## Connecting to Salesforce (Optional)
+## What We Can Build Next — Full Sales Cycle via MCP
 
-Salesforce recently launched an official MCP server ([forcedotcom/mcp-hosted](https://github.com/forcedotcom/mcp-hosted)) and Anthropic announced a formal partnership. This means Claude Desktop can connect directly to your Salesforce org.
+Right now JARVIS is a conversation tool — you paste context in, it generates intelligence. The next evolution is connecting it to the systems you already use, so data flows in and out automatically. MCP (the same protocol JARVIS runs on) makes this possible for almost every tool in the modern sales stack.
 
-**What this unlocks with JARVIS:**
+Here's the full picture: **lead born to deal closed**, every stage, every system.
 
-Instead of manually pasting notes into `discovery.md`, Claude can fetch live data from Salesforce — opportunity details, contact history, activity logs — and pass it straight to JARVIS skills.
+---
+
+### Stage 1 — Lead Born & Prospect Research
+
+**The problem today:** You get a new lead. You spend 30 minutes on LinkedIn, their website, Crunchbase, and Google News piecing together context before your first call.
+
+**What MCP enables:**
+```
+You: "Research RetailCo before my call tomorrow"
+
+Claude:
+→ [LinkedIn MCP]     — scrapes company page, decision-maker profiles, recent posts
+→ [Google Search MCP] — recent news, funding rounds, tech stack signals
+→ [Crunchbase MCP]   — headcount, funding history, investors
+→ [JARVIS]           — scaffold_account + populate company_research.md
+→ Returns: full pre-call brief in 30 seconds
+```
+
+| Integration | What it adds | MCP exists? |
+|---|---|---|
+| LinkedIn | Stakeholder profiles, org chart, job postings (hiring = budget signal) | Yes (unofficial) |
+| Google Search | Recent news, press releases, competitor mentions | Yes |
+| Crunchbase / PitchBook | Funding, investors, growth signals | Possible |
+| Company website | Product pages, pricing, tech stack (via job listings) | Yes (web fetch) |
+
+---
+
+### Stage 2 — CRM Sync (Bi-directional)
+
+**The problem today:** Your CRM has the deal data. JARVIS has the intelligence. They're separate. You copy-paste between them.
+
+**What MCP enables:**
+```
+You: "Sync Acme Corp"
+
+Claude:
+→ [CRM MCP]   — pulls Opportunity, Contacts, Activities, Emails
+→ [JARVIS]    — populates deal_stage.json + discovery.md
+             — runs MEDDPICC, risk report, battlecard in parallel
+→ [CRM MCP]   — pushes back: MEDDPICC score, risk level, next actions as Tasks
+```
+
+**What gets written back to your CRM automatically:**
+- MEDDPICC score and gap summary → custom fields
+- RED/AMBER/GREEN risk → opportunity risk field
+- Stage change → opportunity stage
+- Top 3 next actions → CRM Tasks with due dates
+- Champion/economic buyer confirmed → contact roles updated
+- Key insight → note/chatter on the opportunity
+
+| CRM | MCP Status |
+|---|---|
+| Salesforce | Official MCP server in beta ([forcedotcom/mcp-hosted](https://github.com/forcedotcom/mcp-hosted)) |
+| HubSpot | Community MCP available |
+| Pipedrive | API-based, wrappable as MCP |
+| Notion (deal tracking) | Official MCP available |
+
+---
+
+### Stage 3 — Discovery & Meetings
+
+**The problem today:** You take notes during calls, clean them up after, manually update your CRM. Takes 45 minutes per meeting.
+
+**What MCP enables:**
+```
+After a call:
+You: "Process my Acme Corp call"
+
+Claude:
+→ [Google Meet / Zoom MCP] — pulls transcript from the recording
+→ [JARVIS process_meeting]  — extracts MEDDPICC signals, updates deal stage,
+                              generates meeting summary
+→ [Gmail MCP]              — drafts follow-up email from the summary
+→ [CRM MCP]                — logs activity, updates opportunity, creates next tasks
+→ [Google Calendar MCP]    — schedules next meeting if date was mentioned
+```
+
+| Integration | What it adds | MCP exists? |
+|---|---|---|
+| Google Meet / Zoom | Auto-pull transcripts after calls | Zoom MCP in progress |
+| Fireflies.ai / Otter | Meeting transcripts + summaries | API wrappable |
+| Google Calendar | Meeting context, prep triggering | Yes (Google Workspace MCP) |
+| Gmail / Outlook | Email threads → deal intel, draft follow-ups | Yes (Google Workspace MCP) |
+
+---
+
+### Stage 4 — Demo & Technical Validation
+
+**The problem today:** SC builds a custom demo flow from scratch for each account. No memory of what worked last time.
+
+**What MCP enables:**
+```
+You: "Prep demo for RetailCo — they care about Salesforce integration and SSO"
+
+Claude:
+→ [JARVIS get_demo_strategy]     — custom demo flow from their discovery notes
+→ [JARVIS generate_architecture] — Mermaid.js diagram of their specific setup
+→ [Confluence / Notion MCP]      — pulls your internal solution docs for reference
+→ [Jira MCP]                     — checks if similar integrations were delivered before
+```
+
+| Integration | What it adds | MCP exists? |
+|---|---|---|
+| Confluence / Notion | Internal knowledge base, past solutions | Yes |
+| Jira / Linear | Past implementation references, known issues | Yes |
+| GitHub | Technical docs, integration guides | Yes |
+
+---
+
+### Stage 5 — Proposal & Commercial
+
+**The problem today:** Proposal takes 2-3 hours. Half of it is formatting, half is pulling numbers from different places.
+
+**What MCP enables:**
+```
+You: "Generate proposal for RetailCo"
+
+Claude:
+→ [CRM MCP]             — pulls actual ARR, product, contract terms
+→ [Google Drive MCP]    — pulls approved pricing deck / legal templates
+→ [JARVIS get_proposal] — generates grounded proposal using all of the above
+→ [Google Drive MCP]    — saves final proposal to their shared folder
+→ [Gmail MCP]           — drafts the email to send it
+```
+
+| Integration | What it adds | MCP exists? |
+|---|---|---|
+| Google Drive / SharePoint | Proposal templates, pricing docs, legal terms | Yes |
+| DocuSign / Adobe Sign | Contract send + signature tracking | API wrappable |
+| CPQ tools (Salesforce CPQ, DealHub) | Real-time pricing, discount approval | Possible |
+
+---
+
+### Stage 6 — Negotiation & Close
+
+**The problem today:** Legal redlines take weeks. Procurement surprises kill timelines. No visibility until it's too late.
+
+**What MCP enables:**
+```
+You: "What's blocking TechCo from closing?"
+
+Claude:
+→ [JARVIS get_risk_report]      — RED items from deal data
+→ [CRM MCP]                     — paper process status, last activity
+→ [DocuSign MCP]                — contract status, who hasn't signed
+→ [Email MCP]                   — last email thread, days since response
+→ Returns: clear blocker list with owners and actions
+```
+
+| Integration | What it adds | MCP exists? |
+|---|---|---|
+| DocuSign / Ironclad | Contract status, redline tracking | API wrappable |
+| Slack | Internal deal room discussions, stakeholder signals | Yes (official Slack MCP) |
+| Email thread analysis | Sentiment shift, ghosting detection | Yes (Gmail MCP) |
+
+---
+
+### Stage 7 — Closed Won → Handoff
+
+**The problem today:** AE closes the deal. CS/implementation team starts from scratch. No context transfer.
+
+**What MCP enables:**
+```
+Deal marked Closed Won in CRM:
+
+Claude:
+→ [JARVIS get_account_summary]  — full deal story: stakeholders, pain, requirements
+→ [JARVIS generate_sow]         — SOW from actual discovery data
+→ [Jira MCP]                    — creates implementation project with tasks
+→ [Slack MCP]                   — posts deal summary to #new-customers channel
+→ [CRM MCP]                     — updates account record with implementation notes
+```
+
+| Integration | What it adds | MCP exists? |
+|---|---|---|
+| Jira / Linear | Auto-create implementation tickets from SOW | Yes |
+| Slack | Deal announcement, CS handoff notification | Yes |
+| Gainsight / ChurnZero | CSM handoff with full context | API wrappable |
+| Zendesk / Freshdesk | Support account setup with deal context | API wrappable |
+
+---
+
+### The Full Picture
 
 ```
-You: "Pull Acme Corp from Salesforce and run MEDDPICC"
-Claude: [fetches Opportunity via Salesforce MCP]
-      → [passes to JARVIS track_meddpicc]
-      → Scores all 9 dimensions from your actual Salesforce data
+Lead Born
+    │  LinkedIn + Search MCPs → company_research.md
+    ↓
+CRM Sync
+    │  Salesforce/HubSpot MCP → deal_stage.json (bi-directional)
+    ↓
+Discovery Calls
+    │  Zoom/Meet MCP → transcripts → process_meeting → CRM updated
+    ↓
+Demo & Technical
+    │  Confluence/Jira MCPs → solution reference + architecture diagrams
+    ↓
+Proposal
+    │  Drive MCP → templates → get_proposal → Drive MCP (saved)
+    ↓
+Negotiation
+    │  DocuSign + Slack MCPs → blocker tracking + deal room
+    ↓
+Closed Won
+    │  Jira + Slack + CRM MCPs → full handoff, zero context lost
 ```
 
-**What it is in practice:** Claude bridges the two MCPs in conversation. You ask, Claude fetches from Salesforce, Claude feeds it to JARVIS, JARVIS generates. It's not automatic background sync — you initiate it — but it eliminates manual copy-paste entirely.
+**How MCP makes this possible:** Claude Desktop acts as the orchestrator. Every tool above has (or can have) an MCP server. You add them all to Claude Desktop's config alongside JARVIS. Then in a single conversation, Claude can reach into any of them — read, generate with JARVIS, write back. No custom integrations. No API keys per tool in your code. Just MCP servers registered in one config file.
 
-**How to set it up:**
-1. Follow Salesforce's MCP setup guide at [github.com/forcedotcom/mcp-hosted](https://github.com/forcedotcom/mcp-hosted)
-2. Add the Salesforce MCP server to your Claude Desktop config (same `claude_desktop_config.json` where JARVIS is registered)
-3. Restart Claude Desktop — both JARVIS and Salesforce MCP will be available as tools
-4. In conversation, Claude can now use both: "fetch from Salesforce" → "generate with JARVIS"
-
-**This is still early beta on Salesforce's side.** It works, but the available Salesforce objects and tool coverage depends on what they've exposed in the MCP. Worth setting up if you live in Salesforce — it's the closest thing to true CRM integration JARVIS has right now.
+JARVIS is the intelligence layer. The MCP ecosystem is the connectivity layer. Together they cover the entire revenue cycle.
 
 ---
 
