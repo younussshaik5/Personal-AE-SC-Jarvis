@@ -70,7 +70,7 @@ class KnowledgeMerger:
         self._locks: Dict[str, asyncio.Lock] = {}
         # Cycle guard: "account_name" → timestamp of our last write
         self._self_writes: Dict[str, float] = {}
-        self.SELF_WRITE_COOLDOWN = 10.0  # seconds to suppress re-trigger after our own write
+        self.SELF_WRITE_COOLDOWN = 300.0  # 5 min cooldown — skills take 3-5 min to run
 
     def was_self_written(self, account_name: str) -> bool:
         """Returns True if we wrote to this account's discovery.md within the cooldown window."""

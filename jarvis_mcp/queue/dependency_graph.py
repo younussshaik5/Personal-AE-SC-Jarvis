@@ -14,15 +14,15 @@ from typing import Dict, List
 # Priority 2 (HIGH) — direct source changed, run immediately.
 
 FILE_TRIGGERS: Dict[str, List[str]] = {
+    # IMPORTANT: Only include skills that do NOT write back to discovery.md.
+    # Skills in FEEDBACK_SKILLS (risk_report, value_architecture, competitive_intelligence,
+    # technical_risk, conversation_extractor) must NOT be here — they would create an
+    # infinite loop: discovery.md changes → skill runs → writes to discovery.md → repeat.
+    # Those skills run via user action or SKILL_CASCADES only.
     "discovery.md": [
-        "conversation_extractor",   # extract fresh MEDDPICC signals
-        "meddpicc",                 # re-score all 8 dimensions
-        "risk_report",              # risk from updated discovery
-        "battlecard",               # competitive from updated notes
-        "competitive_intelligence", # deep competitive re-analysis
-        "value_architecture",       # ROI from fresh pain points
-        "technical_risk",           # technical blockers from fresh notes
-        "discovery",                # refresh gap-based discovery questions
+        "meddpicc",    # re-score dimensions — cascades to risk/value/summary
+        "battlecard",  # competitive refresh — does NOT write back to discovery
+        "discovery",   # refresh gap questions — does NOT write back to discovery
     ],
     "company_research.md": [
         "battlecard",

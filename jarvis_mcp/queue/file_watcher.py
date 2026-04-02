@@ -63,10 +63,16 @@ class FileWatcher:
 
         self._last_trigger: Dict[str, float] = {}
         self._seen_files: Set[str] = set()       # tracks already-ingested files
+        self._trigger_history: Dict[str, list] = {}  # loop detection per (account::file)
         self._running = False
         self._observer = None
         self._task: asyncio.Task = None
         self._loop: asyncio.AbstractEventLoop = None
+
+        self.LOOP_WINDOW = 300     # seconds — rolling window for loop detection
+        self.LOOP_MAX_TRIGGERS = 3  # max allowed triggers per account/file in window
+        self.MIN_CONTENT_WORDS = 50   # minimum words for "meaningful" file
+        self.MAX_TBD_COUNT = 15       # if file has this many TBDs it's template-only
 
     def start(self) -> None:
         if self._running:
@@ -172,6 +178,39 @@ class FileWatcher:
 
     # ── Unified file handler ──────────────────────────────────────────────────
 
+    def _has_meaningful_content(self, account_name: str, filename: str) -> bool:
+        """Return True only if file has real content beyond template TBD placeholders."""
+        path = self.accounts_root / account_name / filename
+        if not path.exists():
+            return False
+        try:
+            content = path.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            return False
+        tbd_count = (
+            content.count("TBD")
+            + content.count("To be identified")
+            + content.count("To be discovered")
+            + content.count("To be determined")
+        )
+        total_words = len(content.split())
+        return total_words >= self.MIN_CONTENT_WORDS and tbd_count < self.MAX_TBD_COUNT
+
+    def _loop_detected(self, account_name: str, filename: str) -> bool:
+        """Return True if this (account, file) has been triggered too many times recently."""
+        key = f"{account_name}::{filename}"
+        now = time.time()
+        history = [t for t in self._trigger_history.get(key, []) if now - t < self.LOOP_WINDOW]
+        if len(history) >= self.LOOP_MAX_TRIGGERS:
+            log.warning(
+                f"[watcher] ⚠ Loop guard: {account_name}/{filename} triggered "
+                f"{len(history)}x in {self.LOOP_WINDOW}s — suppressing"
+            )
+            return True
+        history.append(now)
+        self._trigger_history[key] = history
+        return False
+
     async def _handle_file(self, path: Path, is_new: bool) -> None:
         filename = path.name
         account_name = path.parent.name
@@ -185,6 +224,13 @@ class FileWatcher:
                 and self.merger.was_self_written(account_name)
             ):
                 log.debug(f"[watcher] Skipping self-written discovery.md for {account_name} (cycle guard)")
+                return
+            # Content guard: skip if file has no real content yet
+            if not self._has_meaningful_content(account_name, filename):
+                log.info(f"[watcher] Skipping {account_name}/{filename} — no meaningful content (template/TBD only)")
+                return
+            # Loop detection: suppress if same file triggered too many times recently
+            if self._loop_detected(account_name, filename):
                 return
             log.info(f"[watcher] Source changed: {account_name}/{filename}")
             await self._enqueue_triggers(account_name, filename)

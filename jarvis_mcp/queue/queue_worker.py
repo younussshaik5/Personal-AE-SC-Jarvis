@@ -50,6 +50,9 @@ class QueueWorker:
         self.merger    = merger
         self._running  = False
         self._task: asyncio.Task = None
+        # Dedup: track recently completed (account::skill) → timestamp
+        self._recent_runs: Dict[str, float] = {}
+        self.RECENT_RUN_WINDOW = 300  # 5 min — don't re-run same skill via cascade
 
     def start(self) -> None:
         if self._running:
@@ -95,17 +98,27 @@ class QueueWorker:
             else:
                 log.info(f"[worker] ✓ {job.skill_name} | {job.account_name} | {elapsed}s")
 
+                # Track for cascade dedup
+                self._recent_runs[f"{job.account_name}::{job.skill_name}"] = time.time()
+
                 # 1. Record in evolution log
                 if self.learner:
                     await self.learner.record(job.account_name, job.skill_name, job.trigger, status="ok")
 
-                # 2. Feedback loop — extract new intel from this output
-                if self.extractor and self.merger and result:
+                # 2. Feedback loop — only for user-triggered runs.
+                # Auto-triggered (file/cascade) runs do NOT feed back to discovery.md
+                # to prevent the infinite loop: skill writes → discovery.md changes → skill triggers again.
+                if (
+                    self.extractor
+                    and self.merger
+                    and result
+                    and job.trigger == "user"
+                ):
                     asyncio.ensure_future(
                         self._feedback(job.account_name, job.skill_name, result)
                     )
 
-                # 3. Cascade downstream skills
+                # 3. Cascade downstream skills (max depth = 1)
                 await self._cascade(job)
 
         except Exception as e:
@@ -132,6 +145,14 @@ class QueueWorker:
             log.warning(f"[worker] feedback failed ({skill_name}): {e}")
 
     async def _cascade(self, completed_job) -> None:
+        # Max cascade depth = 1: jobs already triggered by a cascade do not cascade further.
+        # This prevents: skill A → cascades B → cascades C → cascades D chains.
+        if completed_job.trigger.startswith("cascade:"):
+            log.debug(
+                f"[worker] cascade depth limit — {completed_job.skill_name} "
+                f"(triggered by {completed_job.trigger}) will not cascade further"
+            )
+            return
         await self.trigger_cascade(completed_job.account_name, completed_job.skill_name)
 
     async def trigger_cascade(self, account_name: str, skill_name: str) -> None:
@@ -146,6 +167,15 @@ class QueueWorker:
         priority = cascade.get("priority", PRIORITY_LOW)
         for downstream_skill in cascade["skills"]:
             if downstream_skill in SKIP_AUTO_QUEUE:
+                continue
+            # Dedup: skip if this downstream skill already ran recently for this account
+            recent_key = f"{account_name}::{downstream_skill}"
+            last_run = self._recent_runs.get(recent_key, 0)
+            if time.time() - last_run < self.RECENT_RUN_WINDOW:
+                log.info(
+                    f"[worker] cascade dedup — {downstream_skill} ran "
+                    f"{int(time.time()-last_run)}s ago for {account_name}, skipping"
+                )
                 continue
             await self.queue.put(
                 account_name=account_name,
