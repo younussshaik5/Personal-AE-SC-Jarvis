@@ -289,20 +289,13 @@ async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
             "generate_html_report":     "html_generator",
         }
 
-        internal_name = alias_map.get(name)
-        if internal_name:
-            skill = _jarvis.skills.get(internal_name)
-            if skill:
-                result = await skill.execute(arguments)
-                return [types.TextContent(type="text", text=str(result))]
-
-        # ── Special: onboarding ──────────────────────────────────────────────
-        if name in ("onboarding_start", "onboarding_next"):
-            msg = arguments.get("message", "")
-            result = f"JARVIS Onboarding: received '{msg}'. Onboarding skill initializing…"
-            return [types.TextContent(type="text", text=result)]
-
-        return [types.TextContent(type="text", text=f"⚠️ Tool '{name}' is registered but has no handler yet.")]
+        # Route through handle_tool_call — this runs the skill AND:
+        #   - Records in SelfLearner (_evolution_log, _skill_timeline)
+        #   - Runs feedback loop (IntelligenceExtractor → KnowledgeMerger)
+        #   - Triggers cascade (downstream skills queued automatically)
+        response = await _jarvis.handle_tool_call(name, arguments)
+        result = response.get("result") or response.get("error", "No result")
+        return [types.TextContent(type="text", text=str(result))]
 
     except Exception as exc:
         log.error(f"Error in {name}: {exc}")
@@ -312,28 +305,14 @@ async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
-async def _process_startup_queue():
-    """On startup: detect file changes + process any queued jobs from when Claude was closed."""
-    try:
-        from jarvis_mcp.queue_manager import QueueManager
-        if _jarvis is None:
-            return
-        q = QueueManager()
-        q.scan_changed_files(_jarvis.config.accounts_root)
-        q.scan_missing_skills(_jarvis.config.accounts_root,
-                               {k: {"file": f"{k}.md"} for k in q.__class__.__module__ and []})
-        pending = len(q.get_pending())
-        if pending:
-            log.info(f"Queue: {pending} jobs pending — processing in background…")
-            asyncio.create_task(q.process_all(_jarvis.llm, _jarvis.config))
-        else:
-            log.info("Queue: nothing pending")
-    except Exception as e:
-        log.warning(f"Queue startup scan skipped: {e}")
-
-
 async def main():
     log.info("JARVIS MCP server ready — waiting for Claude Desktop…")
+
+    # Start the self-evolving queue bus (file watcher + worker + cascade)
+    if _jarvis:
+        asyncio.create_task(_jarvis.start_background_orchestration())
+        log.info("⚡ Queue bus started — file watcher + cascade worker active")
+
     async with stdio_server() as (read_stream, write_stream):
         await server.run(
             read_stream,

@@ -60,11 +60,22 @@ class KnowledgeMerger:
     """
     Merges extracted intel into account knowledge files.
     Thread-safe via per-account asyncio locks.
+
+    Cycle guard: tracks when WE last wrote to discovery.md per account.
+    FileWatcher checks this to skip changes we caused — preventing infinite loops.
     """
 
     def __init__(self, accounts_root: Path):
         self.accounts_root = accounts_root
         self._locks: Dict[str, asyncio.Lock] = {}
+        # Cycle guard: "account_name" → timestamp of our last write
+        self._self_writes: Dict[str, float] = {}
+        self.SELF_WRITE_COOLDOWN = 10.0  # seconds to suppress re-trigger after our own write
+
+    def was_self_written(self, account_name: str) -> bool:
+        """Returns True if we wrote to this account's discovery.md within the cooldown window."""
+        last = self._self_writes.get(account_name, 0)
+        return (asyncio.get_event_loop().time() - last) < self.SELF_WRITE_COOLDOWN
 
     def _lock_for(self, account_name: str) -> asyncio.Lock:
         if account_name not in self._locks:
@@ -132,6 +143,9 @@ class KnowledgeMerger:
 
             with open(discovery_path, "a") as f:
                 f.write(section)
+
+            # Record self-write to suppress cycle in FileWatcher
+            self._self_writes[path.name] = asyncio.get_event_loop().time()
 
             log.info(f"[merger] Appended intel to {path.name}/discovery.md (from {source})")
             return True

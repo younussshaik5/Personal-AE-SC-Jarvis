@@ -178,6 +178,14 @@ class FileWatcher:
 
         # 1. Source file changed → queue skills directly
         if filename in FILE_TRIGGERS:
+            # Cycle guard: skip if KnowledgeMerger wrote this file itself
+            if (
+                filename == "discovery.md"
+                and self.merger
+                and self.merger.was_self_written(account_name)
+            ):
+                log.debug(f"[watcher] Skipping self-written discovery.md for {account_name} (cycle guard)")
+                return
             log.info(f"[watcher] Source changed: {account_name}/{filename}")
             await self._enqueue_triggers(account_name, filename)
             return
