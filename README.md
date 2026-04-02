@@ -2,9 +2,68 @@
 
 > **Stop writing deliverables. Start closing deals.**
 
-JARVIS is a free, open-source plugin for Claude Desktop. You paste in your notes, call transcripts, or emails — Claude reads them and generates battlecards, MEDDPICC scores, risk reports, proposals, demo strategies, and 20+ more sales deliverables in seconds. Everything is grounded in your actual deal data, not generic templates.
+---
 
-It doesn't run in the background. It doesn't auto-sync with anything. You open Claude, tell it what you need, and it does the work.
+## What Is JARVIS?
+
+JARVIS is a free AI plugin that sits inside Claude Desktop and acts as your personal sales analyst. You talk to Claude the same way you always do — and JARVIS gives Claude 24 specialist sales tools it wouldn't otherwise have.
+
+You tell Claude about a deal. JARVIS turns that into a battlecard, a MEDDPICC score, a risk report, a proposal, a demo strategy, a follow-up email — or all of them at once, in parallel, in seconds. Everything it writes is grounded in your actual notes and deal data. It never guesses.
+
+**In one sentence:** JARVIS is the difference between Claude giving you generic sales advice and Claude knowing your specific deal inside out and generating production-ready deliverables from it.
+
+---
+
+## Why Should You Use It?
+
+You're probably already spending time on things like:
+
+- Writing proposals from scratch (2-3 hours each)
+- Updating your CRM after every call (30-45 mins)
+- Prepping for meetings by piecing together notes from 5 places (1 hour)
+- Building competitive battlecards before demos (1-2 hours)
+- Manually scoring MEDDPICC and explaining gaps to your manager
+
+That's 5-8 hours a week on work that isn't selling.
+
+JARVIS cuts that to minutes. You paste your notes, you ask, you get the output. Everything is tied to your actual deal — not a generic template. The proposal references the real ARR. The battlecard addresses the actual competitor. The risk report flags the specific gaps in *your* discovery notes.
+
+**The result:** more time on calls, better prepared for every meeting, nothing falling through the cracks.
+
+---
+
+## How Does It Work?
+
+JARVIS runs as a plugin (called an MCP server) inside Claude Desktop. When you open Claude, JARVIS is already running in the background. You don't launch it separately.
+
+You maintain a simple folder on your computer for each deal — your notes go in, JARVIS outputs come out. The more you put in, the sharper it gets.
+
+```
+How a typical interaction goes:
+
+1. You finish a discovery call
+2. You open Claude and paste your notes:
+   "Update Acme Corp — Sarah confirmed $180k budget, Q3 deadline,
+   competing with Freshdesk, champion is Mike in IT"
+
+3. JARVIS updates the deal files automatically
+
+4. You ask: "Score MEDDPICC for Acme Corp"
+   → JARVIS reads your notes
+   → Scores all 9 dimensions simultaneously (parallel)
+   → Economic Buyer: AMBER — budget confirmed but CFO not engaged
+   → Champion: GREEN — Mike Torres, strong advocate
+   → Competition: GREEN — Freshdesk confirmed
+   → Gives you the full scorecard in ~15 seconds
+
+5. You ask: "What should I focus on before the next call?"
+   → Top gaps, recommended questions, specific next action with date
+```
+
+**What it doesn't do (yet):**
+- It doesn't auto-read your Gmail or calendar — you paste context in, Claude processes it
+- It doesn't run while Claude is closed
+- It doesn't connect to your CRM automatically — though that's on the roadmap (see the "What We Can Build Next" section)
 
 ---
 
@@ -12,20 +71,18 @@ It doesn't run in the background. It doesn't auto-sync with anything. You open C
 
 You bring the context. JARVIS does the writing and analysis.
 
-| What you do | What JARVIS generates |
+| You say | JARVIS generates |
 |---|---|
-| Paste your discovery call notes | MEDDPICC score, risk report, battlecard, value architecture — all in parallel |
-| Say "prep me for my Acme Corp meeting" | Meeting brief: who's in the room, what to ask, what to expect, hard ask |
-| Say "write a proposal for RetailCo" | Full proposal grounded in your actual discovery data — not a template |
-| Say "what's the risk on TechCo?" | RED/AMBER/GREEN risk report with specific mitigations |
-| Say "battlecard vs Salesforce for Acme" | Deal-specific competitive positioning tied to what the customer actually said |
+| Paste discovery notes | MEDDPICC score, risk report, battlecard, value architecture — all in parallel |
+| "Prep me for my Acme Corp meeting" | Who's in the room, what to ask, objections to expect, hard ask |
+| "Write a proposal for RetailCo" | Full proposal from your actual discovery data — not a blank template |
+| "What's the risk on TechCo?" | RED/AMBER/GREEN risk report with specific mitigations per risk |
+| "Battlecard vs Salesforce for Acme" | Competitive positioning tied to what *that customer* actually said |
+| "Demo strategy for RetailCo" | Custom demo flow ordered by their confirmed pain points |
+| "Follow-up email for Acme Corp" | Two options: direct (short, action-focused) and consultative |
+| "Score MEDDPICC for TechCo" | All 9 dimensions scored simultaneously with evidence and gaps |
 
-**What it doesn't do (yet):**
-- It doesn't auto-read your Gmail or calendar — you paste content in, Claude processes it
-- It doesn't run while Claude is closed
-- If you connect Google Workspace MCP separately, Claude can fetch emails/calendar and pass them to JARVIS — but that's a manual "go fetch this" conversation, not automatic background sync
-
-Everything JARVIS generates is saved to markdown files on your computer. The richer your notes, the better the output. If the info isn't in your notes, JARVIS says "TBD — needs discovery" instead of making things up.
+Everything saved to your deal folder. Nothing invented.
 
 ---
 
