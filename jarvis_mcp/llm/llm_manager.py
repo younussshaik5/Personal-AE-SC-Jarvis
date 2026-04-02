@@ -1,20 +1,15 @@
 """
-LLM Manager for JARVIS — flash-first with parallel batch generation.
+LLM Manager for JARVIS — nemotron with thinking mode for all tasks.
 
-Model routing:
-  - ALL text tasks     → stepfun-ai/step-3.5-flash  (confirmed working, fast)
-  - reasoning only     → meta/llama-3.3-70b-instruct (complex analysis)
+Primary model: nvidia/nemotron-3-nano-30b-a3b
+  - reasoning_budget: 16384 (full thinking)
+  - chat_template_kwargs: {"enable_thinking": true}
+  - stream: true, temperature: 1, top_p: 1, max_tokens: 16384
 
-Provider fallback chain:
-  text/default: nvidia-flash → nvidia-llama70b → groq → together
-  reasoning:    nvidia-llama70b → nvidia-flash → groq → together
+Used for BOTH text generation and reasoning tasks.
+Fallback: groq → together (optional, if keys set).
 
 Parallel: batch_generate fires ALL prompts simultaneously via asyncio.gather.
-
-Rules:
-  - Timeout  → immediately try next provider
-  - 429      → cool down 60s, try next
-  - optional providers (groq, together) → skipped silently if no key
 """
 
 import os
@@ -31,35 +26,19 @@ log = logging.getLogger(__name__)
 # optional=True → silently skipped if key not set (no error logged)
 _PROVIDERS = [
     {
-        "name":     "nvidia-llama70b",
+        "name":     "nvidia-nemotron",
         "base_url": "https://integrate.api.nvidia.com/v1",
         "key_env":  "NVIDIA_API_KEY",
         "optional": False,
         "models": {
-            "default":   "meta/llama-3.3-70b-instruct",
-            "reasoning": "meta/llama-3.3-70b-instruct",
-            "text":      "meta/llama-3.3-70b-instruct",
-            "summary":   "meta/llama-3.3-70b-instruct",
-            "fast":      "stepfun-ai/step-3.5-flash",
-            "quick":     "stepfun-ai/step-3.5-flash",
+            "default":   "nvidia/nemotron-3-nano-30b-a3b",
+            "reasoning": "nvidia/nemotron-3-nano-30b-a3b",
+            "text":      "nvidia/nemotron-3-nano-30b-a3b",
+            "summary":   "nvidia/nemotron-3-nano-30b-a3b",
+            "fast":      "nvidia/nemotron-3-nano-30b-a3b",
+            "quick":     "nvidia/nemotron-3-nano-30b-a3b",
         },
-        "timeout": 12,
-    },
-    {
-        "name":     "nvidia-flash",
-        "base_url": "https://integrate.api.nvidia.com/v1",
-        "key_env":  "NVIDIA_API_KEY",
-        "optional": False,
-        # step-3.5-flash: fast, low-latency — default for all fast/quick tasks
-        "models": {
-            "default":   "stepfun-ai/step-3.5-flash",
-            "reasoning": "stepfun-ai/step-3.5-flash",
-            "text":      "stepfun-ai/step-3.5-flash",
-            "summary":   "stepfun-ai/step-3.5-flash",
-            "fast":      "stepfun-ai/step-3.5-flash",
-            "quick":     "stepfun-ai/step-3.5-flash",
-        },
-        "timeout": 10,
+        "timeout": 60,  # thinking mode needs more time
     },
     {
         "name":     "groq",
@@ -93,9 +72,9 @@ _PROVIDERS = [
     },
 ]
 
-# flash is primary for all text tasks — llama70b only for reasoning
-_ORDER_TEXT      = ["nvidia-flash", "nvidia-llama70b", "groq", "together"]
-_ORDER_REASONING = ["nvidia-llama70b", "nvidia-flash", "groq", "together"]
+# nemotron for everything — groq/together as fallback only
+_ORDER_TEXT      = ["nvidia-nemotron", "groq", "together"]
+_ORDER_REASONING = ["nvidia-nemotron", "groq", "together"]
 
 _PROVIDER_MAP = {p["name"]: p for p in _PROVIDERS}
 
@@ -129,20 +108,19 @@ class LLMManager:
         """Call NVIDIA LLM via OpenAI SDK with streaming."""
         client = OpenAI(base_url=base_url, api_key=api_key)
 
-        # Build request params
+        # Build request params — exact working config for nemotron thinking mode
         params = {
             "model": model,
             "messages": messages,
             "max_tokens": max_tokens,
-            "temperature": temperature,
-            "top_p": 0.9,
-            "seed": 42,
+            "temperature": 1,
+            "top_p": 1,
             "stream": True,
         }
 
-        # Add thinking mode for reasoning tasks
-        if is_reasoning and "nemotron" in model.lower():
-            params["reasoning_budget"] = 4096
+        # Enable thinking mode for nemotron
+        if "nemotron" in model.lower():
+            params["reasoning_budget"] = 16384
             params["chat_template_kwargs"] = {"enable_thinking": True}
 
         # Stream and collect response
