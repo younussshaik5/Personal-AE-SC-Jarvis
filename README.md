@@ -56,15 +56,14 @@ No copy-pasting between tools. No blank templates. Everything references what th
 
 ## Day 1 vs Day 30
 
-Set expectations. JARVIS is only as good as the notes you give it.
-
 | | What you get |
 |---|---|
-| **Day 1** | Generic templates. Lots of "TBD — needs discovery." Good for structure, not yet sharp. |
-| **Day 7** | After 2-3 discovery calls of notes, outputs reference real stakeholders, real pain, real competitors. Battlecards and meeting prep become genuinely useful. |
-| **Day 30** | JARVIS knows your deals. Proposals pull actual ARR. Risk reports flag specific gaps. MEDDPICC scores have evidence. You stop writing deliverables entirely. |
+| **Day 1** | Generic templates with "TBD — needs discovery" placeholders. Good structure, not yet sharp. |
+| **After first discovery call** | Paste your notes once. JARVIS auto-runs MEDDPICC, risk report, battlecard, value architecture, discovery gaps — all in parallel, all automatically. By the time you close your laptop, the account folder is fully populated. |
+| **Day 7** | JARVIS has seen 2-3 calls worth of notes. Every output references real stakeholders, real pain, real competitors. Proposals auto-update when deal data changes. |
+| **Day 30** | You stop thinking about deliverables. Drop a transcript → everything regenerates. Ask a question → JARVIS already knows the deal. Every output knows what every previous output found. |
 
-The more notes you add, the sharper it gets. That's the only rule.
+The system evolves itself. You add context — it does the rest.
 
 ---
 
@@ -122,6 +121,8 @@ At that point, everything is consistent and up to date.
 ```
 
 **Result:** Within 2-5 minutes of any input, all 14+ output files for the account are regenerated. Each knows what the previous found. The deal intelligence converges automatically.
+
+> **Confirmed end-to-end:** file watcher starts on Claude Desktop boot, skill calls route through the intelligence layer, outputs feed back into discovery.md, cycle guard prevents infinite loops, cascade runs in correct priority order.
 
 ### What gets added to every account folder
 
@@ -777,6 +778,36 @@ Then register in `jarvis_mcp/skills/__init__.py`, add the tool in `jarvis_mcp_se
 
 ---
 
+## Is This Production Ready?
+
+**For one AE or SC using it personally: yes.**
+
+| What works | Status |
+|---|---|
+| 27 skills generate grounded outputs | ✅ |
+| Multi-model routing with cascade failover | ✅ |
+| File watcher starts on Claude Desktop boot | ✅ |
+| Any dropped file auto-ingested into knowledge base | ✅ |
+| Skill outputs feed back into discovery.md | ✅ |
+| Full cascade fires in correct priority order | ✅ |
+| Cycle guard prevents infinite feedback loops | ✅ |
+| Cross-platform: Mac, Linux, Windows (WSL) | ✅ |
+| Fresh clone → `bash setup.sh` → works | ✅ |
+
+**Not ready for (would need additional build):**
+
+| What's missing | Impact |
+|---|---|
+| No multi-user support | One person per installation |
+| Deal data stored as plain text | Anyone with file access reads everything |
+| NVIDIA keys in `.env` plain text | Single point of compromise |
+| No retry logic if NVIDIA is down | Failed queue jobs are dropped |
+| No sync across devices | Tied to one machine |
+
+Bottom line: fork it, run `setup.sh`, add your NVIDIA keys, restart Claude Desktop. It works for one salesperson managing their own deals. For a company deploying it across a team — that's a different build.
+
+---
+
 ## License
 
 MIT — fork it, customize it, use it commercially.
@@ -789,6 +820,6 @@ PRs welcome. If you build a skill that works well in your workflow, open a PR �
 
 **Built by an AE/SC who got tired of spending more time writing about deals than working them.**
 
-*Used daily across 40+ deals. Proposal time: 3 hours → 12 minutes. Meeting prep: 1 hour → 15 seconds.*
+*Proposal time: 3 hours → 12 minutes. Meeting prep: 1 hour → 15 seconds. Zero deliverables written manually.*
 
-*Try it on one deal this week.*
+*Fork it. Add your keys. Try it on one deal today.*
