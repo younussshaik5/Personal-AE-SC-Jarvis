@@ -1,25 +1,31 @@
 # JARVIS — AI Sales Intelligence Platform
 
-> **Your CRM tells you what happened. JARVIS tells you what to do next.**
+> **Stop writing deliverables. Start closing deals.**
 
-JARVIS is a free, open-source AI assistant that lives inside Claude Desktop and works 24/7 on your deals. It reads your notes, emails, and transcripts — and automatically generates battlecards, MEDDPICC scores, risk reports, proposals, demo strategies, and 20+ more sales deliverables. No manual data entry. No switching apps. Just talk to Claude.
+JARVIS is a free, open-source plugin for Claude Desktop. You paste in your notes, call transcripts, or emails — Claude reads them and generates battlecards, MEDDPICC scores, risk reports, proposals, demo strategies, and 20+ more sales deliverables in seconds. Everything is grounded in your actual deal data, not generic templates.
+
+It doesn't run in the background. It doesn't auto-sync with anything. You open Claude, tell it what you need, and it does the work.
 
 ---
 
 ## What Does It Actually Do?
 
-Most sales tools are data *containers*. JARVIS is a deal *engine*.
+You bring the context. JARVIS does the writing and analysis.
 
-| Instead of... | JARVIS does this |
+| What you do | What JARVIS generates |
 |---|---|
-| Manually updating Salesforce after every call | Auto-extracts deal intel from your notes and updates the pipeline |
-| Spending 2 hours writing a proposal | Generates a grounded proposal from your discovery notes in seconds |
-| Forgetting to prep before a meeting | Automatically queues a meeting brief the morning of |
-| Losing track of MEDDPICC gaps | Scores all 8 dimensions from your notes and flags what's missing |
-| Writing competitive battlecards from scratch | Generates a deal-specific battlecard tied to your actual discovery |
-| Asking your manager "what's the risk on this deal?" | Pulls up a RED/AMBER/GREEN risk report with mitigations |
+| Paste your discovery call notes | MEDDPICC score, risk report, battlecard, value architecture — all in parallel |
+| Say "prep me for my Acme Corp meeting" | Meeting brief: who's in the room, what to ask, what to expect, hard ask |
+| Say "write a proposal for RetailCo" | Full proposal grounded in your actual discovery data — not a template |
+| Say "what's the risk on TechCo?" | RED/AMBER/GREEN risk report with specific mitigations |
+| Say "battlecard vs Salesforce for Acme" | Deal-specific competitive positioning tied to what the customer actually said |
 
-Everything is grounded in your actual deal data — not generic templates. If the information isn't in your notes, JARVIS says "TBD — needs discovery" instead of making things up.
+**What it doesn't do (yet):**
+- It doesn't auto-read your Gmail or calendar — you paste content in, Claude processes it
+- It doesn't run while Claude is closed
+- If you connect Google Workspace MCP separately, Claude can fetch emails/calendar and pass them to JARVIS — but that's a manual "go fetch this" conversation, not automatic background sync
+
+Everything JARVIS generates is saved to markdown files on your computer. The richer your notes, the better the output. If the info isn't in your notes, JARVIS says "TBD — needs discovery" instead of making things up.
 
 ---
 
@@ -273,20 +279,21 @@ JARVIS fires all 9 sections simultaneously:
 
 ```
 [You open Claude Desktop at 8am]
-
-JARVIS auto-starts:
 → CRM dashboard opens at http://localhost:8000
-→ Detects files changed since yesterday
-→ Queues missing intelligence for 3 accounts in background
 
-You: "Brief me for today"
-→ 2 meetings today: RetailCo at 10am, Acme Corp at 2pm
-→ RetailCo: last touch was Tuesday, pending technical questions
-   Meeting prep queued — ready in 30 seconds
-→ Acme Corp: risk report went RED overnight (timeline moved)
-   Action: reach out to Sarah about the timeline change today
-→ TechCo: has been silent for 8 days — flag for follow-up
+You: "Brief me for today — here are my accounts: Acme Corp, RetailCo, TechCo"
+→ JARVIS reads saved deal data for each account
+→ RetailCo: MEDDPICC gaps flagged — no economic buyer confirmed
+→ Acme Corp: timeline is tight, risk report shows RED on paper process
+→ TechCo: last activity was 8 days ago — suggest follow-up
+
+You: "Meeting prep for my Acme Corp call at 2pm"
+→ JARVIS generates brief from saved notes — who's attending, what to ask,
+   objection handlers, hard ask
+→ Takes ~15 seconds
 ```
+
+Note: JARVIS doesn't know about your calendar automatically. You tell it what's happening — it generates what you need.
 
 ---
 
@@ -300,9 +307,9 @@ All skills with multiple sections generate those sections **in parallel** — so
 
 | Skill | What It Generates | Sections Generated in Parallel |
 |---|---|---|
-| `get_account_summary` | Full deal dossier | Company + Deal, Pain Points, MEDDPICC status, Risks & Actions |
-| `quick_insights` | Fast deal snapshot | Deal snapshot & signals, Risks & next action |
-| `track_meddpicc` | All 8 MEDDPICC dimensions scored | **9 sections simultaneously** — each dimension independently |
+| `get_account_summary` | Full deal dossier from your saved notes | Company + Deal, Pain Points, MEDDPICC status, Risks & Actions |
+| `quick_insights` | Fast deal snapshot — stage, risks, next action | Deal snapshot & signals, Risks & next action |
+| `track_meddpicc` | Scores all 8 MEDDPICC dimensions from your discovery notes | **9 sections simultaneously** — each dimension independently |
 
 ### Competitive & Positioning
 
