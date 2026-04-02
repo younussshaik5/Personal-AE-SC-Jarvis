@@ -3,6 +3,7 @@ from jarvis_mcp.skills.base_skill import BaseSkill
 
 
 class CompetitiveIntelligenceSkill(BaseSkill):
+    MODEL_TYPE = "reasoning"
     async def generate(self, account_name: str, **kwargs) -> str:
         context = await self.read_account_files(account_name)
         ctx = self.build_context_block(context, account_name)

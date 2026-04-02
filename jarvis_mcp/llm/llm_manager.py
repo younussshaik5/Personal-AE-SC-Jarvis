@@ -1,14 +1,20 @@
 """
-LLM Manager for JARVIS — Kimi K2 Thinking via NVIDIA NIM with key-pool rotation.
+LLM Manager for JARVIS — Multi-model routing with NVIDIA key-pool rotation.
 
-Primary model: moonshotai/kimi-k2-thinking
-  - Thinks natively: temperature=1, top_p=0.9, stream=True
-  - No special reasoning params needed
+Routing strategy:
+  Each model_type maps to an ordered list of models.
+  Requests try model[0] across all keys first.
+  If all keys are exhausted/rate-limited for model[0], cascade to model[1], etc.
 
-Key pool: NVIDIA_API_KEY, NVIDIA_API_KEY_2, ..., NVIDIA_API_KEY_N
-  - Round-robin across all keys
-  - Per-key rate-limit tracking (60s cooldown)
-  - Parallel sections spread automatically across keys
+Key pool:
+  NVIDIA_API_KEY, NVIDIA_API_KEY_2 ... NVIDIA_API_KEY_N
+  Round-robin rotation with per (key, model) rate-limit tracking.
+
+Model types:
+  reasoning  — deep analysis: MEDDPICC, risk, competitive, value architecture
+  writing    — long-form: proposals, SOW, battlecards, documentation
+  fast       — quick tasks: summaries, insights, follow-ups, meeting prep
+  default    — general purpose fallback
 """
 
 import os
@@ -22,12 +28,48 @@ from openai import OpenAI, APIConnectionError, RateLimitError, APIError
 log = logging.getLogger(__name__)
 
 _BASE_URL = "https://integrate.api.nvidia.com/v1"
-_MODEL    = "moonshotai/kimi-k2-thinking"
 _TIMEOUT  = 120
+
+# ── Model routing table ───────────────────────────────────────────────────────
+# Each entry: model id, params, has_thinking (streams reasoning_content — we discard it)
+# Order = preference. Cascade to next model only if all keys fail on current model.
+
+MODEL_ROUTING: Dict[str, List[Dict]] = {
+    "reasoning": [
+        # Best for: MEDDPICC scoring, risk reports, competitive analysis, value architecture
+        {"model": "moonshotai/kimi-k2-thinking", "temperature": 1,   "top_p": 0.9, "has_thinking": True},
+        {"model": "stepfun-ai/step-3.5-flash",   "temperature": 1,   "top_p": 0.9, "has_thinking": True},
+        {"model": "qwen/qwq-32b",                "temperature": 0.6, "top_p": 0.7, "has_thinking": False},
+    ],
+    "writing": [
+        # Best for: proposals, SOW, documentation, battlecards
+        {"model": "moonshotai/kimi-k2-instruct", "temperature": 0.6, "top_p": 0.9, "has_thinking": False},
+        {"model": "qwen/qwq-32b",               "temperature": 0.6, "top_p": 0.7, "has_thinking": False},
+        {"model": "moonshotai/kimi-k2-thinking", "temperature": 1,   "top_p": 0.9, "has_thinking": True},
+    ],
+    "fast": [
+        # Best for: quick insights, follow-up emails, meeting prep, summaries
+        {"model": "moonshotai/kimi-k2-instruct", "temperature": 0.6, "top_p": 0.9, "has_thinking": False},
+        {"model": "qwen/qwen2-7b-instruct",      "temperature": 0.7, "top_p": 0.8, "has_thinking": False},
+        {"model": "moonshotai/kimi-k2-thinking", "temperature": 1,   "top_p": 0.9, "has_thinking": True},
+    ],
+    "default": [
+        {"model": "moonshotai/kimi-k2-instruct", "temperature": 0.6, "top_p": 0.9, "has_thinking": False},
+        {"model": "moonshotai/kimi-k2-thinking", "temperature": 1,   "top_p": 0.9, "has_thinking": True},
+        {"model": "qwen/qwq-32b",               "temperature": 0.6, "top_p": 0.7, "has_thinking": False},
+    ],
+}
 
 
 class LLMManager:
-    """NVIDIA key-pool LLM manager — round-robin rotation with per-key rate-limit tracking."""
+    """
+    NVIDIA key-pool LLM manager with multi-model routing and cascade failover.
+
+    Failover order:
+      1. Try model[0] — rotate across all available keys
+      2. All keys exhausted for model[0] → cascade to model[1]
+      3. Repeat until a response is received or all models fail
+    """
 
     def __init__(self, config):
         self.config = config
@@ -43,7 +85,7 @@ class LLMManager:
                 self._keys.append(k)
 
         if self._keys:
-            log.info(f"NVIDIA key pool: {len(self._keys)} keys loaded")
+            log.info(f"NVIDIA key pool: {len(self._keys)} key(s) loaded")
         else:
             log.warning("No NVIDIA_API_KEY found — add to .env and restart.")
 
@@ -51,57 +93,75 @@ class LLMManager:
         self._idx = 0
         self._lock = threading.Lock()
 
-        # Per-key rate-limit cooldowns: {"key-0": timestamp, ...}
+        # Per (key_id, model) rate-limit cooldowns: {"key-0::model-name": timestamp}
         self._rate_limited_until: Dict[str, float] = {}
 
-    # ── Key rotation ─────────────────────────────────────────────────────────
+    # ── Rate limit helpers ────────────────────────────────────────────────────
 
-    def _next_key(self) -> Tuple[Optional[str], Optional[str]]:
-        """Round-robin next available key, skipping rate-limited ones."""
+    def _rl_key(self, key_id: str, model: str) -> str:
+        return f"{key_id}::{model}"
+
+    def _is_available(self, key_id: str, model: str) -> bool:
+        return time.time() >= self._rate_limited_until.get(self._rl_key(key_id, model), 0)
+
+    def _mark_rate_limited(self, key_id: str, model: str, cooldown: int = 60) -> None:
+        self._rate_limited_until[self._rl_key(key_id, model)] = time.time() + cooldown
+        log.warning(f"🚫 [{key_id}] [{model}] rate-limited for {cooldown}s — will try next key/model")
+
+    # ── Key rotation ──────────────────────────────────────────────────────────
+
+    def _next_key_for_model(self, model: str) -> Tuple[Optional[str], Optional[str]]:
+        """Round-robin next key that is not rate-limited for this specific model."""
         n = len(self._keys)
         if n == 0:
             return None, None
 
         with self._lock:
-            start = self._idx
             for _ in range(n):
                 idx = self._idx % n
                 self._idx += 1
                 key_id = f"key-{idx}"
-                if time.time() >= self._rate_limited_until.get(key_id, 0):
+                if self._is_available(key_id, model):
                     return self._keys[idx], key_id
 
-        # All rate-limited — pick the one expiring soonest
-        earliest = min(range(n), key=lambda i: self._rate_limited_until.get(f"key-{i}", 0))
+        # All keys rate-limited for this model — return the one expiring soonest
+        earliest = min(
+            range(n),
+            key=lambda i: self._rate_limited_until.get(self._rl_key(f"key-{i}", model), 0),
+        )
         return self._keys[earliest], f"key-{earliest}"
 
     # ── Sync LLM call (runs in executor) ─────────────────────────────────────
 
-    def _llm_call(self, api_key: str, messages: list, max_tokens: int) -> str:
+    def _llm_call(self, api_key: str, model_cfg: Dict, messages: list, max_tokens: int) -> str:
+        """
+        Make a single LLM call. Handles both thinking models (has_thinking=True)
+        and standard models. Only the final content is returned — thinking traces discarded.
+        """
         client = OpenAI(base_url=_BASE_URL, api_key=api_key)
 
         params = {
-            "model": _MODEL,
-            "messages": messages,
-            "max_tokens": max_tokens,
-            "temperature": 1,
-            "top_p": 0.9,
-            "stream": True,
+            "model":       model_cfg["model"],
+            "messages":    messages,
+            "max_tokens":  max_tokens,
+            "temperature": model_cfg["temperature"],
+            "top_p":       model_cfg["top_p"],
+            "stream":      True,
         }
 
         result = []
         try:
-            completion = client.chat.completions.create(**params)
-            for chunk in completion:
-                if not hasattr(chunk, "choices") or not chunk.choices:
+            for chunk in client.chat.completions.create(**params):
+                if not getattr(chunk, "choices", None) or not chunk.choices:
                     continue
-                # Only collect the final answer — discard reasoning_content (thinking trace)
+                # Discard reasoning_content (thinking trace) — only keep final content
                 content = getattr(chunk.choices[0].delta, "content", None)
                 if content:
                     result.append(content)
             return "".join(result)
+
         except Exception as e:
-            log.debug(f"Streaming failed: {e}, retrying without stream")
+            log.debug(f"Streaming failed ({model_cfg['model']}): {e} — retrying without stream")
             params["stream"] = False
             completion = client.chat.completions.create(**params)
             return completion.choices[0].message.content
@@ -114,7 +174,7 @@ class LLMManager:
         model_type: str = "default",
         context: Optional[Dict[str, Any]] = None,
         max_tokens: int = 2000,
-        temperature: float = 0.7,
+        temperature: float = 0.7,          # ignored — model profiles control this
         system_prompt: str = (
             "You are JARVIS, an expert AI sales assistant. "
             "Generate professional, detailed, actionable output in markdown format."
@@ -126,71 +186,84 @@ class LLMManager:
             {"role": "user",   "content": prompt},
         ]
 
-        n = len(self._keys)
-        if n == 0:
-            return "❌ No NVIDIA API keys configured — add NVIDIA_API_KEY to .env"
+        if not self._keys:
+            return "❌ No NVIDIA API keys configured — add NVIDIA_API_KEY to .env and restart."
 
-        errors = []
+        # Resolve model chain for this task type
+        model_chain = MODEL_ROUTING.get(model_type) or MODEL_ROUTING["default"]
+
         loop = asyncio.get_event_loop()
+        all_errors: List[str] = []
 
-        for attempt in range(n):
-            api_key, key_id = self._next_key()
-            if api_key is None:
-                break
+        # Cascade: try each model in order; advance only when all keys fail for current model
+        for model_cfg in model_chain:
+            model_name = model_cfg["model"]
+            model_errors: List[str] = []
+            n = len(self._keys)
 
-            # Skip if still cooling down
-            cooldown = self._rate_limited_until.get(key_id, 0)
-            if time.time() < cooldown:
-                remaining = int(cooldown - time.time())
-                errors.append(f"{key_id}: rate-limited ({remaining}s)")
-                continue
+            for attempt in range(n):
+                api_key, key_id = self._next_key_for_model(model_name)
+                if api_key is None:
+                    break
 
-            log.info(f"LLM → [{key_id}] | {_MODEL} | {model_type} | {max_tokens}tok")
-            t0 = time.time()
-
-            try:
-                result = await asyncio.wait_for(
-                    loop.run_in_executor(
-                        None, self._llm_call, api_key, messages, max_tokens,
-                    ),
-                    timeout=_TIMEOUT,
-                )
-                elapsed = round(time.time() - t0, 1)
-                log.info(f"✅ [{key_id}] responded in {elapsed}s")
-                return result
-
-            except asyncio.TimeoutError:
-                elapsed = round(time.time() - t0, 1)
-                log.warning(f"⏱ [{key_id}] timed out after {elapsed}s — rotating")
-                errors.append(f"{key_id}: timeout")
-                continue
-
-            except RateLimitError:
-                self._rate_limited_until[key_id] = time.time() + 60
-                log.warning(f"🚫 [{key_id}] rate-limited — rotating to next key")
-                errors.append(f"{key_id}: rate-limited")
-                continue
-
-            except APIConnectionError as e:
-                log.error(f"❌ [{key_id}] connection failed: {str(e)[:100]}")
-                errors.append(f"{key_id}: connection error")
-                continue
-
-            except APIError as e:
-                error_msg = str(e)
-                if "401" in error_msg or "Unauthorized" in error_msg:
-                    log.error(f"🔑 [{key_id}] invalid key")
-                    errors.append(f"{key_id}: auth failed")
+                # Still cooling down?
+                if not self._is_available(key_id, model_name):
+                    remaining = int(
+                        self._rate_limited_until.get(self._rl_key(key_id, model_name), 0) - time.time()
+                    )
+                    model_errors.append(f"{key_id}: rate-limited ({remaining}s)")
                     continue
-                log.error(f"❌ [{key_id}] API error: {error_msg[:100]}")
-                errors.append(f"{key_id}: API error")
-                continue
 
-        error_summary = " | ".join(errors)
-        log.error(f"All {n} NVIDIA keys failed: {error_summary}")
-        return f"❌ All NVIDIA keys exhausted: {error_summary}"
+                log.info(f"LLM → [{key_id}] [{model_name}] | type={model_type} | {max_tokens}tok")
+                t0 = time.time()
 
-    # ── Parallel batch ─────────────────────────────────────────────────────────
+                try:
+                    result = await asyncio.wait_for(
+                        loop.run_in_executor(
+                            None, self._llm_call, api_key, model_cfg, messages, max_tokens
+                        ),
+                        timeout=_TIMEOUT,
+                    )
+                    elapsed = round(time.time() - t0, 1)
+                    log.info(f"✅ [{key_id}] [{model_name}] responded in {elapsed}s")
+                    return result
+
+                except asyncio.TimeoutError:
+                    elapsed = round(time.time() - t0, 1)
+                    log.warning(f"⏱ [{key_id}] [{model_name}] timed out after {elapsed}s")
+                    model_errors.append(f"{key_id}: timeout")
+
+                except RateLimitError:
+                    self._mark_rate_limited(key_id, model_name)
+                    model_errors.append(f"{key_id}: rate-limited")
+
+                except APIConnectionError as e:
+                    log.error(f"❌ [{key_id}] [{model_name}] connection failed: {str(e)[:80]}")
+                    model_errors.append(f"{key_id}: connection error")
+
+                except APIError as e:
+                    msg = str(e)
+                    if "401" in msg or "Unauthorized" in msg:
+                        log.error(f"🔑 [{key_id}] [{model_name}] invalid API key")
+                        model_errors.append(f"{key_id}: auth failed")
+                    elif "404" in msg or "not found" in msg.lower():
+                        log.warning(f"⚠️ [{key_id}] [{model_name}] model unavailable — cascading")
+                        model_errors.append(f"{key_id}: model unavailable")
+                        break  # Skip remaining keys for this model, try next
+                    else:
+                        log.error(f"❌ [{key_id}] [{model_name}] API error: {msg[:80]}")
+                        model_errors.append(f"{key_id}: {msg[:60]}")
+
+            summary = " | ".join(model_errors)
+            log.warning(f"All keys failed for [{model_name}]: {summary} — cascading to next model")
+            all_errors.append(f"[{model_name}]: {summary}")
+
+        # All models and all keys exhausted
+        error_detail = " || ".join(all_errors)
+        log.error(f"All models failed for type={model_type}: {error_detail}")
+        return f"❌ All models exhausted for '{model_type}': {error_detail}"
+
+    # ── Parallel batch ────────────────────────────────────────────────────────
 
     async def batch_generate(
         self,
@@ -198,8 +271,8 @@ class LLMManager:
         model_type: str = "default",
         **kwargs,
     ) -> List[str]:
-        """Fire ALL prompts simultaneously — round-robin spreads across keys."""
-        log.info(f"batch_generate: {len(prompts)} prompts across {len(self._keys)} keys")
+        """Fire all prompts simultaneously — keys and models rotate automatically."""
+        log.info(f"batch_generate: {len(prompts)} prompts | type={model_type} | {len(self._keys)} keys")
         tasks = [
             asyncio.ensure_future(self.generate(p, model_type=model_type, **kwargs))
             for p in prompts
@@ -212,38 +285,50 @@ class LLMManager:
 
     # ── Status ────────────────────────────────────────────────────────────────
 
-    def provider_status(self) -> Dict[str, str]:
-        status = {}
+    def provider_status(self) -> Dict[str, Any]:
+        """Return current status of all keys across all model profiles."""
+        status: Dict[str, Any] = {}
+        all_models = {
+            cfg["model"]
+            for chain in MODEL_ROUTING.values()
+            for cfg in chain
+        }
         for i in range(len(self._keys)):
             key_id = f"key-{i}"
-            if time.time() < self._rate_limited_until.get(key_id, 0):
-                remaining = int(self._rate_limited_until[key_id] - time.time())
-                status[key_id] = f"rate-limited ({remaining}s)"
-            else:
-                status[key_id] = "ready"
+            key_status: Dict[str, str] = {}
+            for model in sorted(all_models):
+                rl_k = self._rl_key(key_id, model)
+                if time.time() < self._rate_limited_until.get(rl_k, 0):
+                    remaining = int(self._rate_limited_until[rl_k] - time.time())
+                    key_status[model] = f"rate-limited ({remaining}s)"
+                else:
+                    key_status[model] = "ready"
+            status[key_id] = key_status
         return status
 
     # ── Health check ──────────────────────────────────────────────────────────
 
     async def health_check(self) -> Dict[str, Any]:
-        """Test each NVIDIA key."""
+        """Test each key against the first model in the default chain."""
         results = {}
+        test_model = MODEL_ROUTING["default"][0]
         test_messages = [{"role": "user", "content": "Hi"}]
+        loop = asyncio.get_event_loop()
 
         for i, key in enumerate(self._keys):
             key_id = f"key-{i}"
             try:
-                log.info(f"Health check: {key_id}")
+                log.info(f"Health check: {key_id} → {test_model['model']}")
                 result = await asyncio.wait_for(
-                    asyncio.get_event_loop().run_in_executor(
-                        None, self._llm_call, key, test_messages, 50,
+                    loop.run_in_executor(
+                        None, self._llm_call, key, test_model, test_messages, 50
                     ),
                     timeout=30,
                 )
-                results[key_id] = {"status": "ok", "response_len": len(result)}
+                results[key_id] = {"status": "ok", "model": test_model["model"], "response_len": len(result)}
                 log.info(f"✅ {key_id} passed")
             except Exception as e:
-                results[key_id] = {"status": "error", "error": str(e)[:100]}
+                results[key_id] = {"status": "error", "model": test_model["model"], "error": str(e)[:100]}
                 log.error(f"🔴 {key_id}: {e}")
 
         return results

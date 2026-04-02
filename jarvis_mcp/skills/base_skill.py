@@ -11,6 +11,13 @@ from jarvis_mcp.utils.file_utils import read_file, write_file
 class BaseSkill:
     """Base class for all skills"""
 
+    # Override in subclasses to route to the right model profile.
+    # reasoning → deep analysis (MEDDPICC, risk, competitive)
+    # writing   → long-form generation (proposals, SOW, battlecards)
+    # fast      → quick tasks (summaries, insights, follow-ups)
+    # default   → general purpose
+    MODEL_TYPE: str = "default"
+
     def __init__(self, llm_manager, config_manager):
         self.llm = llm_manager
         self.config = config_manager
@@ -153,7 +160,7 @@ class BaseSkill:
         async def _gen(section):
             return await self.llm.generate(
                 prompt=section["prompt"],
-                model_type=section.get("model_type", "reasoning"),
+                model_type=section.get("model_type", self.MODEL_TYPE),
                 system_prompt=self.grounded_system_prompt(),
                 max_tokens=section.get("max_tokens", 1000),
             )
