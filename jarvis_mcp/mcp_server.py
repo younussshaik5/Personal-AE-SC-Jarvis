@@ -18,7 +18,7 @@ from .utils.logger import setup_logger
 from .agents import AgentOrchestrator
 from .context_detector import ContextDetector
 from .account_hierarchy import AccountHierarchy
-from .queue import SkillQueue, QueueWorker, FileWatcher, PRIORITY_HIGH
+from .queue import SkillQueue, QueueWorker, FileWatcher, PRIORITY_HIGH, SKILL_OUTPUT_FILES
 from .learning import SelfLearner, IntelligenceExtractor, KnowledgeMerger
 
 
@@ -159,33 +159,6 @@ class JarvisServer:
             "generate_custom_template",
         ]
 
-    # Maps skill name → output filename written to the account folder
-    SKILL_OUTPUT_FILES = {
-        "proposal":               "proposal.md",
-        "battlecard":             "battlecard.md",
-        "demo_strategy":          "demo_strategy.md",
-        "risk_report":            "risk_report.md",
-        "value_architecture":     "value_architecture.md",
-        "discovery":              "discovery.md",
-        "competitive_intelligence": "competitive_intelligence.md",
-        "meeting_prep":           "meeting_prep.md",
-        "meeting_summary":        "meeting_prep.md",
-        "conversation_summarizer": "conversation_summary.md",
-        "meddpicc":               "meddpicc.md",
-        "sow":                    "sow.md",
-        "followup_email":         "followup_email.md",
-        "account_summary":        "account_summary.md",
-        "technical_risk":         "technical_risk.md",
-        "competitor_pricing":     "competitor_pricing.md",
-        "architecture_diagram":   "architecture_diagram.md",
-        "documentation":          "documentation.md",
-        "html_generator":         "report.html",
-        "knowledge_builder":      "knowledge_builder.md",
-        "quick_insights":         "quick_insights.md",
-        "custom_template":        "custom_template.md",
-        # conversation_extractor feeds discovery.md via merger — no direct file write
-        # deal_stage_tracker writes deal_stage.json internally
-    }
 
     async def handle_tool_call(self, tool_name: str, arguments: dict) -> dict:
         """Handle tool call with FULL autonomous evolution and learning."""
@@ -241,7 +214,7 @@ class JarvisServer:
 
             if result and not result.strip().startswith("❌"):
                 # Persist output to disk so files are always populated
-                output_file = self.SKILL_OUTPUT_FILES.get(skill_name)
+                output_file = SKILL_OUTPUT_FILES.get(skill_name)
                 if output_file and account_name:
                     await skill.write_output(account_name, output_file, result)
 

@@ -18,7 +18,7 @@ import time
 from typing import Dict, Any, Optional
 
 from .skill_queue import SkillQueue, PRIORITY_MEDIUM, PRIORITY_LOW, PRIORITY_TAIL
-from .dependency_graph import SKILL_CASCADES, SKIP_AUTO_QUEUE
+from .dependency_graph import SKILL_CASCADES, SKIP_AUTO_QUEUE, SKILL_OUTPUT_FILES
 
 log = logging.getLogger(__name__)
 
@@ -97,6 +97,12 @@ class QueueWorker:
                     await self.learner.record(job.account_name, job.skill_name, job.trigger, status="error")
             else:
                 log.info(f"[worker] ✓ {job.skill_name} | {job.account_name} | {elapsed}s")
+
+                # Persist output to disk
+                output_file = SKILL_OUTPUT_FILES.get(job.skill_name)
+                if output_file and result:
+                    await skill.write_output(job.account_name, output_file, result)
+                    log.info(f"[worker] wrote {output_file} for {job.account_name}")
 
                 # Track for cascade dedup
                 self._recent_runs[f"{job.account_name}::{job.skill_name}"] = time.time()

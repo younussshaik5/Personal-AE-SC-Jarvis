@@ -10,6 +10,37 @@ All skill names match SKILL_REGISTRY keys exactly.
 
 from typing import Dict, List
 
+# ── Skill name → output file written to the account folder ───────────────────
+# Used by both QueueWorker and handle_tool_call to persist every skill output.
+# Skills not listed here (deal_stage_tracker, scaffold_account) manage their
+# own file writes internally.
+
+SKILL_OUTPUT_FILES: Dict[str, str] = {
+    "proposal":               "proposal.md",
+    "battlecard":             "battlecard.md",
+    "demo_strategy":          "demo_strategy.md",
+    "risk_report":            "risk_report.md",
+    "value_architecture":     "value_architecture.md",
+    "discovery":              "discovery_questions.md",
+    "competitive_intelligence": "competitive_intelligence.md",
+    "meeting_prep":           "meeting_prep.md",
+    "meeting_summary":        "meeting_summary.md",
+    "conversation_summarizer": "conversation_summary.md",
+    "meddpicc":               "meddpicc.md",
+    "sow":                    "sow.md",
+    "followup_email":         "followup_email.md",
+    "account_summary":        "account_summary.md",
+    "technical_risk":         "technical_risk.md",
+    "competitor_pricing":     "competitor_pricing.md",
+    "architecture_diagram":   "architecture_diagram.md",
+    "documentation":          "documentation.md",
+    "html_generator":         "report.html",
+    "knowledge_builder":      "knowledge_builder.md",
+    "quick_insights":         "quick_insights.md",
+    "custom_template":        "custom_template.md",
+    "conversation_extractor": "conversation_extractor.md",
+}
+
 # ── File change → skills to queue ────────────────────────────────────────────
 # Priority 2 (HIGH) — direct source changed, run immediately.
 
