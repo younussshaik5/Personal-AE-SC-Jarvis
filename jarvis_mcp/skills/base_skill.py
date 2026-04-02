@@ -44,7 +44,7 @@ class BaseSkill:
 
         context = {}
 
-        # Read all .md files
+        # Read all .md files (including _evolution_log.md)
         for md_file in sorted(account_path.glob("*.md")):
             key = md_file.stem
             content = await read_file(md_file)
@@ -111,8 +111,18 @@ class BaseSkill:
         if disc:
             parts.append(f"=== DISCOVERY NOTES ===\n{disc[:5000]}")
 
+        # Evolution log — what skills ran recently and what they found
+        evo = context.get("_evolution_log", "")
+        if evo:
+            # Only include the last 30 lines — enough for context, not noisy
+            lines = [l for l in evo.splitlines() if l.strip() and not l.startswith("#")]
+            recent = "\n".join(lines[-30:])
+            if recent:
+                parts.append(f"=== RECENT EVOLUTION LOG ===\n{recent}")
+
         # Include any other skill outputs already generated
-        skip = {"deal_stage", "company_research", "discovery", "CLAUDE", "_deal"}
+        skip = {"deal_stage", "company_research", "discovery", "CLAUDE", "_deal",
+                "_evolution_log", "_skill_timeline"}
         for key, val in context.items():
             if key not in skip and isinstance(val, str) and val.strip():
                 parts.append(f"=== {key.upper().replace('_', ' ')} ===\n{val[:2000]}")

@@ -68,6 +68,62 @@ The more notes you add, the sharper it gets. That's the only rule.
 
 ---
 
+## Self-Evolving Intelligence
+
+JARVIS doesn't wait for you to ask. The moment you save notes, it starts updating itself.
+
+```
+You paste call notes into discovery.md (or tell Claude to update it)
+
+  File watcher detects the change (instant, via watchdog)
+    |
+    v
+  Queue fires — HIGH priority:
+    meddpicc, risk_report, battlecard, competitive_intelligence,
+    value_architecture, technical_risk, discovery gaps
+    |
+    v
+  meddpicc completes → cascades (MEDIUM priority):
+    risk_report, account_summary, knowledge_builder
+    |
+    v
+  risk_report completes → cascades:
+    meeting_prep, demo_strategy
+    |
+    v
+  value_architecture completes → cascades:
+    proposal
+    |
+    v
+  proposal completes → cascades:
+    sow
+
+  Every run writes to _evolution_log.md in the account folder.
+  Every subsequent skill reads that log as context.
+  Each generation knows what the previous one found.
+```
+
+**Result:** Within ~2-3 minutes of adding notes, every output file for that account is regenerated. MEDDPICC informs risk, risk informs meeting prep, value arch informs proposal — the whole chain, automatically.
+
+**Two files added to every account folder:**
+
+| File | What it is |
+|---|---|
+| `_skill_timeline.json` | When each skill last ran, what triggered it, success/error |
+| `_evolution_log.md` | Human-readable log — read by all skills as context |
+
+**Model routing per task type** — each skill runs on the right model:
+
+| Model type | Skills | Model chain (failover order) |
+|---|---|---|
+| `reasoning` | MEDDPICC, risk, competitive, value arch, technical risk | kimi-k2-thinking → step-3.5-flash → qwq-32b |
+| `writing` | Proposals, SOW, battlecards, demo strategy, docs | kimi-k2-instruct → qwq-32b → kimi-k2-thinking |
+| `fast` | Quick insights, meeting prep, summaries, follow-ups | kimi-k2-instruct → qwen2-7b → kimi-k2-thinking |
+
+If every key hits a rate limit on model 1, it cascades to model 2 automatically. No failures, no waiting.
+
+---
+
 ## Before You Start — What You Need
 
 You need 3 things. All free.
@@ -656,10 +712,14 @@ Make sure you're running it inside WSL (Ubuntu) or Git Bash, not the regular Win
 | What | What it actually is |
 |---|---|
 | Claude Desktop | The app you chat in. Loads JARVIS as a plugin. |
-| JARVIS | A Python program running quietly alongside Claude, exposing 24 tools |
-| Kimi K2 Thinking | The AI model doing the actual writing — it reasons through your deal before generating |
-| NVIDIA NIM | Where Kimi K2 runs. Free tier. OpenAI-compatible API. |
-| CRM Sidecar | A small web server that serves the pipeline dashboard at localhost:8000 |
+| JARVIS MCP Server | Python process exposing 27 tools via MCP protocol |
+| Multi-model router | Routes each task to the right model (reasoning/writing/fast) with cascade failover |
+| NVIDIA NIM | Hosted inference API — runs kimi-k2-thinking, kimi-k2-instruct, qwq-32b, qwen2-7b |
+| File Watcher | watchdog-based OS-level monitor — detects file changes instantly |
+| Skill Queue | Priority queue (HIGH → MEDIUM → LOW) with deduplication — no double-runs |
+| Queue Worker | Async background worker — runs queued skills, triggers cascades |
+| SelfLearner | Writes `_skill_timeline.json` + `_evolution_log.md` per account — read by all skills |
+| CRM Sidecar | Small web server at localhost:8000 — pipeline dashboard |
 
 ---
 

@@ -21,6 +21,8 @@ from .account_scaffolder import AccountScaffolder
 from .skill_context_enricher import SkillContextEnricher
 from .account_hierarchy import AccountHierarchy
 from .claude_md_loader import ClaudeMdLoader
+from .queue import SkillQueue, QueueWorker, FileWatcher, PRIORITY_HIGH
+from .learning import SelfLearner
 
 
 # Setup logging
@@ -43,7 +45,7 @@ class JarvisServer:
         self.account_scaffolder = AccountScaffolder()
         self.claude_loader = ClaudeMdLoader()
         self.enricher = SkillContextEnricher()  # Context enricher for skills
-        
+
         # Initialize skill instances
         self.skills = {}
         self._initialize_skills()
@@ -51,6 +53,12 @@ class JarvisServer:
         # Initialize orchestrator for current account
         self.orchestrator = None
         self._initialize_orchestrator()
+
+        # ── Queue bus + self-learning ────────────────────────────────────────
+        self.learner      = SelfLearner(self.config.accounts_root)
+        self.skill_queue  = SkillQueue()
+        self.queue_worker = QueueWorker(self.skill_queue, self.skills, learner=self.learner)
+        self.file_watcher = FileWatcher(self.skill_queue, self.config.accounts_root)
 
         # Agent background tasks
         self.agent_task = None
@@ -108,6 +116,11 @@ class JarvisServer:
 
     async def start_background_orchestration(self):
         """Start background orchestration with full autonomy and evolution."""
+        # Always start queue bus regardless of orchestrator
+        self.queue_worker.start()
+        self.file_watcher.start()
+        self.logger.info("⚡ Queue bus started — file watcher + cascade worker active")
+
         if not self.orchestrator:
             return
 
@@ -232,18 +245,24 @@ class JarvisServer:
             # Execute skill
             result = await skill.generate(account, **arguments)
 
-            # CRITICAL: Record this outcome for learning
+            if result and not result.strip().startswith("❌"):
+                # Record in evolution log + skill timeline
+                await self.learner.record(
+                    account_name=account,
+                    skill_name=skill_name,
+                    trigger="user",
+                    status="ok",
+                )
+                # Fire cascade — same downstream chain as if queue worker ran it
+                await self.queue_worker.trigger_cascade(account, skill_name)
+
+            # Legacy orchestrator outcome recording (no-op if orchestrator absent)
             if self.orchestrator:
                 await self.orchestrator.record_skill_outcome(
                     skill_name,
                     arguments.get("opportunity_id", "unknown"),
-                    {
-                        "status": "executed",
-                        "quality_score": 4.5,  # Would be from user feedback
-                        "impact": "high"
-                    }
+                    {"status": "executed", "quality_score": 4.5, "impact": "high"},
                 )
-                self.logger.debug(f"✓ Outcome recorded for {skill_name}")
 
             return {"result": result}
         except Exception as e:
