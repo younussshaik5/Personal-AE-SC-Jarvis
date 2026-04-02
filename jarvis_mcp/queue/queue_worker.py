@@ -151,14 +151,6 @@ class QueueWorker:
             log.warning(f"[worker] feedback failed ({skill_name}): {e}")
 
     async def _cascade(self, completed_job) -> None:
-        # Max cascade depth = 1: jobs already triggered by a cascade do not cascade further.
-        # This prevents: skill A → cascades B → cascades C → cascades D chains.
-        if completed_job.trigger.startswith("cascade:"):
-            log.debug(
-                f"[worker] cascade depth limit — {completed_job.skill_name} "
-                f"(triggered by {completed_job.trigger}) will not cascade further"
-            )
-            return
         await self.trigger_cascade(completed_job.account_name, completed_job.skill_name)
 
     async def trigger_cascade(self, account_name: str, skill_name: str) -> None:
