@@ -111,15 +111,12 @@ class QueueWorker:
                 if self.learner:
                     await self.learner.record(job.account_name, job.skill_name, job.trigger, status="ok")
 
-                # 2. Feedback loop — only for user-triggered runs.
-                # Auto-triggered (file/cascade) runs do NOT feed back to discovery.md
-                # to prevent the infinite loop: skill writes → discovery.md changes → skill triggers again.
-                if (
-                    self.extractor
-                    and self.merger
-                    and result
-                    and job.trigger == "user"
-                ):
+                # 2. Feedback loop — extract new intel from output, merge into discovery.md.
+                # Safe for all triggers because:
+                # - KnowledgeMerger.was_self_written() has 300s cooldown per account
+                # - FileWatcher cycle guard checks was_self_written() → suppresses re-trigger
+                # Net effect: skills enrich discovery.md once per run cycle, no infinite loop.
+                if self.extractor and self.merger and result:
                     asyncio.ensure_future(
                         self._feedback(job.account_name, job.skill_name, result)
                     )

@@ -45,15 +45,17 @@ SKILL_OUTPUT_FILES: Dict[str, str] = {
 # Priority 2 (HIGH) — direct source changed, run immediately.
 
 FILE_TRIGGERS: Dict[str, List[str]] = {
-    # IMPORTANT: Only include skills that do NOT write back to discovery.md.
-    # Skills in FEEDBACK_SKILLS (risk_report, value_architecture, competitive_intelligence,
-    # technical_risk, conversation_extractor) must NOT be here — they would create an
-    # infinite loop: discovery.md changes → skill runs → writes to discovery.md → repeat.
-    # Those skills run via user action or SKILL_CASCADES only.
+    # Safe to include feedback skills here because:
+    # - Feedback loop (skill output → discovery.md) is fire-and-forget async
+    # - KnowledgeMerger.was_self_written() has a 300s cooldown per account
+    # - FileWatcher cycle guard checks was_self_written() and suppresses re-triggers
+    # Result: one full batch of skills runs, enriches discovery.md once, stops.
     "discovery.md": [
-        "meddpicc",    # re-score dimensions — cascades to risk/value/summary
-        "battlecard",  # competitive refresh — does NOT write back to discovery
-        "discovery",   # refresh gap questions — does NOT write back to discovery
+        "meddpicc",                 # re-score all 8 MEDDPICC dimensions
+        "battlecard",               # competitive refresh
+        "competitive_intelligence", # deep competitive analysis
+        "technical_risk",           # technical blockers and integration risk
+        "discovery",                # refresh gap-based discovery questions
     ],
     "company_research.md": [
         "battlecard",
