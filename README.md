@@ -70,57 +70,76 @@ The more notes you add, the sharper it gets. That's the only rule.
 
 ## Self-Evolving Intelligence
 
-JARVIS doesn't wait for you to ask. The moment you save notes, it starts updating itself.
+JARVIS learns from everything — chat, files you drop in, and its own outputs. You don't have to trigger anything.
+
+### Any input feeds the knowledge base
 
 ```
-You paste call notes into discovery.md (or tell Claude to update it)
-
-  File watcher detects the change (instant, via watchdog)
-    |
-    v
-  Queue fires — HIGH priority:
-    meddpicc, risk_report, battlecard, competitive_intelligence,
-    value_architecture, technical_risk, discovery gaps
-    |
-    v
-  meddpicc completes → cascades (MEDIUM priority):
-    risk_report, account_summary, knowledge_builder
-    |
-    v
-  risk_report completes → cascades:
-    meeting_prep, demo_strategy
-    |
-    v
-  value_architecture completes → cascades:
-    proposal
-    |
-    v
-  proposal completes → cascades:
-    sow
-
-  Every run writes to _evolution_log.md in the account folder.
-  Every subsequent skill reads that log as context.
-  Each generation knows what the previous one found.
+Chat with Claude          → skill output → intel extracted → discovery.md updated
+Drop a .txt / .md file    → file watcher detects → intel extracted → discovery.md updated
+Drop a transcript         → same
+Ask for a SOW             → SOW output → new requirements extracted → merged back
+MEDDPICC runs             → output extracted → new signals merged → cascade re-fires
 ```
 
-**Result:** Within ~2-3 minutes of adding notes, every output file for that account is regenerated. MEDDPICC informs risk, risk informs meeting prep, value arch informs proposal — the whole chain, automatically.
+**The extraction engine** reads any text and pulls out only concrete, new facts:
+- Stakeholders (name, title, role)
+- Pain points and problems
+- Requirements and success criteria
+- Metrics, ROI, cost savings
+- Competitors and their status
+- Timelines and deadlines
+- Budget signals
+- Champion/sponsor signals
+- Technical requirements and blockers
 
-**Two files added to every account folder:**
+Everything gets appended to `discovery.md` with a timestamp and source — never overwritten, always traceable.
+
+### The cascade (what happens after any update)
+
+```
+discovery.md updated (by anything above)
+  |
+  ├─ HIGH priority queue fires immediately:
+  |    meddpicc, risk_report, battlecard, competitive_intelligence,
+  |    value_architecture, technical_risk, discovery gaps
+  |
+  ├─ meddpicc completes → cascades:
+  |    risk_report, account_summary, knowledge_builder
+  |    → each output also scanned for new intel → merged back → loop continues
+  |
+  ├─ risk_report completes → cascades:
+  |    meeting_prep, demo_strategy
+  |
+  ├─ value_architecture completes → cascades:
+  |    proposal
+  |
+  └─ proposal completes → cascades:
+       sow
+
+Loop stops when IntelligenceExtractor returns NO_NEW_INTEL.
+At that point, everything is consistent and up to date.
+```
+
+**Result:** Within 2-5 minutes of any input, all 14+ output files for the account are regenerated. Each knows what the previous found. The deal intelligence converges automatically.
+
+### What gets added to every account folder
 
 | File | What it is |
 |---|---|
 | `_skill_timeline.json` | When each skill last ran, what triggered it, success/error |
-| `_evolution_log.md` | Human-readable log — read by all skills as context |
+| `_evolution_log.md` | Append-only log — every entry timestamped and sourced, read by all skills |
 
-**Model routing per task type** — each skill runs on the right model:
+### Model routing — right model for each task
 
-| Model type | Skills | Model chain (failover order) |
+| Type | Skills | Chain (failover order) |
 |---|---|---|
 | `reasoning` | MEDDPICC, risk, competitive, value arch, technical risk | kimi-k2-thinking → step-3.5-flash → qwq-32b |
 | `writing` | Proposals, SOW, battlecards, demo strategy, docs | kimi-k2-instruct → qwq-32b → kimi-k2-thinking |
-| `fast` | Quick insights, meeting prep, summaries, follow-ups | kimi-k2-instruct → qwen2-7b → kimi-k2-thinking |
+| `fast` | Quick insights, meeting prep, summaries, follow-ups, extraction | kimi-k2-instruct → qwen2-7b → kimi-k2-thinking |
+| `default` | Everything else | kimi-k2-instruct → kimi-k2-thinking → qwq-32b |
 
-If every key hits a rate limit on model 1, it cascades to model 2 automatically. No failures, no waiting.
+If a key hits rate limits on model 1, it cascades to model 2 automatically. With 5 keys across 3 model options, failures are essentially impossible.
 
 ---
 
@@ -714,11 +733,13 @@ Make sure you're running it inside WSL (Ubuntu) or Git Bash, not the regular Win
 | Claude Desktop | The app you chat in. Loads JARVIS as a plugin. |
 | JARVIS MCP Server | Python process exposing 27 tools via MCP protocol |
 | Multi-model router | Routes each task to the right model (reasoning/writing/fast) with cascade failover |
-| NVIDIA NIM | Hosted inference API — runs kimi-k2-thinking, kimi-k2-instruct, qwq-32b, qwen2-7b |
-| File Watcher | watchdog-based OS-level monitor — detects file changes instantly |
-| Skill Queue | Priority queue (HIGH → MEDIUM → LOW) with deduplication — no double-runs |
-| Queue Worker | Async background worker — runs queued skills, triggers cascades |
-| SelfLearner | Writes `_skill_timeline.json` + `_evolution_log.md` per account — read by all skills |
+| NVIDIA NIM | Hosted inference API — kimi-k2-thinking, kimi-k2-instruct, qwq-32b, qwen2-7b, step-3.5-flash |
+| File Watcher | watchdog OS-level monitor — detects source file changes + any new file dropped in |
+| Skill Queue | Priority queue (HIGH → MEDIUM → LOW) with deduplication |
+| Queue Worker | Async background worker — runs skills, triggers feedback loop + cascade |
+| IntelligenceExtractor | LLM-powered — extracts structured deal intel from any text (files, outputs, chat) |
+| KnowledgeMerger | Appends extracted intel to discovery.md — append-only, timestamped, never overwrites |
+| SelfLearner | `_skill_timeline.json` + `_evolution_log.md` per account — read by all skills as context |
 | CRM Sidecar | Small web server at localhost:8000 — pipeline dashboard |
 
 ---
