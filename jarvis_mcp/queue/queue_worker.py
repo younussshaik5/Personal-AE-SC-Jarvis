@@ -85,10 +85,14 @@ class QueueWorker:
             return
 
         t0 = time.time()
+        SKILL_TIMEOUT = 600  # 10 min — LLM calls are slow but shouldn't hang forever
         log.info(f"[worker] ▶ {job.skill_name} | {job.account_name} | trigger={job.trigger}")
 
         try:
-            result = await skill.generate(job.account_name)
+            result = await asyncio.wait_for(
+                skill.generate(job.account_name),
+                timeout=SKILL_TIMEOUT,
+            )
             elapsed = round(time.time() - t0, 1)
 
             if result and result.strip().startswith("❌"):
@@ -118,11 +122,15 @@ class QueueWorker:
                 # Net effect: skills enrich discovery.md once per run cycle, no infinite loop.
                 if self.extractor and self.merger and result:
                     asyncio.ensure_future(
-                        self._feedback(job.account_name, job.skill_name, result)
+                        self._feedback_safe(job.account_name, job.skill_name, result)
                     )
 
                 # 3. Cascade downstream skills (max depth = 1)
                 await self._cascade(job)
+
+        except asyncio.TimeoutError:
+            elapsed = round(time.time() - t0, 1)
+            log.error(f"[worker] ✗ TIMEOUT {job.skill_name} | {job.account_name} | {elapsed}s — killed")
 
         except Exception as e:
             elapsed = round(time.time() - t0, 1)
@@ -130,6 +138,13 @@ class QueueWorker:
 
         finally:
             await self.queue.done(job)
+
+    async def _feedback_safe(self, account_name: str, skill_name: str, output: str) -> None:
+        """Wrapper so fire-and-forget feedback failures are always logged, never silent."""
+        try:
+            await self._feedback(account_name, skill_name, output)
+        except Exception as e:
+            log.error(f"[worker] feedback loop crashed ({skill_name}): {e}", exc_info=True)
 
     async def _feedback(self, account_name: str, skill_name: str, output: str) -> None:
         """

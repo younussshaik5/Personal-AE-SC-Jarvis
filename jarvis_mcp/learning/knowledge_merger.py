@@ -20,6 +20,7 @@ Also updates deal_stage.json if hard deal facts are found
 import json
 import asyncio
 import logging
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, Dict, Any
@@ -75,7 +76,7 @@ class KnowledgeMerger:
     def was_self_written(self, account_name: str) -> bool:
         """Returns True if we wrote to this account's discovery.md within the cooldown window."""
         last = self._self_writes.get(account_name, 0)
-        return (asyncio.get_event_loop().time() - last) < self.SELF_WRITE_COOLDOWN
+        return (time.monotonic() - last) < self.SELF_WRITE_COOLDOWN
 
     def _lock_for(self, account_name: str) -> asyncio.Lock:
         if account_name not in self._locks:
@@ -117,10 +118,10 @@ class KnowledgeMerger:
             return False
 
         async with self._lock_for(account_name):
-            return await self._append_to_discovery(path, intel, source)
+            return await self._append_to_discovery(path, intel, source, account_name)
 
     async def _append_to_discovery(
-        self, path: Path, intel: str, source: str
+        self, path: Path, intel: str, source: str, account_name: str
     ) -> bool:
         discovery_path = path / "discovery.md"
         now = datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -149,14 +150,15 @@ class KnowledgeMerger:
             with open(discovery_path, "a") as f:
                 f.write(section)
 
-            # Record self-write to suppress cycle in FileWatcher
-            self._self_writes[path.name] = asyncio.get_event_loop().time()
+            # Record self-write AFTER successful write — keyed by account_name
+            # so was_self_written() lookup matches correctly
+            self._self_writes[account_name] = time.monotonic()
 
-            log.info(f"[merger] Appended intel to {path.name}/discovery.md (from {source})")
+            log.info(f"[merger] Appended intel to {account_name}/discovery.md (from {source})")
             return True
 
         except Exception as e:
-            log.error(f"[merger] Write failed for {path.name}: {e}")
+            log.error(f"[merger] Write failed for {account_name}: {e}")
             return False
 
     async def merge_from_skill_output(

@@ -35,8 +35,10 @@ class SkillQueue:
     Deduplicates: if (account, skill) is already queued, the new job is dropped.
     """
 
+    MAX_SIZE = 500  # hard cap — prevents runaway cascade from filling memory
+
     def __init__(self):
-        self._queue: asyncio.PriorityQueue = asyncio.PriorityQueue()
+        self._queue: asyncio.PriorityQueue = asyncio.PriorityQueue(maxsize=self.MAX_SIZE)
         self._pending: Set[Tuple[str, str]] = set()   # (account_name, skill_name)
         self._lock = asyncio.Lock()
 
@@ -54,6 +56,9 @@ class SkillQueue:
         async with self._lock:
             if key in self._pending:
                 log.debug(f"[queue] skip duplicate: {skill_name} for {account_name}")
+                return False
+            if self._queue.qsize() >= self.MAX_SIZE:
+                log.error(f"[queue] FULL ({self.MAX_SIZE}) — dropping {skill_name} for {account_name}")
                 return False
             self._pending.add(key)
 

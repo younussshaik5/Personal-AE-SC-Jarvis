@@ -9,7 +9,7 @@ async def read_file(path: Path) -> str:
     try:
         loop = asyncio.get_event_loop()
         # run_in_executor only accepts positional args — use a lambda to pass encoding
-        return await loop.run_in_executor(None, lambda: path.read_text(encoding='utf-8'))
+        return await loop.run_in_executor(None, lambda: path.read_text(encoding='utf-8', errors='replace'))
     except Exception as e:
         print(f"Error reading {path}: {e}")
         return ""

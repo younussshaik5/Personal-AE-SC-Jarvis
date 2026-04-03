@@ -164,7 +164,12 @@ class LLMManager:
             log.debug(f"Streaming failed ({model_cfg['model']}): {e} — retrying without stream")
             params["stream"] = False
             completion = client.chat.completions.create(**params)
-            return completion.choices[0].message.content
+            if not completion.choices:
+                raise ValueError(f"LLM returned empty choices for {model_cfg['model']}")
+            content = completion.choices[0].message.content
+            if not content:
+                raise ValueError(f"LLM returned None content for {model_cfg['model']}")
+            return content
 
     # ── Main generate ─────────────────────────────────────────────────────────
 

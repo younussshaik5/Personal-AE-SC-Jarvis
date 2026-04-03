@@ -67,15 +67,17 @@ class FileWatcher:
         self.merger = merger
 
         self._last_trigger: Dict[str, float] = {}
-        self._seen_files: Set[str] = set()       # tracks already-ingested files
+        self._seen_files: Set[str] = set()         # tracks already-ingested files
         self._trigger_history: Dict[str, list] = {}  # loop detection per (account::file)
+        self._ingest_cooldown: Dict[str, float] = {}  # path → last ingest time
         self._running = False
         self._observer = None
         self._task: asyncio.Task = None
         self._loop: asyncio.AbstractEventLoop = None
 
-        self.LOOP_WINDOW = 300     # seconds — rolling window for loop detection
-        self.LOOP_MAX_TRIGGERS = 3  # max allowed triggers per account/file in window
+        self.LOOP_WINDOW = 300       # seconds — rolling window for loop detection
+        self.LOOP_MAX_TRIGGERS = 3   # max allowed triggers per account/file in window
+        self.INGEST_COOLDOWN = 300   # seconds — don't re-ingest same file within 5 min
 
     def start(self) -> None:
         if self._running:
@@ -100,7 +102,7 @@ class FileWatcher:
         self._running = False
         if self._observer:
             self._observer.stop()
-            self._observer.join()
+            self._observer.join(timeout=5)  # don't hang forever waiting for watchdog thread
         if self._task:
             self._task.cancel()
 
@@ -161,6 +163,9 @@ class FileWatcher:
 
     def _on_file_event(self, path: Path, is_new: bool) -> None:
         """Called by watchdog thread — bridge to asyncio loop."""
+        if not self._loop or self._loop.is_closed():
+            log.error(f"[watcher] Event loop dead — dropping event for {path.name}")
+            return
         key = f"{path.parent.name}::{path.name}"
         now = time.time()
         if now - self._last_trigger.get(key, 0) < DEBOUNCE:
@@ -245,12 +250,18 @@ class FileWatcher:
         if (
             path.suffix in INGESTIBLE_EXTENSIONS
             and filename not in JARVIS_OUTPUT_FILES
-            and str(path) not in self._seen_files
             and self.extractor
             and self.merger
         ):
-            self._seen_files.add(str(path))
-            log.info(f"[watcher] New file detected: {account_name}/{filename} — ingesting")
+            # Ingest cooldown: don't re-process the same file within 5 minutes
+            path_key = str(path)
+            last_ingest = self._ingest_cooldown.get(path_key, 0)
+            if time.time() - last_ingest < self.INGEST_COOLDOWN:
+                log.debug(f"[watcher] {filename} recently ingested — skipping")
+                return
+            self._ingest_cooldown[path_key] = time.time()
+            self._seen_files.add(path_key)
+            log.info(f"[watcher] New/modified file: {account_name}/{filename} — ingesting")
             asyncio.ensure_future(self._ingest_file(account_name, path))
 
     async def _ingest_file(self, account_name: str, path: Path) -> None:

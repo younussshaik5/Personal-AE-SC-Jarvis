@@ -152,13 +152,23 @@ class BaseSkill:
         if content and content.strip().startswith("❌"):
             self.logger.error(f"Skipping write of {filename} — LLM returned error: {content[:100]}")
             return False
-        account_path = self.config.get_account_path(account_name)
-        account_path.mkdir(parents=True, exist_ok=True)
+        try:
+            account_path = self.config.get_account_path(account_name)
+            account_path.mkdir(parents=True, exist_ok=True)
+        except OSError as e:
+            self.logger.error(f"Cannot create account path for {account_name}: {e}")
+            return False
         output_path = account_path / filename
-        success = await write_file(output_path, content)
-        if success:
-            self.logger.info(f"Wrote {filename} for {account_name}")
-        return success
+        try:
+            success = await write_file(output_path, content)
+            if success:
+                self.logger.info(f"Wrote {filename} for {account_name}")
+            else:
+                self.logger.error(f"write_file returned False for {filename} ({account_name})")
+            return success
+        except Exception as e:
+            self.logger.error(f"Unexpected error writing {filename} for {account_name}: {e}")
+            return False
 
     async def parallel_sections(self, sections: List[Dict[str, Any]]) -> str:
         """

@@ -26,9 +26,15 @@ class ConfigManager:
             )
         ).expanduser()
 
-        # Create directories if they don't exist
-        self.accounts_root.mkdir(parents=True, exist_ok=True)
-        self.memory_root.mkdir(parents=True, exist_ok=True)
+        # Create directories if they don't exist — fail fast with clear error if impossible
+        try:
+            self.accounts_root.mkdir(parents=True, exist_ok=True)
+            self.memory_root.mkdir(parents=True, exist_ok=True)
+        except OSError as e:
+            raise RuntimeError(
+                f"JARVIS cannot create required directories: {e}. "
+                f"Check permissions on {self.accounts_root.parent}"
+            ) from e
 
         # API Keys from environment
         self.nvidia_api_key = os.getenv("NVIDIA_API_KEY", "")

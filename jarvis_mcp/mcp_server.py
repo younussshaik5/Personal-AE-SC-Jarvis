@@ -329,15 +329,19 @@ class JarvisServer:
             self.logger.warning("⚠️  Multi-agent orchestrator not initialized")
 
     async def shutdown(self):
-        """Graceful shutdown"""
+        """Graceful shutdown — stops all background services within 10s."""
         self.logger.info("🛑 Shutting down JARVIS MCP Server...")
         self.orchestration_running = False
 
-        if self.agent_task:
+        # Stop queue bus first so no new jobs are started
+        self.queue_worker.stop()
+        self.file_watcher.stop()
+
+        if self.agent_task and not self.agent_task.done():
             self.agent_task.cancel()
             try:
-                await self.agent_task
-            except asyncio.CancelledError:
+                await asyncio.wait_for(self.agent_task, timeout=10.0)
+            except (asyncio.CancelledError, asyncio.TimeoutError):
                 pass
 
         self.logger.info("✅ Shutdown complete")
