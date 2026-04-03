@@ -135,12 +135,14 @@ At that point, everything is consistent and up to date.
 
 | Type | Skills | Chain (failover order) |
 |---|---|---|
-| `reasoning` | MEDDPICC, risk, competitive, value arch, technical risk | kimi-k2-thinking → step-3.5-flash → qwq-32b |
+| `reasoning` | MEDDPICC, risk, competitive, value arch, technical risk | **Nemotron-120B (1M ctx)** → kimi-k2-thinking → step-3.5-flash → qwq-32b |
 | `writing` | Proposals, SOW, battlecards, demo strategy, docs | kimi-k2-instruct → qwq-32b → kimi-k2-thinking |
 | `fast` | Quick insights, meeting prep, summaries, follow-ups, extraction | kimi-k2-instruct → qwen2-7b → kimi-k2-thinking |
 | `default` | Everything else | kimi-k2-instruct → kimi-k2-thinking → qwq-32b |
 
-If a key hits rate limits on model 1, it cascades to model 2 automatically. With 5 keys across 3 model options, failures are essentially impossible.
+**Nemotron-120B** (`nvidia/nemotron-3-super-120b-a12b`) is the primary reasoning model. It has a 1M token context window — all account files (discovery notes, MEDDPICC, battlecard, risk report, company research) are fed in full with no truncation. Every reasoning skill now has the complete deal picture, not just fragments. Falls back to kimi-k2-thinking automatically if unavailable.
+
+If a key hits rate limits on model 1, it cascades to model 2 automatically. With 6 keys across 4 model options, failures are essentially impossible.
 
 ---
 
@@ -356,7 +358,7 @@ Create it with: `"Create account TataTeleservices with parent Tata"`
 
 ---
 
-## The 24 Skills
+## The 25 Skills
 
 ### Start here (try these first)
 
@@ -442,6 +444,15 @@ Create it with: `"Create account TataTeleservices with parent Tata"`
 
 </details>
 
+<details>
+<summary>Research</summary>
+
+| Skill | What it generates |
+|---|---|
+| `company_research` | Structured company profile — overview, business model, pain points, tech stack, competitive landscape, budget & timeline, key contacts, strategic initiatives — auto-generated from all account intel |
+
+</details>
+
 ---
 
 ## MEDDPICC — What JARVIS Is Scoring
@@ -478,7 +489,17 @@ Deals
   TechCo      | Negotiate  | $240k | GREEN risk
 ```
 
-Click any account for the full intelligence report, MEDDPICC scorecard, and a button to generate all missing skills at once.
+Click any account for the **VP-level executive report**:
+
+- **Deal Health Score** — composite (MEDDPICC + Discovery + Risk + Win Prob) shown as Healthy / At Risk / Critical
+- **Stakeholder Map** — every contact as a card: Champion (starred), Economic Buyer, Blocker, or Stakeholder — detected automatically from deal notes
+- **MEDDPICC full breakdown** — each dimension scored GREEN / AMBER / RED with evidence
+- **Value Case & ROI** — full value architecture in context
+- **Competitive Intelligence** — competitive position, battlecard, and pricing analysis in one view
+- **Deal Health gauges** — 4 bars: MEDDPICC %, Discovery %, Risk Score, Win Probability
+- **Export to PDF** — clean print CSS, VP-shareable without CRM access
+
+The report shows everything a VP needs for a deal review in one scroll — no toggling between tabs or tools.
 
 ---
 
@@ -734,7 +755,7 @@ Make sure you're running it inside WSL (Ubuntu) or Git Bash, not the regular Win
 | Claude Desktop | The app you chat in. Loads JARVIS as a plugin. |
 | JARVIS MCP Server | Python process exposing 27 tools via MCP protocol |
 | Multi-model router | Routes each task to the right model (reasoning/writing/fast) with cascade failover |
-| NVIDIA NIM | Hosted inference API — kimi-k2-thinking, kimi-k2-instruct, qwq-32b, qwen2-7b, step-3.5-flash |
+| NVIDIA NIM | Hosted inference API — **nemotron-3-super-120b** (1M ctx, primary reasoning), kimi-k2-thinking, kimi-k2-instruct, qwq-32b, qwen2-7b, step-3.5-flash |
 | File Watcher | watchdog OS-level monitor — detects source file changes + any new file dropped in |
 | Skill Queue | Priority queue (HIGH → MEDIUM → LOW) with deduplication |
 | Queue Worker | Async background worker — runs skills, triggers feedback loop + cascade |

@@ -36,6 +36,16 @@ _TIMEOUT  = 120
 
 MODEL_ROUTING: Dict[str, List[Dict]] = {
     "reasoning": [
+        # 1M context — primary for all deep analysis; has_thinking uses reasoning_budget
+        {
+            "model": "nvidia/nemotron-3-super-120b-a12b",
+            "temperature": 0.6, "top_p": 0.9, "has_thinking": True,
+            "timeout": 300,
+            "extra_body": {
+                "chat_template_kwargs": {"enable_thinking": True},
+                "reasoning_budget": 16384,
+            },
+        },
         # Best for: MEDDPICC scoring, risk reports, competitive analysis, value architecture
         {"model": "moonshotai/kimi-k2-thinking", "temperature": 1,   "top_p": 0.9, "has_thinking": True},
         {"model": "stepfun-ai/step-3.5-flash",   "temperature": 1,   "top_p": 0.9, "has_thinking": True},
@@ -149,6 +159,10 @@ class LLMManager:
             "stream":      True,
         }
 
+        # Pass extra_body if model requires it (e.g. Nemotron reasoning_budget)
+        if model_cfg.get("extra_body"):
+            params["extra_body"] = model_cfg["extra_body"]
+
         result = []
         try:
             for chunk in client.chat.completions.create(**params):
@@ -227,12 +241,15 @@ class LLMManager:
                     log.info(f"LLM → [{key_id}] [{model_name}] | type={model_type} | {max_tokens}tok")
                     t0 = time.time()
 
+                    # Per-model timeout: respect model_cfg["timeout"] or global _TIMEOUT
+                    call_timeout = model_cfg.get("timeout", _TIMEOUT)
+
                     try:
                         result = await asyncio.wait_for(
                             loop.run_in_executor(
                                 None, self._llm_call, api_key, model_cfg, messages, max_tokens
                             ),
-                            timeout=_TIMEOUT,
+                            timeout=call_timeout,
                         )
                         elapsed = round(time.time() - t0, 1)
                         log.info(f"✅ [{key_id}] [{model_name}] responded in {elapsed}s")
@@ -268,6 +285,12 @@ class LLMManager:
                             log.error(f"❌ [{key_id}] [{model_name}] API error: {msg[:80]}")
                             model_errors.append(f"{key_id}: {msg[:60]}")
                             has_only_rate_limits = False
+
+                    except Exception as e:
+                        # Catches ValueError("LLM returned None content") and any other unexpected errors
+                        log.warning(f"⚠️ [{key_id}] [{model_name}] unexpected error: {str(e)[:100]} — cascading")
+                        model_errors.append(f"{key_id}: {str(e)[:60]}")
+                        has_only_rate_limits = False
 
                 summary = " | ".join(model_errors)
                 log.warning(f"All keys failed for [{model_name}]: {summary} — cascading to next model")

@@ -17,11 +17,11 @@
         }
         *{margin:0;padding:0;box-sizing:border-box}
         body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--t1);min-height:100vh;-webkit-font-smoothing:antialiased}
-        .shell{max-width:1100px;margin:0 auto;padding:20px 24px}
+        .shell{max-width:1200px;margin:0 auto;padding:20px 24px}
 
         .topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 0 20px;border-bottom:1px solid var(--bdr);margin-bottom:24px}
         .topbar h1{font-size:20px;font-weight:700} .topbar h1 span{color:var(--accent2)}
-        .topbar-r{font-size:12px;color:var(--t2)}
+        .topbar-r{font-size:12px;color:var(--t2);display:flex;align-items:center;gap:10px}
 
         .kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:24px}
         .kpi{background:var(--s1);border:1px solid var(--bdr);border-radius:var(--rad);padding:18px 16px}
@@ -61,53 +61,78 @@
         .back{display:inline-flex;align-items:center;gap:5px;color:var(--t2);font-size:12px;cursor:pointer;margin-bottom:16px;padding:7px 12px;border-radius:8px;transition:all .12s;border:none;background:none}
         .back:hover{background:var(--s1);color:var(--t1)}
 
-        .hero{background:var(--s1);border:1px solid var(--bdr);border-radius:var(--rad);padding:28px;margin-bottom:28px}
-        .hero-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px}
-        .hero h2{font-size:28px;font-weight:700;margin-bottom:2px}
-        .hero .par{font-size:11px;color:var(--t2)}
-        .hero-kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:16px}
-        .hk{text-align:center}.hk .hl{font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:var(--t2);margin-bottom:3px}.hk .hv{font-size:22px;font-weight:700}
-        .btn-exp{padding:10px 22px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;transition:all .2s}
-        .btn-exp:hover{background:var(--accent2);transform:translateY(-1px)}
+        /* ── VP Executive Hero ───────────────────────────────── */
+        .vp-hero{background:linear-gradient(135deg,rgba(108,92,231,.08) 0%,var(--s1) 100%);border:1px solid var(--bdr);border-radius:var(--rad);padding:28px;margin-bottom:20px}
+        .vp-hero-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:22px;gap:16px}
+        .vp-hero-title h2{font-size:30px;font-weight:800;margin-bottom:4px;letter-spacing:-.3px}
+        .vp-hero-title .sub{font-size:12px;color:var(--t2)}
+        .vp-hero-actions{display:flex;gap:8px;flex-shrink:0}
+        .btn-primary{padding:9px 20px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;transition:all .2s}
+        .btn-primary:hover{background:var(--accent2);transform:translateY(-1px)}
+        .btn-sec{padding:9px 16px;background:var(--s2);color:var(--t1);border:1px solid var(--bdr);border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;transition:all .2s}
+        .btn-sec:hover{border-color:var(--accent2);color:var(--accent2)}
 
-        .section{margin-bottom:28px}
-        .section-label{font-size:11px;text-transform:uppercase;letter-spacing:1.2px;color:var(--t3);margin-bottom:12px;padding-left:2px;font-weight:600}
+        .vp-kpis{display:grid;grid-template-columns:repeat(7,1fr);gap:12px}
+        .vk{background:var(--s2);border-radius:10px;padding:14px;text-align:center}
+        .vk .vkl{font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:var(--t2);margin-bottom:5px}
+        .vk .vkv{font-size:22px;font-weight:700}
+        .vk .vks{font-size:10px;color:var(--t3);margin-top:2px}
+
+        /* Deal health pill */
+        .health-pill{display:inline-flex;align-items:center;gap:8px;padding:6px 16px;border-radius:24px;font-size:13px;font-weight:700;margin-left:12px}
+        .health-pill.green{background:var(--gbg);color:var(--g);border:1px solid rgba(0,184,148,.25)}
+        .health-pill.yellow{background:var(--ybg);color:var(--y);border:1px solid rgba(253,203,110,.25)}
+        .health-pill.red{background:var(--rbg);color:var(--r);border:1px solid rgba(255,107,107,.25)}
+        .health-dot{width:8px;height:8px;border-radius:50%}
+        .health-dot.green{background:var(--g)}.health-dot.yellow{background:var(--y)}.health-dot.red{background:var(--r)}
+
+        /* ── Section layout ──────────────────────────────────── */
+        .section{margin-bottom:24px}
+        .section-label{font-size:10px;text-transform:uppercase;letter-spacing:1.4px;color:var(--t3);margin-bottom:10px;padding-left:2px;font-weight:700}
         .sec{background:var(--s1);border:1px solid var(--bdr);border-radius:var(--rad);overflow:hidden}
-        .sec-h{padding:16px 20px;border-bottom:1px solid var(--bdr);font-size:13px;font-weight:600;display:flex;justify-content:space-between;align-items:center}
-        .sec-b{padding:20px;font-size:13px;line-height:1.7}
+        .sec-h{padding:14px 20px;border-bottom:1px solid var(--bdr);font-size:13px;font-weight:600;display:flex;justify-content:space-between;align-items:center}
+        .sec-b{padding:18px 20px;font-size:13px;line-height:1.7}
 
         .cols{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+        .cols3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
 
-        .mg{display:grid;grid-template-columns:1fr 1fr;gap:7px}
-        .mi{display:flex;align-items:center;gap:9px;padding:9px 11px;background:var(--s2);border-radius:8px}
-        .mi .ml{font-size:11px;color:var(--t2);min-width:118px}
-        .mi .mbar{flex:1;height:8px;background:rgba(255,255,255,.05);border-radius:4px;overflow:hidden}
+        /* ── MEDDPICC grid ───────────────────────────────────── */
+        .mg{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+        .mi{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--s2);border-radius:8px}
+        .mi .ml{font-size:11px;color:var(--t2);min-width:128px}
+        .mi .mbar{flex:1;height:9px;background:rgba(255,255,255,.05);border-radius:4px;overflow:hidden}
         .mi .mfl{height:100%;border-radius:4px;transition:width .4s}
-        .mi .ms{font-size:11px;font-weight:600;min-width:30px;text-align:right}
+        .mi .ms{font-size:11px;font-weight:700;min-width:30px;text-align:right}
+        .mi .mrank{font-size:9px;font-weight:700;text-transform:uppercase;min-width:40px;text-align:right;letter-spacing:.3px}
 
+        /* ── Risk items ──────────────────────────────────────── */
         .ri{display:flex;gap:10px;padding:10px 12px;border-radius:8px;margin-bottom:6px;font-size:12px;align-items:flex-start}
         .ri.high{background:var(--rbg)}.ri.medium{background:var(--ybg)}.ri.low{background:var(--gbg)}
         .rb{font-size:9px;font-weight:700;text-transform:uppercase;padding:2px 8px;border-radius:4px;white-space:nowrap}
         .rb.high{background:var(--r);color:#fff}.rb.medium{background:var(--y);color:#111}.rb.low{background:var(--g);color:#fff}
 
-        .si{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--bdr)}
-        .si:last-child{border-bottom:none}
-        .sav{width:36px;height:36px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;flex-shrink:0}
-        .sn{font-weight:600;font-size:13px}.sr{font-size:11px;color:var(--t2)}
+        /* ── Stakeholder cards ───────────────────────────────── */
+        .smap{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px}
+        .scard{background:var(--s2);border:1px solid var(--bdr);border-radius:10px;padding:14px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:5px;position:relative}
+        .scard.champion{border-color:rgba(0,184,148,.4)}
+        .scard.blocker{border-color:rgba(255,107,107,.3)}
+        .scard.economic{border-color:rgba(253,203,110,.4)}
+        .sav{width:40px;height:40px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0}
+        .sav.champion{background:var(--g)}.sav.blocker{background:var(--r)}.sav.economic{background:var(--y);color:#111}
+        .sn{font-weight:600;font-size:12px;line-height:1.3}
+        .sr{font-size:10px;color:var(--t2)}
+        .srole{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;padding:2px 8px;border-radius:10px;margin-top:2px}
+        .srole.champion{background:var(--gbg);color:var(--g)}.srole.blocker{background:var(--rbg);color:var(--r)}.srole.economic{background:var(--ybg);color:var(--y)}.srole.default{background:rgba(108,92,231,.15);color:var(--accent2)}
+        .champ-star{position:absolute;top:6px;right:8px;font-size:14px}
 
-        .dp{display:flex;gap:5px;margin-bottom:10px}
-        .ds{flex:1;height:8px;border-radius:4px;background:var(--s2)}.ds.ok{background:var(--g)}
-
-        .ai{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--bdr);font-size:13px}
+        /* ── Activity / action items ─────────────────────────── */
+        .ai{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--bdr);font-size:12px}
         .ai:last-child{border-bottom:none}
-        .anum{min-width:24px;height:24px;background:var(--accent);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0}
+        .anum{min-width:22px;height:22px;background:var(--accent);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0}
+        .anum.red{background:var(--r)}.anum.yellow{background:var(--y);color:#111}.anum.green{background:var(--g)}
 
-        .cg{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-        .ci{padding:12px;background:var(--s2);border-radius:8px}
-        .ci .cl{font-size:9px;text-transform:uppercase;color:var(--t2);letter-spacing:.5px;margin-bottom:3px}
-        .ci .cv{font-size:14px;font-weight:600}
-
-        .prog{display:flex;margin:8px 0}
+        /* ── Progress stages ─────────────────────────────────── */
+        .prog{display:flex;margin:10px 0 4px}
         .ps{flex:1;text-align:center;position:relative;padding:8px 2px}
         .pd{width:14px;height:14px;border-radius:50%;margin:0 auto 5px;border:2px solid var(--bdr)}
         .pd.completed{background:var(--g);border-color:var(--g)}.pd.current{background:var(--accent);border-color:var(--accent);box-shadow:0 0 0 4px rgba(108,92,231,.2)}.pd.pending{background:transparent}
@@ -115,6 +140,35 @@
         .pline{position:absolute;top:14px;left:50%;right:-50%;height:2px;background:var(--bdr);z-index:0}
         .ps:last-child .pline{display:none}.ps.completed .pline{background:var(--g)}
 
+        /* ── Metrics grid (2×2 or 2×3) ─────────────────────── */
+        .cg{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+        .cg3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+        .ci{padding:12px;background:var(--s2);border-radius:8px}
+        .ci .cl{font-size:9px;text-transform:uppercase;color:var(--t2);letter-spacing:.5px;margin-bottom:3px}
+        .ci .cv{font-size:14px;font-weight:700}
+
+        /* ── Discovery bar ───────────────────────────────────── */
+        .dp{display:flex;gap:5px;margin-bottom:8px}
+        .ds{flex:1;height:8px;border-radius:4px;background:var(--s2)}.ds.ok{background:var(--g)}
+
+        /* ── Health gauge strip ──────────────────────────────── */
+        .hstrip{display:flex;gap:14px;margin-top:16px}
+        .hg{flex:1;background:var(--s2);border-radius:8px;padding:12px 14px}
+        .hg .hgl{font-size:9px;text-transform:uppercase;color:var(--t2);letter-spacing:.5px;margin-bottom:6px}
+        .hg .hgbar{height:8px;background:rgba(255,255,255,.05);border-radius:4px;overflow:hidden;margin-bottom:4px}
+        .hg .hgf{height:100%;border-radius:4px;transition:width .4s}
+        .hg .hgv{font-size:13px;font-weight:700}
+
+        /* ── Competitive position ────────────────────────────── */
+        .comp-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
+
+        /* ── Value / ROI ─────────────────────────────────────── */
+        .value-strip{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
+        .vs-item{background:var(--s2);border-radius:8px;padding:14px}
+        .vs-item .vsl{font-size:9px;text-transform:uppercase;color:var(--t2);letter-spacing:.5px;margin-bottom:3px}
+        .vs-item .vsv{font-size:15px;font-weight:700}
+
+        /* ── Skill outputs ───────────────────────────────────── */
         .skill-md{white-space:pre-wrap;font-size:12px;line-height:1.85;color:var(--t2)}
         .md-body{white-space:normal}
         .md-body h1,.md-body h2,.md-body h3,.md-body h4{color:var(--t1);font-weight:600;margin:12px 0 6px}
@@ -124,54 +178,64 @@
         .md-body li{margin:2px 0}
         .md-body strong{color:var(--t1);font-weight:600}
         .md-body em{color:var(--accent2);font-style:italic}
-        .md-body code{background:var(--s1);color:var(--accent1);padding:1px 5px;border-radius:4px;font-family:monospace;font-size:11px}
+        .md-body code{background:var(--s1);color:var(--accent2);padding:1px 5px;border-radius:4px;font-family:monospace;font-size:11px}
         .md-body pre{background:var(--s1);border:1px solid var(--bdr);border-radius:6px;padding:10px;overflow-x:auto;margin:8px 0}
         .md-body pre code{background:none;padding:0;color:var(--t1)}
         .md-body table{width:100%;border-collapse:collapse;margin:8px 0;font-size:11px}
         .md-body th{background:var(--s1);color:var(--t1);font-weight:600;padding:6px 10px;text-align:left;border:1px solid var(--bdr)}
         .md-body td{padding:5px 10px;border:1px solid var(--bdr);color:var(--t2);vertical-align:top}
         .md-body tr:nth-child(even) td{background:rgba(255,255,255,.02)}
-        .md-body blockquote{border-left:3px solid var(--accent1);margin:6px 0;padding:4px 12px;color:var(--t3);font-style:italic}
+        .md-body blockquote{border-left:3px solid var(--accent);margin:6px 0;padding:4px 12px;color:var(--t3);font-style:italic}
         .md-body hr{border:none;border-top:1px solid var(--bdr);margin:10px 0}
-        .skill-empty{text-align:center;padding:24px 12px}
+        .skill-empty{text-align:center;padding:20px 12px}
         .skill-empty .se-title{font-size:13px;font-weight:600;color:var(--t1);margin-bottom:4px}
         .skill-empty .se-desc{font-size:11px;color:var(--t2);margin-bottom:10px}
         .se-cmd{font-family:'SF Mono',Consolas,monospace;font-size:11px;padding:8px 14px;background:var(--s2);border-radius:8px;color:var(--accent2);display:inline-block;cursor:pointer;border:1px solid var(--bdr);transition:all .15s}
         .se-cmd:hover{border-color:var(--accent);background:rgba(108,92,231,.1)}
         .jarvis-tag{font-size:9px;font-weight:600;color:var(--g);text-transform:uppercase;letter-spacing:.5px}
 
-        .divider{border:none;border-top:1px solid var(--bdr);margin:36px 0 28px}
+        .divider{border:none;border-top:1px solid var(--bdr);margin:28px 0 20px}
         .loading{text-align:center;padding:60px;color:var(--t2);font-size:15px}
         .empty{color:var(--t2);font-size:11px;font-style:italic}
 
-        @media print{
-            body{background:#fff!important;color:#111!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-            .topbar,.back,.btn-exp,.dash,.funnel,.skill-empty,.se-cmd{display:none!important}
-            .detail.on{display:block!important}
-            .shell{max-width:100%;padding:10px}
-            .hero,.sec,.card{border:1px solid #ddd!important;background:#fff!important;box-shadow:none!important;break-inside:avoid}
-            :root{--t1:#111;--t2:#555;--s1:#fff;--s2:#f5f5f5;--bdr:#ddd;--accent:#4a3fbf;--accent2:#5f4fcf}
-            .kpis{display:none}
-            .ph{display:block!important;text-align:center;padding:14px 0 8px;border-bottom:2px solid #111;margin-bottom:14px}
-            .ph h1{font-size:20px}.ph p{font-size:10px;color:#555}
-            .pf{display:block!important;text-align:center;margin-top:20px;padding-top:8px;border-top:1px solid #ddd;font-size:9px;color:#999}
-            .section{break-inside:avoid}
-        }
-        .ph,.pf{display:none}
         .q-badge{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:20px;font-size:10px;font-weight:600;background:rgba(108,92,231,.15);color:var(--accent2);border:1px solid rgba(108,92,231,.3);cursor:default}
         .q-badge.active{background:rgba(253,203,110,.12);color:var(--y);border-color:rgba(253,203,110,.3);animation:pulse 2s infinite}
         .q-badge.done{background:var(--gbg);color:var(--g);border-color:rgba(0,184,148,.3)}
         @keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
         .gen-all{padding:6px 14px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;transition:all .15s}
         .gen-all:hover{background:var(--accent2)}
-        @media(max-width:1000px){.kpis{grid-template-columns:repeat(3,1fr)}.cols{grid-template-columns:1fr}.hero-kpis{grid-template-columns:repeat(3,1fr)}}
-        @media(max-width:600px){.kpis{grid-template-columns:repeat(2,1fr)}}
+
+        /* ── Print / VP share styles ─────────────────────────── */
+        .ph,.pf{display:none}
+        @media print{
+            body{background:#fff!important;color:#111!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+            .topbar,.back,.vp-hero-actions,.dash,.funnel,.skill-empty,.se-cmd,.gen-all,.q-badge{display:none!important}
+            .detail.on{display:block!important}
+            .shell{max-width:100%;padding:10px}
+            .vp-hero,.sec,.card,.scard,.ci{border:1px solid #ddd!important;background:#fff!important;box-shadow:none!important;break-inside:avoid}
+            :root{--t1:#111;--t2:#555;--s1:#fff;--s2:#f5f5f5;--bdr:#ddd;--accent:#4a3fbf;--accent2:#5f4fcf;--g:#00875a;--r:#c0392b;--y:#b8860b}
+            .ph{display:block!important;text-align:center;padding:14px 0 8px;border-bottom:2px solid #111;margin-bottom:14px}
+            .ph h1{font-size:20px}.ph p{font-size:10px;color:#555}
+            .pf{display:block!important;text-align:center;margin-top:20px;padding-top:8px;border-top:1px solid #ddd;font-size:9px;color:#999}
+            .section{break-inside:avoid}
+            .vp-kpis{grid-template-columns:repeat(4,1fr)!important}
+            .smap{grid-template-columns:repeat(4,1fr)!important}
+        }
+        @media(max-width:1000px){.kpis{grid-template-columns:repeat(3,1fr)}.cols{grid-template-columns:1fr}.vp-kpis{grid-template-columns:repeat(3,1fr)}}
+        @media(max-width:600px){.kpis{grid-template-columns:repeat(2,1fr)}.vp-kpis{grid-template-columns:repeat(2,1fr)}}
     </style>
 </head>
 <body>
 <div class="shell">
-    <div class="ph"><h1>JARVIS Deal Intelligence Report</h1><p id="printDate"></p></div>
-    <div class="topbar"><h1><span>JARVIS</span> Deal Intelligence</h1><div class="topbar-r" style="display:flex;align-items:center;gap:10px"><span id="qBadge" style="display:none" class="q-badge"></span><span id="lastRefresh"></span></div></div>
+    <div class="ph"><h1>JARVIS Deal Intelligence — VP Report</h1><p id="printDate"></p></div>
+    <div class="topbar">
+        <h1><span>JARVIS</span> Deal Intelligence</h1>
+        <div class="topbar-r">
+            <span id="qBadge" style="display:none" class="q-badge"></span>
+            <button class="gen-all" onclick="generateAll()">Generate All Intelligence</button>
+            <span id="lastRefresh"></span>
+        </div>
+    </div>
     <div id="loading" class="loading">Loading deal intelligence...</div>
 
     <!-- DASHBOARD -->
@@ -184,12 +248,12 @@
         </div>
     </div>
 
-    <!-- DETAIL -->
+    <!-- DETAIL (VP Account View) -->
     <div id="detail" class="detail">
-        <button class="back" onclick="goBack()">Back to Pipeline</button>
+        <button class="back" onclick="goBack()">← Back to Pipeline</button>
         <div id="detailContent"></div>
     </div>
-    <div class="pf">Generated by JARVIS Deal Intelligence</div>
+    <div class="pf">Generated by JARVIS Deal Intelligence · Confidential</div>
 </div>
 
 <script>
@@ -265,7 +329,6 @@ function startQueuePoll(){
             updateQBadge();
             if(!Q.is_active){
                 clearInterval(_qPoll);_qPoll=null;
-                // Refresh data now that generation is done
                 var r2=await fetch('/api/accounts');D=await r2.json();REG=D.skill_registry||{};
                 document.getElementById('lastRefresh').textContent='Updated '+new Date().toLocaleTimeString();
                 if(cur){var a=D.accounts.find(function(x){return x.id===cur.id});if(a){cur=a;renderReport(a)}}
@@ -302,11 +365,33 @@ function showToast(msg){
     t.textContent=msg;document.body.appendChild(t);
     setTimeout(function(){t.remove();},3500);
 }
+
 const fmt$=n=>n>=1e6?'$'+(n/1e6).toFixed(1)+'M':n>=1e3?'$'+(n/1e3).toFixed(0)+'K':'$'+n;
 const fmtP=n=>Math.round(n*100)+'%';
-function bc(s){const l=s.toLowerCase();if(l.includes('won'))return'b-won';if(l.includes('lost'))return'b-lost';return l.includes('negot')||l.includes('close')?'b-neg':l.includes('qual')?'b-qual':l.includes('disc')?'b-disc':l.includes('demo')?'b-demo':'b-init'}
+function bc(s){const l=(s||'').toLowerCase();if(l.includes('won'))return'b-won';if(l.includes('lost'))return'b-lost';return l.includes('negot')||l.includes('close')?'b-neg':l.includes('qual')?'b-qual':l.includes('disc')?'b-disc':l.includes('demo')?'b-demo':'b-init'}
 function mc(p){return p>=70?'var(--g)':p>=40?'var(--y)':'var(--r)'}
 function esc(t){return(t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+
+// Compute composite deal health score (0–100)
+function dealHealth(a){
+    var mp=a.meddpicc.percentage||0;
+    var dc=a.discovery_completeness.percentage||0;
+    var hr=a.risks.filter(function(r){return r.level==='high'}).length;
+    var mr=a.risks.filter(function(r){return r.level==='medium'}).length;
+    var riskScore=Math.max(0,100-(hr*20+mr*8));
+    var prob=Math.round((a.probability||0)*100);
+    var h=Math.round(mp*0.35+dc*0.25+riskScore*0.25+prob*0.15);
+    return{score:h,label:h>=70?'Healthy':h>=45?'At Risk':'Critical',cls:h>=70?'green':h>=45?'yellow':'red'};
+}
+
+// Parse role string to detect champion / economic buyer / blocker
+function parseRole(roleStr){
+    var r=(roleStr||'').toLowerCase();
+    if(r.includes('champion'))return'champion';
+    if(r.includes('economic')||r.includes('cfo')||r.includes('ceo')||r.includes('vp')||r.includes('budget'))return'economic';
+    if(r.includes('block')||r.includes('oppos')||r.includes('detract'))return'blocker';
+    return'default';
+}
 
 function renderDash(){
     const a=D.accounts,ps=D.pipeline_summary,avgP=a.length?Math.round(a.reduce((s,x)=>s+x.probability,0)/a.length*100):0;
@@ -332,8 +417,10 @@ function renderDash(){
     parents.forEach(function(p){rows+=aRow(p,0);a.filter(function(x){return x.parent===p.folder}).forEach(function(sub){rows+=aRow(sub,1)})});
     document.getElementById('tbl').innerHTML=rows;
 }
+
 function aRow(a,sub){
     var mp=a.meddpicc.percentage,hr=a.risks.filter(function(r){return r.level==='high'}).length,mr=a.risks.filter(function(r){return r.level==='medium'}).length;
+    var dh=dealHealth(a);
     return'<tr onclick="openAcct(\''+a.id+'\')"><td><span class="'+(sub?'asub':'an')+'">'+a.name+'</span></td><td><span class="badge '+bc(a.stage)+'">'+a.stage+'</span></td><td style="font-weight:600">'+fmt$(a.deal_size)+'</td><td>'+fmtP(a.probability)+'</td><td><span class="mb"><span class="mf" style="width:'+mp+'%;background:'+mc(mp)+'"></span></span>'+mp+'%</td><td>'+(hr?'<span class="rd h"></span>'+hr:'')+(mr?' <span class="rd m"></span>'+mr:'')+(!hr&&!mr?'<span class="rd l"></span>Clean':'')+'</td><td><span class="skill-count">'+a.skills_generated+'/'+a.skills_total+'</span></td><td style="font-size:11px">'+a.timeline+'</td><td style="font-size:11px;color:var(--t2)">'+a.last_updated+'</td></tr>';
 }
 
@@ -348,62 +435,249 @@ function openAcct(id){
 
 function renderReport(a){
     var mp=a.meddpicc,wv=a.deal_size*a.probability,dc=a.discovery_completeness,comp=a.competitive_situation||{},nm=a.next_milestone||{};
+    var dh=dealHealth(a);
     var mLabels={metrics:'Metrics',economic_buyer:'Economic Buyer',decision_criteria:'Decision Criteria',decision_process:'Decision Process',paper_process:'Paper Process',implications:'Implications of Pain',champion:'Champion',competition:'Competition'};
     var h='';
 
-    // HERO
-    h+='<div class="hero"><div class="hero-top"><div><h2>'+a.name+'</h2>'+(a.parent?'<div class="par">Sub-account of '+a.parent+'</div>':'')+'</div><button class="btn-exp" onclick="exportPDF()">Export Full Report (PDF)</button></div><div class="hero-kpis"><div class="hk"><div class="hl">Stage</div><div class="hv"><span class="badge '+bc(a.stage)+'" style="font-size:13px;padding:5px 14px">'+a.stage+'</span></div></div><div class="hk"><div class="hl">Deal Size</div><div class="hv blue">'+fmt$(a.deal_size)+'</div></div><div class="hk"><div class="hl">Win Prob</div><div class="hv" style="color:'+(a.probability>=.5?'var(--g)':a.probability>=.3?'var(--y)':'var(--r)')+'">'+fmtP(a.probability)+'</div></div><div class="hk"><div class="hl">Weighted</div><div class="hv green">'+fmt$(wv)+'</div></div><div class="hk"><div class="hl">MEDDPICC</div><div class="hv" style="color:'+mc(mp.percentage)+'">'+mp.percentage+'%</div></div><div class="hk"><div class="hl">Skills</div><div class="hv acc">'+a.skills_generated+'/'+a.skills_total+'</div></div></div></div>';
+    // ── EXECUTIVE HERO ────────────────────────────────────────────────────────
+    h+='<div class="vp-hero">';
+    h+='<div class="vp-hero-top"><div class="vp-hero-title">';
+    h+='<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">';
+    h+='<h2>'+esc(a.name)+'</h2>';
+    h+='<span class="badge '+bc(a.stage)+'" style="font-size:12px;padding:5px 14px">'+esc(a.stage)+'</span>';
+    h+='<span class="health-pill '+dh.cls+'"><span class="health-dot '+dh.cls+'"></span>'+dh.label+' &bull; '+dh.score+'%</span>';
+    h+='</div>';
+    h+='<div class="sub" style="margin-top:6px">'+(a.parent?'Sub-account of '+esc(a.parent)+' &nbsp;&bull;&nbsp; ':'')+'Last updated: '+esc(a.last_updated)+'</div>';
+    h+='</div>';
+    h+='<div class="vp-hero-actions"><button class="btn-sec" onclick="window.print()">Export PDF</button><button class="btn-primary" onclick="generateAll()">Refresh Intelligence</button></div>';
+    h+='</div>';
 
-    // PROGRESSION
-    if(a.deal_progression.length){
-        h+='<div class="section"><div class="sec"><div class="sec-h">Deal Progression</div><div class="sec-b"><div class="prog">'+a.deal_progression.map(function(s){return'<div class="ps '+s.status+'"><div class="pline"></div><div class="pd '+s.status+'"></div><div class="pl">'+s.name+'</div></div>'}).join('')+'</div></div></div></div>';
+    // KPI strip
+    h+='<div class="vp-kpis">';
+    h+='<div class="vk"><div class="vkl">Deal Size</div><div class="vkv blue">'+fmt$(a.deal_size)+'</div></div>';
+    h+='<div class="vk"><div class="vkl">Win Probability</div><div class="vkv" style="color:'+(a.probability>=.5?'var(--g)':a.probability>=.3?'var(--y)':'var(--r)')+'">'+fmtP(a.probability)+'</div></div>';
+    h+='<div class="vk"><div class="vkl">Weighted Value</div><div class="vkv green">'+fmt$(wv)+'</div></div>';
+    h+='<div class="vk"><div class="vkl">MEDDPICC</div><div class="vkv" style="color:'+mc(mp.percentage)+'">'+mp.percentage+'%</div><div class="vks">'+mp.total+'/'+mp.max+'</div></div>';
+    h+='<div class="vk"><div class="vkl">Discovery</div><div class="vkv" style="color:'+(dc.percentage>=70?'var(--g)':dc.percentage>=40?'var(--y)':'var(--r)')+'">'+dc.percentage+'%</div><div class="vks">'+dc.completed+'/'+dc.total+' areas</div></div>';
+    var hrCnt=a.risks.filter(function(r){return r.level==='high'}).length;
+    h+='<div class="vk"><div class="vkl">High Risks</div><div class="vkv '+(hrCnt?'red':'green')+'">'+(hrCnt||'None')+'</div></div>';
+    h+='<div class="vk"><div class="vkl">Timeline</div><div class="vkv" style="font-size:13px">'+esc(a.timeline||'TBD')+'</div></div>';
+    h+='</div></div>';
+
+    // ── DEAL HEALTH + STAGE PROGRESSION ───────────────────────────────────────
+    h+='<div class="section"><div class="cols">';
+
+    // Health gauges
+    h+='<div class="sec"><div class="sec-h">Deal Health Breakdown</div><div class="sec-b">';
+    h+='<div class="hstrip">';
+    h+='<div class="hg"><div class="hgl">MEDDPICC</div><div class="hgbar"><div class="hgf" style="width:'+mp.percentage+'%;background:'+mc(mp.percentage)+'"></div></div><div class="hgv" style="color:'+mc(mp.percentage)+'">'+mp.percentage+'%</div></div>';
+    h+='<div class="hg"><div class="hgl">Discovery</div><div class="hgbar"><div class="hgf" style="width:'+dc.percentage+'%;background:'+(dc.percentage>=70?'var(--g)':dc.percentage>=40?'var(--y)':'var(--r)')+'"></div></div><div class="hgv" style="color:'+(dc.percentage>=70?'var(--g)':dc.percentage>=40?'var(--y)':'var(--r)')+'">'+dc.percentage+'%</div></div>';
+    var rPct=Math.max(0,100-hrCnt*20-(a.risks.filter(function(r){return r.level==='medium'}).length)*8);
+    h+='<div class="hg"><div class="hgl">Risk Score</div><div class="hgbar"><div class="hgf" style="width:'+rPct+'%;background:'+(rPct>=80?'var(--g)':rPct>=60?'var(--y)':'var(--r)')+'"></div></div><div class="hgv" style="color:'+(rPct>=80?'var(--g)':rPct>=60?'var(--y)':'var(--r)')+'">'+rPct+'%</div></div>';
+    h+='<div class="hg"><div class="hgl">Win Prob</div><div class="hgbar"><div class="hgf" style="width:'+Math.round(a.probability*100)+'%;background:'+(a.probability>=.5?'var(--g)':a.probability>=.3?'var(--y)':'var(--r)')+'"></div></div><div class="hgv" style="color:'+(a.probability>=.5?'var(--g)':a.probability>=.3?'var(--y)':'var(--r)')+'">'+fmtP(a.probability)+'</div></div>';
+    h+='</div></div></div>';
+
+    // Stage progression
+    h+='<div class="sec"><div class="sec-h">Deal Stage & Milestones</div><div class="sec-b">';
+    if(a.deal_progression&&a.deal_progression.length){
+        h+='<div class="prog">'+a.deal_progression.map(function(s){return'<div class="ps '+s.status+'"><div class="pline"></div><div class="pd '+s.status+'"></div><div class="pl">'+esc(s.name)+'</div></div>'}).join('')+'</div>';
     }
-
-    // DEAL OVERVIEW
-    h+='<div class="section"><div class="section-label">Deal Overview</div><div class="cols"><div class="sec"><div class="sec-h">Key Metrics</div><div class="sec-b"><div class="cg"><div class="ci"><div class="cl">Deal Size</div><div class="cv blue">'+fmt$(a.deal_size)+'</div></div><div class="ci"><div class="cl">Win Probability</div><div class="cv" style="color:'+(a.probability>=.5?'var(--g)':'var(--y)')+'">'+fmtP(a.probability)+'</div></div><div class="ci"><div class="cl">Weighted Value</div><div class="cv green">'+fmt$(wv)+'</div></div><div class="ci"><div class="cl">Timeline</div><div class="cv">'+a.timeline+'</div></div></div>'+(a.pain_points.length?'<div style="margin-top:14px"><div style="font-size:10px;color:var(--t2);text-transform:uppercase;font-weight:600;margin-bottom:6px">Key Pain Points</div>'+a.pain_points.map(function(p){return'<div style="padding:3px 0;font-size:12px">&bull; '+p+'</div>'}).join('')+'</div>':'')+'</div></div>';
-    h+='<div class="sec"><div class="sec-h">Key Stakeholders <span style="color:var(--t2);font-weight:400">'+a.stakeholders.length+'</span></div><div class="sec-b">'+(a.stakeholders.length?a.stakeholders.map(function(s){var nm,rl;if(s&&typeof s==='object'){nm=s.name||s.title||'Unknown';rl=s.role||s.title||'';}else{var str=String(s||''),m=str.match(/^(.+?)\s*[\(\-]\s*(.+?)[\)\s]*$/)||[null,str,''];nm=m[1]||str;rl=m[2]||'';}var ini=nm.trim().split(/\s+/).map(function(w){return w[0]||''}).join('').substring(0,2).toUpperCase();return'<div class="si"><div class="sav">'+ini+'</div><div><div class="sn">'+nm+'</div>'+(rl?'<div class="sr">'+rl+'</div>':'')+'</div></div>'}).join(''):'<div class="empty">No stakeholders mapped</div>')+'</div></div></div></div>';
-
-    // MEDDPICC
-    h+='<div class="section"><div class="section-label">MEDDPICC Qualification</div><div class="sec"><div class="sec-h">MEDDPICC Score <span style="font-size:20px;font-weight:700;color:'+mc(mp.percentage)+'">'+mp.total+'/'+mp.max+' ('+mp.percentage+'%)</span></div><div class="sec-b"><div class="mg">';
-    Object.keys(mLabels).forEach(function(k){var v=mLabels[k],s=mp[k]||0,p=s*10,c=p>=70?'var(--g)':p>=40?'var(--y)':'var(--r)';h+='<div class="mi"><span class="ml">'+v+'</span><div class="mbar"><div class="mfl" style="width:'+p+'%;background:'+c+'"></div></div><span class="ms" style="color:'+c+'">'+s+'/10</span></div>'});
-    h+='</div>'+skillBlock('meddpicc',a,'JARVIS MEDDPICC Analysis')+'</div></div></div>';
-
-    // RISKS
-    h+='<div class="section"><div class="section-label">Risk Analysis</div><div class="sec"><div class="sec-h">Deal Risks <span style="color:'+(a.risks.filter(function(r){return r.level==='high'}).length?'var(--r)':'var(--g)')+'">'+a.risks.length+' identified</span></div><div class="sec-b">'+(a.risks.length?a.risks.map(function(r){return'<div class="ri '+r.level+'"><span class="rb '+r.level+'">'+r.level+'</span><div><strong>'+r.cat+'</strong> &mdash; '+r.text+'</div></div>'}).join(''):'<div style="color:var(--g);font-size:12px;padding:8px 0">No significant risks identified</div>')+skillBlock('risk_report',a,'JARVIS AI Risk Report')+'</div></div></div>';
-
-    // COMPETITION
-    h+='<div class="section"><div class="section-label">Competitive Intelligence</div><div class="cols"><div class="sec"><div class="sec-h">Competitive Landscape</div><div class="sec-b"><div class="cg"><div class="ci"><div class="cl">Primary Competitor</div><div class="cv">'+(comp.primary_competitor||'Unknown')+'</div></div><div class="ci"><div class="cl">Status</div><div class="cv">'+(comp.competitor_status||'Unknown')+'</div></div><div class="ci"><div class="cl">Our Price</div><div class="cv">'+(comp.our_price||'TBD')+'</div></div><div class="ci"><div class="cl">Win vs Competitor</div><div class="cv" style="color:'+((comp.win_probability_vs_competitor||0)>=.5?'var(--g)':'var(--r)')+'">'+(comp.win_probability_vs_competitor?fmtP(comp.win_probability_vs_competitor):'TBD')+'</div></div></div>'+(a.constraints&&a.constraints.length?'<div style="margin-top:12px"><div style="font-size:10px;color:var(--t2);text-transform:uppercase;font-weight:600;margin-bottom:4px">Constraints</div>'+a.constraints.map(function(c){return'<div style="padding:2px 0;font-size:12px;color:var(--y)">&bull; '+c+'</div>'}).join('')+'</div>':'')+skillBlock('competitive_intelligence',a,'JARVIS Competitive Intel')+'</div></div>';
-    h+='<div class="sec"><div class="sec-h">Battlecard</div><div class="sec-b">'+skillBlock('battlecard',a,'JARVIS Battlecard',true)+'</div></div></div></div>';
-
-    // DISCOVERY
-    h+='<div class="section"><div class="section-label">Discovery &amp; Research</div><div class="cols"><div class="sec"><div class="sec-h">Discovery Completeness <span style="color:'+(dc.percentage>=70?'var(--g)':dc.percentage>=40?'var(--y)':'var(--r)')+'">'+dc.percentage+'%</span></div><div class="sec-b"><div class="dp">'+Array.from({length:dc.total},function(_,i){return'<div class="ds '+(i<dc.completed?'ok':'')+'"></div>'}).join('')+'</div><div style="font-size:11px;color:var(--t2);margin-bottom:8px">'+dc.completed+'/'+dc.total+' areas covered</div>'+(dc.missing.length?'<div style="margin-bottom:10px"><div style="font-size:10px;color:var(--r);text-transform:uppercase;font-weight:600;margin-bottom:4px">Missing</div>'+dc.missing.map(function(m){return'<div style="padding:2px 0;font-size:11px;color:var(--y)">&cir; '+m+'</div>'}).join('')+'</div>':'<div style="color:var(--g);font-size:11px;margin-bottom:8px">All key areas covered</div>')+(a.discovery_notes?'<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--bdr)"><div style="font-size:10px;color:var(--t2);text-transform:uppercase;font-weight:600;margin-bottom:6px">Discovery Notes</div><div class="skill-md md-body">'+mdToHtml(a.discovery_notes)+'</div></div>':'')+'</div></div>';
-    h+='<div class="sec"><div class="sec-h">Company Research</div><div class="sec-b"><div class="skill-md md-body">'+mdToHtml(a.company_info||'No company research')+'</div></div></div></div></div>';
-
-    // ACTIONS & ACTIVITIES
-    h+='<div class="section"><div class="section-label">Actions &amp; Activities</div><div class="cols"><div class="sec"><div class="sec-h">Next Actions <span style="color:var(--t2);font-weight:400">'+a.next_actions.length+'</span></div><div class="sec-b">'+(a.next_actions.length?a.next_actions.map(function(x,i){return'<div class="ai"><div class="anum">'+(i+1)+'</div><div>'+x+'</div></div>'}).join(''):'<div class="empty">No actions defined in CLAUDE.md</div>')+(nm.activity?'<div style="margin-top:14px;padding:14px;background:var(--s2);border-radius:10px"><div style="font-size:10px;color:var(--accent2);text-transform:uppercase;font-weight:600;margin-bottom:4px">Next Milestone</div><div style="font-size:14px;font-weight:600;margin-top:2px">'+nm.activity+'</div><div style="font-size:11px;color:var(--t2);margin-top:2px">'+(nm.date||'')+' &mdash; '+(nm.description||'')+'</div></div>':'')+'</div></div>';
-    h+='<div class="sec"><div class="sec-h">Recent Activities <span style="color:var(--t2);font-weight:400">'+a.activities.length+'</span></div><div class="sec-b">'+(a.activities.length?a.activities.map(function(x){return'<div style="padding:8px 0;border-bottom:1px solid var(--bdr);display:flex;gap:8px;font-size:12px"><span style="color:var(--g)">&check;</span><div>'+x+'</div></div>'}).join(''):'<div class="empty">No activities recorded</div>')+'</div></div></div></div>';
-
-    // JARVIS GENERATED INTELLIGENCE
-    var skillOrder=['account_summary','quick_insights','discovery_questions','value_architecture','competitor_pricing','meeting_prep','demo_strategy','proposal','followup_email','technical_risk','sow'];
-    var generated=skillOrder.filter(function(k){return a.skill_outputs[k]});
-    var pending=skillOrder.filter(function(k){return!a.skill_outputs[k]});
-
-    if(generated.length){
-        h+='<hr class="divider"><div class="section"><div class="section-label">JARVIS AI Intelligence ('+generated.length+' generated)</div>';
-        generated.forEach(function(k){var info=REG[k]||{label:k};h+='<div class="sec" style="margin-bottom:14px"><div class="sec-h">'+info.label+' <span class="jarvis-tag">Generated by JARVIS</span></div><div class="sec-b"><div class="skill-md md-body">'+mdToHtml(a.skill_outputs[k])+'</div></div></div>'});
+    if(nm&&nm.activity){
+        h+='<div style="margin-top:14px;padding:14px;background:var(--s2);border-radius:10px">';
+        h+='<div style="font-size:10px;color:var(--accent2);text-transform:uppercase;font-weight:700;margin-bottom:5px">Next Milestone</div>';
+        h+='<div style="font-size:14px;font-weight:700">'+esc(nm.activity)+'</div>';
+        h+='<div style="font-size:11px;color:var(--t2);margin-top:3px">'+(nm.date?nm.date+' &mdash; ':'')+esc(nm.description||'')+'</div>';
         h+='</div>';
     }
+    if(a.constraints&&a.constraints.length){
+        h+='<div style="margin-top:12px"><div style="font-size:10px;color:var(--r);text-transform:uppercase;font-weight:700;margin-bottom:4px">Constraints / Blockers</div>';
+        h+=a.constraints.map(function(c){return'<div style="padding:2px 0;font-size:12px;color:var(--y)">&bull; '+esc(c)+'</div>'}).join('');
+        h+='</div>';
+    }
+    h+='</div></div>';
+    h+='</div></div>';
+
+    // ── STAKEHOLDER MAP ────────────────────────────────────────────────────────
+    h+='<div class="section"><div class="section-label">Stakeholder Map</div>';
+    h+='<div class="sec"><div class="sec-h">Key Contacts <span style="color:var(--t2);font-weight:400;font-size:12px">'+a.stakeholders.length+' mapped</span></div><div class="sec-b">';
+    if(a.stakeholders.length){
+        h+='<div class="smap">';
+        a.stakeholders.forEach(function(s){
+            var nm2,title2,roleStr,notesStr;
+            if(s&&typeof s==='object'){nm2=s.name||s.title||'Unknown';title2=s.title||'';roleStr=s.role||'';notesStr=s.notes||'';}
+            else{var str=String(s||''),m=str.match(/^(.+?)\s*[\(\-]\s*(.+?)[\)\s]*$/)||[null,str,''];nm2=m[1]||str;title2='';roleStr=m[2]||'';}
+            var rtype=parseRole(roleStr+' '+notesStr);
+            var ini=(nm2||'?').trim().split(/\s+/).map(function(w){return w[0]||''}).join('').substring(0,2).toUpperCase();
+            h+='<div class="scard '+rtype+'">';
+            if(rtype==='champion')h+='<div class="champ-star">★</div>';
+            h+='<div class="sav '+rtype+'">'+ini+'</div>';
+            h+='<div class="sn">'+esc(nm2)+'</div>';
+            if(title2)h+='<div class="sr">'+esc(title2)+'</div>';
+            if(roleStr&&roleStr!==title2)h+='<div class="sr" style="color:var(--accent2)">'+esc(roleStr)+'</div>';
+            h+='<div class="srole '+rtype+'">'+esc(rtype==='default'?'Stakeholder':rtype==='economic'?'Eco. Buyer':rtype.charAt(0).toUpperCase()+rtype.slice(1))+'</div>';
+            if(notesStr)h+='<div style="font-size:10px;color:var(--t3);margin-top:3px;line-height:1.4">'+esc(notesStr.substring(0,80))+'</div>';
+            h+='</div>';
+        });
+        h+='</div>';
+    } else {
+        h+='<div class="empty">No stakeholders mapped — add to deal_stage.json</div>';
+    }
+    // Pain points below stakeholders
+    if(a.pain_points&&a.pain_points.length){
+        h+='<div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--bdr)">';
+        h+='<div style="font-size:10px;color:var(--t2);text-transform:uppercase;font-weight:700;margin-bottom:6px">Confirmed Pain Points</div>';
+        h+=a.pain_points.map(function(p){return'<div style="padding:3px 0;font-size:12px">&bull; '+esc(p)+'</div>'}).join('');
+        h+='</div>';
+    }
+    h+='</div></div></div>';
+
+    // ── MEDDPICC FULL BREAKDOWN ────────────────────────────────────────────────
+    h+='<div class="section"><div class="section-label">MEDDPICC Qualification</div>';
+    h+='<div class="sec"><div class="sec-h">MEDDPICC Score <span style="font-size:18px;font-weight:700;color:'+mc(mp.percentage)+'">'+mp.total+'/'+mp.max+'</span><span style="font-size:13px;color:'+mc(mp.percentage)+'"> ('+mp.percentage+'%)</span></div>';
+    h+='<div class="sec-b"><div class="mg">';
+    Object.keys(mLabels).forEach(function(k){
+        var v=mLabels[k],s=mp[k]||0,pct=s*10;
+        var col=pct>=70?'var(--g)':pct>=40?'var(--y)':'var(--r)';
+        var rankTxt=pct>=70?'GREEN':pct>=40?'AMBER':'RED';
+        h+='<div class="mi"><span class="ml">'+v+'</span><div class="mbar"><div class="mfl" style="width:'+pct+'%;background:'+col+'"></div></div><span class="ms" style="color:'+col+'">'+s+'/10</span><span class="mrank" style="color:'+col+'">'+rankTxt+'</span></div>';
+    });
+    h+='</div>';
+    // Inline MEDDPICC analysis from skill
+    h+=skillBlock('meddpicc',a,'JARVIS MEDDPICC Analysis');
+    h+='</div></div></div>';
+
+    // ── VALUE CASE ─────────────────────────────────────────────────────────────
+    h+='<div class="section"><div class="section-label">Value Case & ROI</div>';
+    h+='<div class="sec"><div class="sec-h">Business Value Architecture <span class="jarvis-tag" style="margin-left:8px">AI Generated</span></div><div class="sec-b">';
+    if(a.skill_outputs['value_architecture']){
+        h+='<div class="skill-md md-body">'+mdToHtml(a.skill_outputs['value_architecture'])+'</div>';
+    } else {
+        h+='<div class="empty" style="margin-bottom:12px">Value architecture not yet generated — run <em>get_value_architecture</em></div>';
+    }
+    h+='</div></div></div>';
+
+    // ── COMPETITIVE INTELLIGENCE ────────────────────────────────────────────────
+    h+='<div class="section"><div class="section-label">Competitive Intelligence</div>';
+    h+='<div class="cols">';
+
+    // Competitive position card
+    h+='<div class="sec"><div class="sec-h">Competitive Position</div><div class="sec-b">';
+    h+='<div class="comp-strip" style="grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">';
+    h+='<div class="ci"><div class="cl">Primary Competitor</div><div class="cv">'+(esc(comp.primary_competitor)||'Unknown')+'</div></div>';
+    h+='<div class="ci"><div class="cl">Status</div><div class="cv">'+(esc(comp.competitor_status)||'Unknown')+'</div></div>';
+    h+='<div class="ci"><div class="cl">Our Pricing</div><div class="cv">'+(esc(comp.our_price)||'TBD')+'</div></div>';
+    h+='<div class="ci"><div class="cl">Win vs Competitor</div><div class="cv" style="color:'+((comp.win_probability_vs_competitor||0)>=.5?'var(--g)':'var(--r)')+'">'+(comp.win_probability_vs_competitor?fmtP(comp.win_probability_vs_competitor):'TBD')+'</div></div>';
+    h+='</div>';
+    h+=skillBlock('competitive_intelligence',a,'JARVIS Competitive Intel');
+    h+='</div></div>';
+
+    // Battlecard
+    h+='<div class="sec"><div class="sec-h">Battlecard</div><div class="sec-b">';
+    h+=skillBlock('battlecard',a,'JARVIS Battlecard',true);
+    h+='</div></div>';
+    h+='</div>'; // end cols
+
+    // Pricing analysis (full width)
+    if(a.skill_outputs['competitor_pricing']){
+        h+='<div class="sec" style="margin-top:14px"><div class="sec-h">Pricing Analysis <span class="jarvis-tag" style="margin-left:8px">AI Generated</span></div><div class="sec-b"><div class="skill-md md-body">'+mdToHtml(a.skill_outputs['competitor_pricing'])+'</div></div></div>';
+    }
+    h+='</div>';
+
+    // ── DISCOVERY & COMPANY RESEARCH ───────────────────────────────────────────
+    h+='<div class="section"><div class="section-label">Discovery & Research</div><div class="cols">';
+
+    h+='<div class="sec"><div class="sec-h">Discovery Completeness <span style="font-weight:400;color:'+(dc.percentage>=70?'var(--g)':dc.percentage>=40?'var(--y)':'var(--r)')+'">'+dc.percentage+'%</span></div><div class="sec-b">';
+    h+='<div class="dp">'+Array.from({length:dc.total},function(_,i){return'<div class="ds '+(i<dc.completed?'ok':'')+'"></div>'}).join('')+'</div>';
+    h+='<div style="font-size:11px;color:var(--t2);margin-bottom:10px">'+dc.completed+'/'+dc.total+' areas covered</div>';
+    if(dc.missing&&dc.missing.length){
+        h+='<div style="margin-bottom:10px"><div style="font-size:10px;color:var(--r);text-transform:uppercase;font-weight:600;margin-bottom:4px">Missing</div>';
+        h+=dc.missing.map(function(m){return'<div style="padding:2px 0;font-size:11px;color:var(--y)">&cir; '+esc(m)+'</div>'}).join('');
+        h+='</div>';
+    }
+    if(a.skill_outputs['discovery_questions']){
+        h+='<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--bdr)"><span class="jarvis-tag">Discovery Questions</span><div class="skill-md md-body" style="margin-top:6px">'+mdToHtml(a.skill_outputs['discovery_questions'])+'</div></div>';
+    } else if(a.discovery_notes){
+        h+='<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--bdr)"><div style="font-size:10px;color:var(--t2);text-transform:uppercase;font-weight:600;margin-bottom:6px">Discovery Notes</div><div class="skill-md md-body">'+mdToHtml(a.discovery_notes)+'</div></div>';
+    }
+    h+='</div></div>';
+
+    h+='<div class="sec"><div class="sec-h">Company Research</div><div class="sec-b"><div class="skill-md md-body">'+mdToHtml(a.company_info||'No company research generated yet.')+'</div></div></div>';
+    h+='</div></div>';
+
+    // ── RISK ANALYSIS ──────────────────────────────────────────────────────────
+    h+='<div class="section"><div class="section-label">Risk Analysis</div>';
+    h+='<div class="sec"><div class="sec-h">Deal Risks <span style="color:'+(hrCnt?'var(--r)':'var(--g)')+'">'+a.risks.length+' identified'+(hrCnt?' &bull; '+hrCnt+' HIGH':'')+'</span></div><div class="sec-b">';
+    if(a.risks.length){
+        h+=a.risks.map(function(r){return'<div class="ri '+r.level+'"><span class="rb '+r.level+'">'+esc(r.level)+'</span><div><strong>'+esc(r.cat)+'</strong> &mdash; '+esc(r.text)+'</div></div>'}).join('');
+    } else {
+        h+='<div style="color:var(--g);font-size:12px;padding:8px 0">No significant risks identified</div>';
+    }
+    h+=skillBlock('risk_report',a,'JARVIS AI Risk Report');
+    h+=skillBlock('technical_risk',a,'JARVIS Technical Risk');
+    h+='</div></div></div>';
+
+    // ── NEXT ACTIONS & RECENT ACTIVITIES ──────────────────────────────────────
+    h+='<div class="section"><div class="section-label">Actions & Activities</div><div class="cols">';
+
+    h+='<div class="sec"><div class="sec-h">Next Actions <span style="color:var(--t2);font-weight:400;font-size:12px">'+a.next_actions.length+'</span></div><div class="sec-b">';
+    if(a.next_actions.length){
+        h+=a.next_actions.map(function(x,i){
+            var num=i+1,cls=num<=2?'red':num<=4?'yellow':'green';
+            return'<div class="ai"><div class="anum '+cls+'">'+num+'</div><div>'+esc(x)+'</div></div>';
+        }).join('');
+    } else {
+        h+='<div class="empty">No actions defined — populate CLAUDE.md or account_summary</div>';
+    }
+    // Meeting prep
+    if(a.skill_outputs['meeting_prep']){
+        h+='<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--bdr)"><span class="jarvis-tag">Meeting Prep</span><div class="skill-md md-body" style="margin-top:6px">'+mdToHtml(a.skill_outputs['meeting_prep'])+'</div></div>';
+    }
+    h+='</div></div>';
+
+    h+='<div class="sec"><div class="sec-h">Recent Activities <span style="color:var(--t2);font-weight:400;font-size:12px">'+a.activities.length+'</span></div><div class="sec-b">';
+    if(a.activities.length){
+        h+=a.activities.map(function(x){return'<div style="padding:7px 0;border-bottom:1px solid var(--bdr);display:flex;gap:8px;font-size:12px"><span style="color:var(--g)">✓</span><div>'+esc(x)+'</div></div>'}).join('');
+    } else {
+        h+='<div class="empty">No activities recorded</div>';
+    }
+    h+='</div></div>';
+    h+='</div></div>';
+
+    // ── ACCOUNT SUMMARY (AI) ───────────────────────────────────────────────────
+    if(a.skill_outputs['account_summary']||a.skill_outputs['quick_insights']){
+        h+='<div class="section"><div class="section-label">AI Deal Summary</div><div class="cols">';
+        if(a.skill_outputs['account_summary']){
+            h+='<div class="sec"><div class="sec-h">Account Summary <span class="jarvis-tag" style="margin-left:8px">AI Generated</span></div><div class="sec-b"><div class="skill-md md-body">'+mdToHtml(a.skill_outputs['account_summary'])+'</div></div></div>';
+        }
+        if(a.skill_outputs['quick_insights']){
+            h+='<div class="sec"><div class="sec-h">Quick Insights <span class="jarvis-tag" style="margin-left:8px">AI Generated</span></div><div class="sec-b"><div class="skill-md md-body">'+mdToHtml(a.skill_outputs['quick_insights'])+'</div></div></div>';
+        }
+        h+='</div></div>';
+    }
+
+    // ── REMAINING JARVIS INTELLIGENCE ─────────────────────────────────────────
+    var alreadyShown=new Set(['meddpicc','risk_report','technical_risk','competitive_intelligence','battlecard','competitor_pricing','value_architecture','discovery_questions','meeting_prep','account_summary','quick_insights']);
+    var skillOrder=['demo_strategy','proposal','followup_email','sow','documentation','architecture_diagram','knowledge_builder','conversation_summary','custom_template'];
+    var generated=skillOrder.filter(function(k){return a.skill_outputs[k]&&!alreadyShown.has(k)});
+    var allPending=['account_summary','quick_insights','discovery_questions','value_architecture','competitor_pricing','meeting_prep','demo_strategy','proposal','followup_email','technical_risk','sow','meddpicc','risk_report','battlecard','competitive_intelligence'];
+    var pending=allPending.filter(function(k){return!a.skill_outputs[k]});
+
+    if(generated.length){
+        h+='<hr class="divider"><div class="section"><div class="section-label">More JARVIS Intelligence ('+generated.length+')</div>';
+        generated.forEach(function(k){var info=REG[k]||{label:k};h+='<div class="sec" style="margin-bottom:14px"><div class="sec-h">'+esc(info.label)+' <span class="jarvis-tag">Generated by JARVIS</span></div><div class="sec-b"><div class="skill-md md-body">'+mdToHtml(a.skill_outputs[k])+'</div></div></div>'});
+        h+='</div>';
+    }
+
     if(pending.length){
-        var queued=a.skills_queued||[];
-        var isActive=Q&&Q.is_active;
-        h+='<hr class="divider"><div class="section"><div class="section-label">Intelligence Generating ('+pending.length+' in progress)</div><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">';
+        var queued=a.skills_queued||[],isActive=Q&&Q.is_active;
+        h+='<hr class="divider"><div class="section"><div class="section-label">Intelligence Generating ('+pending.length+' pending)</div><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">';
         pending.forEach(function(k){
             var info=REG[k]||{label:k,cmd:k};
             var inQ=queued.indexOf(k)>=0||isActive;
             if(inQ){
-                h+='<div class="sec"><div class="sec-b"><div class="skill-empty"><div class="se-title">'+info.label+'</div><div style="margin:10px 0;color:var(--y);font-size:12px;font-weight:600">⏳ Generating…</div><div style="font-size:10px;color:var(--t3)">Refreshes automatically when ready</div></div></div></div>';
+                h+='<div class="sec"><div class="sec-b"><div class="skill-empty"><div class="se-title">'+esc(info.label)+'</div><div style="margin:10px 0;color:var(--y);font-size:12px;font-weight:600">⏳ Generating…</div><div style="font-size:10px;color:var(--t3)">Refreshes automatically when ready</div></div></div></div>';
             } else {
-                h+='<div class="sec"><div class="sec-b"><div class="skill-empty"><div class="se-title">'+info.label+'</div><div style="font-size:10px;color:var(--t3);margin-bottom:8px">Will auto-generate when JARVIS is active</div><div class="se-cmd" onclick="copyCmd(this)" title="Click to copy">Run '+info.cmd+' for '+a.name+'</div></div></div></div>';
+                h+='<div class="sec"><div class="sec-b"><div class="skill-empty"><div class="se-title">'+esc(info.label)+'</div><div style="font-size:10px;color:var(--t3);margin-bottom:8px">Will auto-generate when JARVIS is active</div><div class="se-cmd" onclick="copyCmd(this)" title="Click to copy">Run '+esc(info.cmd)+' for '+esc(a.name)+'</div></div></div></div>';
             }
         });
         h+='</div></div>';
@@ -414,8 +688,8 @@ function renderReport(a){
 
 function skillBlock(key,a,title,standalone){
     var content=a.skill_outputs[key];
-    if(content)return'<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--bdr)"><span class="jarvis-tag">'+title+'</span><div class="skill-md md-body" style="margin-top:6px">'+mdToHtml(content)+'</div></div>';
-    if(standalone){var info=REG[key]||{cmd:key};return'<div class="skill-empty"><div class="se-title">Not Generated Yet</div><div class="se-desc">Ask JARVIS:</div><div class="se-cmd" onclick="copyCmd(this)">"Run '+info.cmd+' for '+a.name+'"</div></div>'}
+    if(content)return'<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--bdr)"><span class="jarvis-tag">'+esc(title)+'</span><div class="skill-md md-body" style="margin-top:6px">'+mdToHtml(content)+'</div></div>';
+    if(standalone){var info=REG[key]||{cmd:key};return'<div class="skill-empty"><div class="se-title">Not Generated Yet</div><div class="se-desc">Ask JARVIS:</div><div class="se-cmd" onclick="copyCmd(this)">"Run '+esc(info.cmd)+' for '+esc((cur||{}).name||'')+'"</div></div>'}
     return'';
 }
 
