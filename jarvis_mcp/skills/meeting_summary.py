@@ -27,5 +27,4 @@ class MeetingSummarySkill(BaseSkill):
         ]
 
         response = await self.parallel_sections(sections)
-        await self.write_output(account_name, "meeting_summary.md", response)
         return response

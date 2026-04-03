@@ -30,5 +30,4 @@ class CompetitorPricingSkill(BaseSkill):
         ]
 
         response = await self.parallel_sections(sections)
-        await self.write_output(account_name, "competitor_pricing.md", response)
         return response

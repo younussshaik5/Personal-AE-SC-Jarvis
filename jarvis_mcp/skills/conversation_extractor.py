@@ -27,5 +27,4 @@ class ConversationExtractorSkill(BaseSkill):
         ]
 
         response = await self.parallel_sections(sections)
-        await self.write_output(account_name, "conversation_extractor.md", response)
         return response

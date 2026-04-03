@@ -33,5 +33,4 @@ class DealStageTrackerSkill(BaseSkill):
         ]
 
         response = await self.parallel_sections(sections)
-        await self.write_output(account_name, "deal_stage_tracker.md", response)
         return response

@@ -34,5 +34,4 @@ class RiskReportSkill(BaseSkill):
         ]
 
         response = await self.parallel_sections(sections)
-        await self.write_output(account_name, "risk_report.md", response)
         return response

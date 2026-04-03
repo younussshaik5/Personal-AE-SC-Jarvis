@@ -34,5 +34,4 @@ class ProposalSkill(BaseSkill):
         ]
 
         response = await self.parallel_sections(sections)
-        await self.write_output(account_name, "proposal.md", response)
         return response

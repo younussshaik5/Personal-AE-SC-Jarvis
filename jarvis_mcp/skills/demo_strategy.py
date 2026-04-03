@@ -29,5 +29,4 @@ class DemoStrategySkill(BaseSkill):
         ]
 
         response = await self.parallel_sections(sections)
-        await self.write_output(account_name, "demo_strategy.md", response)
         return response

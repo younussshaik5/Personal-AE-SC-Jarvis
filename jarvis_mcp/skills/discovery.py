@@ -25,5 +25,4 @@ class DiscoverySkill(BaseSkill):
         ]
 
         response = await self.parallel_sections(sections)
-        await self.write_output(account_name, "discovery_questions.md", response)
         return response

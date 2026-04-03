@@ -34,5 +34,4 @@ class AccountSummarySkill(BaseSkill):
         ]
 
         response = await self.parallel_sections(sections)
-        await self.write_output(account_name, "account_summary.md", response)
         return response

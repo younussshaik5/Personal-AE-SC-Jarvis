@@ -29,5 +29,4 @@ class ValueArchitectureSkill(BaseSkill):
         ]
 
         response = await self.parallel_sections(sections)
-        await self.write_output(account_name, "value_architecture.md", response)
         return response

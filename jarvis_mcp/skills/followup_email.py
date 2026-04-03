@@ -27,5 +27,4 @@ class FollowupEmailSkill(BaseSkill):
         ]
 
         response = await self.parallel_sections(sections)
-        await self.write_output(account_name, "followup_email.md", response)
         return response

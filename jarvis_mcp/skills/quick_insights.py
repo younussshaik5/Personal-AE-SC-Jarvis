@@ -26,5 +26,4 @@ class QuickInsightsSkill(BaseSkill):
         ]
 
         response = await self.parallel_sections(sections)
-        await self.write_output(account_name, "quick_insights.md", response)
         return response
