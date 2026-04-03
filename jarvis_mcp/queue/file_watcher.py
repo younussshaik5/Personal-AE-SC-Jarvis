@@ -76,8 +76,6 @@ class FileWatcher:
 
         self.LOOP_WINDOW = 300     # seconds — rolling window for loop detection
         self.LOOP_MAX_TRIGGERS = 3  # max allowed triggers per account/file in window
-        self.MIN_CONTENT_WORDS = 50   # minimum words for "meaningful" file
-        self.MAX_TBD_COUNT = 15       # if file has this many TBDs it's template-only
 
     def start(self) -> None:
         if self._running:
@@ -136,9 +134,6 @@ class FileWatcher:
             for filename, _skills in FILE_TRIGGERS.items():
                 filepath = acct / filename
                 if not filepath.exists():
-                    continue
-                # Apply same guards as _handle_file
-                if filename.endswith(".md") and not self._has_meaningful_content(account_name, filename):
                     continue
                 log.info(f"[watcher] startup scan: queuing triggers for {account_name}/{filename}")
                 await self._enqueue_triggers(account_name, filename)
@@ -210,26 +205,6 @@ class FileWatcher:
 
     # ── Unified file handler ──────────────────────────────────────────────────
 
-    def _has_meaningful_content(self, account_name: str, filename: str) -> bool:
-        """Return True only if file has real content beyond a blank scaffold template.
-
-        Only checks word count — TBD count was too aggressive and blocked files
-        that mix template headers with real appended intel (which is the normal state).
-        Loop prevention is handled by: cycle guard (300s cooldown), loop detection
-        (3 triggers/5min), and dedup (5min per skill). No need for TBD gating.
-        """
-        path = self.accounts_root / account_name / filename
-        if not path.exists():
-            return False
-        try:
-            content = path.read_text(encoding="utf-8", errors="ignore")
-        except OSError:
-            return False
-        total_words = len(content.split())
-        # 200 words safely clears a blank scaffold template (~100-150 words)
-        # but passes any file with even a small amount of real content added
-        return total_words >= 200
-
     def _loop_detected(self, account_name: str, filename: str) -> bool:
         """Return True if this (account, file) has been triggered too many times recently."""
         key = f"{account_name}::{filename}"
@@ -258,11 +233,6 @@ class FileWatcher:
                 and self.merger.was_self_written(account_name)
             ):
                 log.debug(f"[watcher] Skipping self-written discovery.md for {account_name} (cycle guard)")
-                return
-            # Content guard: skip if file has no real content yet
-            # Only applies to .md files — JSON files are always valid regardless of size
-            if filename.endswith(".md") and not self._has_meaningful_content(account_name, filename):
-                log.info(f"[watcher] Skipping {account_name}/{filename} — no meaningful content (template/TBD only)")
                 return
             # Loop detection: suppress if same file triggered too many times recently
             if self._loop_detected(account_name, filename):
