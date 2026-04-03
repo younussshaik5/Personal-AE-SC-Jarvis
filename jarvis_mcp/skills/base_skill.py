@@ -96,40 +96,64 @@ class BaseSkill:
         return context
 
     def build_context_block(self, context: Dict[str, Any], account_name: str) -> str:
-        """Build a rich, grounded context block for LLM prompts."""
+        """
+        Build context block for LLM prompts.
+
+        Fast path (preferred): if intelligence_brief.md exists, use it as the
+        primary context — it was synthesised by Nemotron from ALL files with
+        zero truncation, so downstream skills get the complete picture in a
+        compact, cross-referenced form.
+
+        Fallback: if no brief yet, use the raw files (with limits) as before.
+        """
         parts = []
 
-        ds = context.get("deal_stage", "")
-        if ds:
-            parts.append(f"=== DEAL DATA ===\n{ds}")
+        brief = context.get("intelligence_brief", "")
+        if brief and len(brief.strip()) > 500:
+            # ── Fast path: Nemotron brief available ──────────────────────────
+            parts.append(
+                f"=== INTELLIGENCE BRIEF (Nemotron full-context synthesis) ===\n{brief}"
+            )
+            # Always include structured deal data alongside the brief
+            ds = context.get("deal_stage", "")
+            if ds:
+                parts.append(f"=== DEAL DATA ===\n{ds}")
+            # Recent evolution log for latest activity
+            evo = context.get("_evolution_log", "")
+            if evo:
+                lines = [l for l in evo.splitlines() if l.strip() and not l.startswith("#")]
+                recent = "\n".join(lines[-20:])
+                if recent:
+                    parts.append(f"=== RECENT EVOLUTION LOG ===\n{recent}")
 
-        cr = context.get("company_research", "")
-        if cr:
-            parts.append(f"=== COMPANY RESEARCH ===\n{cr[:25000]}")
+        else:
+            # ── Fallback: no brief yet, use raw files ─────────────────────────
+            ds = context.get("deal_stage", "")
+            if ds:
+                parts.append(f"=== DEAL DATA ===\n{ds}")
 
-        disc = context.get("discovery", "")
-        if disc:
-            # Use TAIL of file — real intel is appended at the bottom;
-            # the top is the blank MEDDPICC template (~4000 chars of TBDs)
-            DISC_LIMIT = 30000
-            disc_content = disc[-DISC_LIMIT:] if len(disc) > DISC_LIMIT else disc
-            parts.append(f"=== DISCOVERY NOTES ===\n{disc_content}")
+            cr = context.get("company_research", "")
+            if cr:
+                parts.append(f"=== COMPANY RESEARCH ===\n{cr[:25000]}")
 
-        # Evolution log — what skills ran recently and what they found
-        evo = context.get("_evolution_log", "")
-        if evo:
-            # Only include the last 30 lines — enough for context, not noisy
-            lines = [l for l in evo.splitlines() if l.strip() and not l.startswith("#")]
-            recent = "\n".join(lines[-30:])
-            if recent:
-                parts.append(f"=== RECENT EVOLUTION LOG ===\n{recent}")
+            disc = context.get("discovery", "")
+            if disc:
+                DISC_LIMIT = 30000
+                disc_content = disc[-DISC_LIMIT:] if len(disc) > DISC_LIMIT else disc
+                parts.append(f"=== DISCOVERY NOTES ===\n{disc_content}")
 
-        # Include any other skill outputs already generated
-        skip = {"deal_stage", "company_research", "discovery", "CLAUDE", "_deal",
-                "_evolution_log", "_skill_timeline"}
-        for key, val in context.items():
-            if key not in skip and isinstance(val, str) and val.strip():
-                parts.append(f"=== {key.upper().replace('_', ' ')} ===\n{val[:10000]}")
+            evo = context.get("_evolution_log", "")
+            if evo:
+                lines = [l for l in evo.splitlines() if l.strip() and not l.startswith("#")]
+                recent = "\n".join(lines[-30:])
+                if recent:
+                    parts.append(f"=== RECENT EVOLUTION LOG ===\n{recent}")
+
+            skip = {"deal_stage", "company_research", "discovery", "CLAUDE", "_deal",
+                    "_evolution_log", "_skill_timeline", "intelligence_brief"}
+            for key, val in context.items():
+                if key not in skip and isinstance(val, str) and val.strip():
+                    parts.append(f"=== {key.upper().replace('_', ' ')} ===\n{val[:10000]}")
 
         if not parts:
             return f"Account: {account_name}\n(No account data found — run discovery first)"

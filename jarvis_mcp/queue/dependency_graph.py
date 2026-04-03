@@ -16,6 +16,7 @@ from typing import Dict, List
 # own file writes internally.
 
 SKILL_OUTPUT_FILES: Dict[str, str] = {
+    "intelligence_brief":     "intelligence_brief.md",
     "company_research":       "company_research.md",
     "proposal":               "proposal.md",
     "battlecard":             "battlecard.md",
@@ -46,31 +47,25 @@ SKILL_OUTPUT_FILES: Dict[str, str] = {
 # Priority 2 (HIGH) — direct source changed, run immediately.
 
 FILE_TRIGGERS: Dict[str, List[str]] = {
-    # Safe to include feedback skills here because:
-    # - Feedback loop (skill output → discovery.md) is fire-and-forget async
-    # - KnowledgeMerger.was_self_written() has a 300s cooldown per account
-    # - FileWatcher cycle guard checks was_self_written() and suppresses re-triggers
-    # Result: one full batch of skills runs, enriches discovery.md once, stops.
+    # intelligence_brief runs FIRST on any source change.
+    # Nemotron reads all files, writes intelligence_brief.md, then
+    # SKILL_CASCADES["intelligence_brief"] fires all reasoning skills.
+    # company_research runs in parallel (independent of brief).
     "discovery.md": [
-        "meddpicc",                 # re-score all 8 MEDDPICC dimensions
-        "battlecard",               # competitive refresh
-        "competitive_intelligence", # deep competitive analysis
-        "technical_risk",           # technical blockers and integration risk
-        "discovery",                # refresh gap-based discovery questions
-        "company_research",         # refresh company profile from latest intel
+        "intelligence_brief",       # Nemotron full-context synthesis (runs first)
+        "company_research",         # parallel — doesn't depend on brief
     ],
     "company_research.md": [
+        "intelligence_brief",       # re-synthesise when company profile updates
         "battlecard",
         "competitive_intelligence",
         "demo_strategy",
         "account_summary",
     ],
     "deal_stage.json": [
-        "quick_insights",           # stage/ARR changed
-        "account_summary",          # dossier needs refresh
-        "meddpicc",                 # deal data affects scores
-        "risk_report",              # stage change = risk shift
-        "company_research",         # company profile refresh on deal update
+        "intelligence_brief",       # re-synthesise on deal data change
+        "quick_insights",           # fast — runs in parallel
+        "account_summary",          # fast — runs in parallel
     ],
 }
 
@@ -79,6 +74,24 @@ FILE_TRIGGERS: Dict[str, List[str]] = {
 # priority 3 = first wave, 4 = second wave, 5 = third wave.
 
 SKILL_CASCADES: Dict[str, Dict] = {
+
+    # ── Wave 0 — Intelligence Brief cascade (priority 2 = HIGH) ──────────────
+    # After Nemotron writes intelligence_brief.md, all reasoning skills fire
+    # with the full synthesised context as their primary input.
+
+    "intelligence_brief": {
+        "skills": [
+            "meddpicc",                 # score all 8 dimensions from complete brief
+            "battlecard",               # competitive positioning from complete intel
+            "competitive_intelligence", # deep competitive analysis
+            "technical_risk",           # technical blockers and integration risk
+            "discovery",                # gap-based discovery questions
+            "risk_report",              # deal risk from complete picture
+            "value_architecture",       # ROI model with all value signals
+            "account_summary",          # full deal dossier
+        ],
+        "priority": 2,   # HIGH — same as file trigger priority
+    },
 
     # ── Wave 1 (priority 3) ───────────────────────────────────────────────────
 

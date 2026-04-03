@@ -33,6 +33,7 @@ INGESTIBLE_EXTENSIONS = {".md", ".txt", ".text", ".csv", ".log"}
 # Filenames that are JARVIS-generated outputs — don't feed back into themselves
 JARVIS_OUTPUT_FILES = {
     # Skill output files — never re-ingest these as external intel
+    "intelligence_brief.md",
     "battlecard.md", "meddpicc.md", "risk_report.md", "proposal.md",
     "sow.md", "value_architecture.md", "demo_strategy.md", "meeting_prep.md",
     "account_summary.md", "competitive_intelligence.md", "competitor_pricing.md",

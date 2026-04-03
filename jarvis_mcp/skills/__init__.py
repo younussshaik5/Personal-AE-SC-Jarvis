@@ -1,6 +1,7 @@
 """JARVIS Skills package - all 24+ presales intelligence skills."""
 
 from .account_summary import AccountSummarySkill
+from .intelligence_brief import IntelligenceBriefSkill
 from .architecture_diagram import ArchitectureDiagramSkill
 from .battlecard import BattlecardSkill
 from .company_research import CompanyResearchSkill
@@ -32,6 +33,7 @@ from .system_health import SystemHealthSkill
 # Skill registry mapping skill names to classes
 SKILL_REGISTRY = {
     "account_summary": AccountSummarySkill,
+    "intelligence_brief": IntelligenceBriefSkill,
     "architecture_diagram": ArchitectureDiagramSkill,
     "battlecard": BattlecardSkill,
     "company_research": CompanyResearchSkill,
@@ -64,6 +66,7 @@ SKILL_REGISTRY = {
 __all__ = [
     "SKILL_REGISTRY",
     "AccountSummarySkill",
+    "IntelligenceBriefSkill",
     "ArchitectureDiagramSkill",
     "BattlecardSkill",
     "CompanyResearchSkill",
