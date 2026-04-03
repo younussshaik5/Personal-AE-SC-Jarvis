@@ -32,13 +32,18 @@ INGESTIBLE_EXTENSIONS = {".md", ".txt", ".text", ".csv", ".log"}
 
 # Filenames that are JARVIS-generated outputs — don't feed back into themselves
 JARVIS_OUTPUT_FILES = {
+    # Skill output files — never re-ingest these as external intel
     "battlecard.md", "meddpicc.md", "risk_report.md", "proposal.md",
     "sow.md", "value_architecture.md", "demo_strategy.md", "meeting_prep.md",
     "account_summary.md", "competitive_intelligence.md", "competitor_pricing.md",
-    "technical_risk.md", "discovery.md", "quick_insights.md", "followup_email.md",
+    "technical_risk.md", "quick_insights.md", "followup_email.md",
     "architecture_diagram.md", "knowledge_builder.md", "documentation.md",
+    "discovery_questions.md", "conversation_extractor.md", "conversation_summary.md",
+    "meeting_summary.md", "report.html", "custom_template.md",
+    # Internal JARVIS files
     "_evolution_log.md", "_skill_timeline.json", "deal_stage.json",
-    "company_research.md",  # source file — handled by FILE_TRIGGERS directly
+    # Source files — handled by FILE_TRIGGERS directly, not via extractor
+    "discovery.md", "company_research.md",
 }
 
 
@@ -179,7 +184,13 @@ class FileWatcher:
     # ── Unified file handler ──────────────────────────────────────────────────
 
     def _has_meaningful_content(self, account_name: str, filename: str) -> bool:
-        """Return True only if file has real content beyond template TBD placeholders."""
+        """Return True only if file has real content beyond a blank scaffold template.
+
+        Only checks word count — TBD count was too aggressive and blocked files
+        that mix template headers with real appended intel (which is the normal state).
+        Loop prevention is handled by: cycle guard (300s cooldown), loop detection
+        (3 triggers/5min), and dedup (5min per skill). No need for TBD gating.
+        """
         path = self.accounts_root / account_name / filename
         if not path.exists():
             return False
@@ -187,14 +198,10 @@ class FileWatcher:
             content = path.read_text(encoding="utf-8", errors="ignore")
         except OSError:
             return False
-        tbd_count = (
-            content.count("TBD")
-            + content.count("To be identified")
-            + content.count("To be discovered")
-            + content.count("To be determined")
-        )
         total_words = len(content.split())
-        return total_words >= self.MIN_CONTENT_WORDS and tbd_count < self.MAX_TBD_COUNT
+        # 200 words safely clears a blank scaffold template (~100-150 words)
+        # but passes any file with even a small amount of real content added
+        return total_words >= 200
 
     def _loop_detected(self, account_name: str, filename: str) -> bool:
         """Return True if this (account, file) has been triggered too many times recently."""
