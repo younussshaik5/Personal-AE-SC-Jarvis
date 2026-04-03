@@ -88,6 +88,9 @@ class FileWatcher:
         # Snapshot existing files so we don't re-ingest on startup
         self._snapshot_existing()
 
+        # Queue skills for accounts that already have data (handles JARVIS restarts)
+        asyncio.ensure_future(self._startup_scan())
+
         try:
             self._start_watchdog()
             log.info(f"[watcher] watchdog active on {self.accounts_root}")
@@ -115,6 +118,30 @@ class FileWatcher:
                 for f in d.iterdir():
                     if f.is_file():
                         self._seen_files.add(str(f))
+
+    async def _startup_scan(self) -> None:
+        """
+        On startup, queue skills for any account that already has meaningful data.
+        This handles JARVIS restarts — existing accounts don't need a file change
+        to trigger skill generation; if the source files exist and have content,
+        queue them immediately.
+        """
+        if not self.accounts_root.exists():
+            return
+        await asyncio.sleep(2.0)  # Let queue worker fully start first
+        for acct in self.accounts_root.iterdir():
+            if not acct.is_dir():
+                continue
+            account_name = acct.name
+            for filename, _skills in FILE_TRIGGERS.items():
+                filepath = acct / filename
+                if not filepath.exists():
+                    continue
+                # Apply same guards as _handle_file
+                if filename.endswith(".md") and not self._has_meaningful_content(account_name, filename):
+                    continue
+                log.info(f"[watcher] startup scan: queuing triggers for {account_name}/{filename}")
+                await self._enqueue_triggers(account_name, filename)
 
     # ── Watchdog path ─────────────────────────────────────────────────────────
 
@@ -233,7 +260,8 @@ class FileWatcher:
                 log.debug(f"[watcher] Skipping self-written discovery.md for {account_name} (cycle guard)")
                 return
             # Content guard: skip if file has no real content yet
-            if not self._has_meaningful_content(account_name, filename):
+            # Only applies to .md files — JSON files are always valid regardless of size
+            if filename.endswith(".md") and not self._has_meaningful_content(account_name, filename):
                 log.info(f"[watcher] Skipping {account_name}/{filename} — no meaningful content (template/TBD only)")
                 return
             # Loop detection: suppress if same file triggered too many times recently
