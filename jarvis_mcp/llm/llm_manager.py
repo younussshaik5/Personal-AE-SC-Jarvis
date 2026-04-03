@@ -198,72 +198,103 @@ class LLMManager:
         model_chain = MODEL_ROUTING.get(model_type) or MODEL_ROUTING["default"]
 
         loop = asyncio.get_event_loop()
-        all_errors: List[str] = []
 
-        # Cascade: try each model in order; advance only when all keys fail for current model
-        for model_cfg in model_chain:
-            model_name = model_cfg["model"]
-            model_errors: List[str] = []
-            n = len(self._keys)
+        # Retry loop — on rate limits, wait for the shortest cooldown and try again.
+        # Only gives up on hard errors (auth failure, no keys, connection refused).
+        attempt_num = 0
+        while True:
+            attempt_num += 1
+            all_errors: List[str] = []
+            has_only_rate_limits = True  # will flip if we see a hard error
 
-            for attempt in range(n):
-                api_key, key_id = self._next_key_for_model(model_name)
-                if api_key is None:
-                    break
+            for model_cfg in model_chain:
+                model_name = model_cfg["model"]
+                model_errors: List[str] = []
+                n = len(self._keys)
 
-                # Still cooling down?
-                if not self._is_available(key_id, model_name):
-                    remaining = int(
-                        self._rate_limited_until.get(self._rl_key(key_id, model_name), 0) - time.time()
-                    )
-                    model_errors.append(f"{key_id}: rate-limited ({remaining}s)")
-                    continue
+                for _ in range(n):
+                    api_key, key_id = self._next_key_for_model(model_name)
+                    if api_key is None:
+                        break
 
-                log.info(f"LLM → [{key_id}] [{model_name}] | type={model_type} | {max_tokens}tok")
-                t0 = time.time()
+                    if not self._is_available(key_id, model_name):
+                        remaining = int(
+                            self._rate_limited_until.get(self._rl_key(key_id, model_name), 0) - time.time()
+                        )
+                        model_errors.append(f"{key_id}: rate-limited ({remaining}s)")
+                        continue
 
-                try:
-                    result = await asyncio.wait_for(
-                        loop.run_in_executor(
-                            None, self._llm_call, api_key, model_cfg, messages, max_tokens
-                        ),
-                        timeout=_TIMEOUT,
-                    )
-                    elapsed = round(time.time() - t0, 1)
-                    log.info(f"✅ [{key_id}] [{model_name}] responded in {elapsed}s")
-                    return result
+                    log.info(f"LLM → [{key_id}] [{model_name}] | type={model_type} | {max_tokens}tok")
+                    t0 = time.time()
 
-                except asyncio.TimeoutError:
-                    elapsed = round(time.time() - t0, 1)
-                    log.warning(f"⏱ [{key_id}] [{model_name}] timed out after {elapsed}s")
-                    model_errors.append(f"{key_id}: timeout")
+                    try:
+                        result = await asyncio.wait_for(
+                            loop.run_in_executor(
+                                None, self._llm_call, api_key, model_cfg, messages, max_tokens
+                            ),
+                            timeout=_TIMEOUT,
+                        )
+                        elapsed = round(time.time() - t0, 1)
+                        log.info(f"✅ [{key_id}] [{model_name}] responded in {elapsed}s")
+                        return result
 
-                except RateLimitError:
-                    self._mark_rate_limited(key_id, model_name)
-                    model_errors.append(f"{key_id}: rate-limited")
+                    except asyncio.TimeoutError:
+                        elapsed = round(time.time() - t0, 1)
+                        log.warning(f"⏱ [{key_id}] [{model_name}] timed out after {elapsed}s")
+                        model_errors.append(f"{key_id}: timeout")
+                        has_only_rate_limits = False
 
-                except APIConnectionError as e:
-                    log.error(f"❌ [{key_id}] [{model_name}] connection failed: {str(e)[:80]}")
-                    model_errors.append(f"{key_id}: connection error")
+                    except RateLimitError:
+                        self._mark_rate_limited(key_id, model_name)
+                        model_errors.append(f"{key_id}: rate-limited")
 
-                except APIError as e:
-                    msg = str(e)
-                    if "401" in msg or "Unauthorized" in msg:
-                        log.error(f"🔑 [{key_id}] [{model_name}] invalid API key")
-                        model_errors.append(f"{key_id}: auth failed")
-                    elif "404" in msg or "not found" in msg.lower():
-                        log.warning(f"⚠️ [{key_id}] [{model_name}] model unavailable — cascading")
-                        model_errors.append(f"{key_id}: model unavailable")
-                        break  # Skip remaining keys for this model, try next
-                    else:
-                        log.error(f"❌ [{key_id}] [{model_name}] API error: {msg[:80]}")
-                        model_errors.append(f"{key_id}: {msg[:60]}")
+                    except APIConnectionError as e:
+                        log.error(f"❌ [{key_id}] [{model_name}] connection failed: {str(e)[:80]}")
+                        model_errors.append(f"{key_id}: connection error")
+                        has_only_rate_limits = False
 
-            summary = " | ".join(model_errors)
-            log.warning(f"All keys failed for [{model_name}]: {summary} — cascading to next model")
-            all_errors.append(f"[{model_name}]: {summary}")
+                    except APIError as e:
+                        msg = str(e)
+                        if "401" in msg or "Unauthorized" in msg:
+                            log.error(f"🔑 [{key_id}] [{model_name}] invalid API key")
+                            model_errors.append(f"{key_id}: auth failed")
+                            has_only_rate_limits = False
+                        elif "404" in msg or "not found" in msg.lower():
+                            log.warning(f"⚠️ [{key_id}] [{model_name}] model unavailable — cascading")
+                            model_errors.append(f"{key_id}: model unavailable")
+                            has_only_rate_limits = False
+                            break
+                        else:
+                            log.error(f"❌ [{key_id}] [{model_name}] API error: {msg[:80]}")
+                            model_errors.append(f"{key_id}: {msg[:60]}")
+                            has_only_rate_limits = False
 
-        # All models and all keys exhausted
+                summary = " | ".join(model_errors)
+                log.warning(f"All keys failed for [{model_name}]: {summary} — cascading to next model")
+                all_errors.append(f"[{model_name}]: {summary}")
+
+            # All models exhausted this pass.
+            # If ALL failures were rate-limits, wait for the soonest key to free up and retry.
+            if has_only_rate_limits and self._keys:
+                now = time.time()
+                soonest = min(
+                    (self._rate_limited_until.get(self._rl_key(f"key-{i}", cfg["model"]), 0)
+                     for i in range(len(self._keys))
+                     for chain in MODEL_ROUTING.values()
+                     for cfg in chain),
+                    default=0,
+                )
+                wait = max(soonest - now + 1, 5)  # at least 5s buffer
+                log.warning(
+                    f"All keys rate-limited (attempt {attempt_num}) — "
+                    f"waiting {wait:.0f}s for cooldown, then retrying…"
+                )
+                await asyncio.sleep(wait)
+                continue  # retry the whole model chain
+
+            # Hard failure (auth/connection/model error) — don't retry
+            break
+
         error_detail = " || ".join(all_errors)
         log.error(f"All models failed for type={model_type}: {error_detail}")
         return f"❌ All models exhausted for '{model_type}': {error_detail}"
