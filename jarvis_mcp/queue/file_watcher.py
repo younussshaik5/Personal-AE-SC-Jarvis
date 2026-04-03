@@ -39,9 +39,12 @@ JARVIS_OUTPUT_FILES = {
     "technical_risk.md", "quick_insights.md", "followup_email.md",
     "architecture_diagram.md", "knowledge_builder.md", "documentation.md",
     "discovery_questions.md", "conversation_extractor.md", "conversation_summary.md",
-    "meeting_summary.md", "report.html", "custom_template.md",
+    "meeting_summary.md", "report.html", "html_report.md", "custom_template.md",
+    "deal_stage_tracker.md", "conversation_summarizer.md",
     # Internal JARVIS files
     "_evolution_log.md", "_skill_timeline.json", "deal_stage.json",
+    # Account config files — never extract intel from these
+    "CLAUDE.md",
     # Source files — handled by FILE_TRIGGERS directly, not via extractor
     "discovery.md", "company_research.md",
 }
