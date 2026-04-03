@@ -243,15 +243,72 @@ def compute_risks(deal, disc_sec, meddpicc):
     return risks
 
 
-def compute_discovery(disc_sec):
+def parse_meddpicc_scores(content):
+    """Parse JARVIS-generated meddpicc.md for per-dimension RED/AMBER/GREEN scores.
+    Falls back to 0 if a section is missing or empty."""
+    if not content or len(content.strip()) < 100:
+        return None
+    rating = {'GREEN': 9, 'AMBER': 5, 'RED': 2}
+    dim_aliases = {
+        'metrics':          ['metrics', 'metric'],
+        'economic_buyer':   ['economic buyer', 'economic'],
+        'decision_criteria':['decision criteria'],
+        'decision_process': ['decision process'],
+        'paper_process':    ['paper process', 'paper'],
+        'implications':     ['implication', 'pain'],
+        'champion':         ['champion'],
+        'competition':      ['competition', 'compet'],
+    }
+    sections = parse_md_sections(content)
+    score = {}
+    for dim, aliases in dim_aliases.items():
+        sec_content = next(
+            (v for k, v in sections.items() if any(a in k.lower() for a in aliases)),
+            ''
+        )
+        m = re.search(r'\*{0,2}Score\*{0,2}\s*[:\*]+\s*\*{0,2}(RED|AMBER|GREEN)\*{0,2}',
+                      sec_content, re.IGNORECASE)
+        if m:
+            score[dim] = rating[m.group(1).upper()]
+        elif sec_content.strip() and len(sec_content.strip()) > 30:
+            score[dim] = 4  # has content but no explicit score → mid-AMBER
+        else:
+            score[dim] = 0
+    if not any(score.values()):
+        return None   # nothing parsed — fall back to computed
+    total = sum(score.values())
+    score['total'] = total
+    score['max'] = 80
+    score['percentage'] = round((total / 80) * 100)
+    return score
+
+
+def compute_discovery(disc_sec, full_text=''):
     areas = ['Company Background', 'Business Drivers', 'Key Challenges', 'Technical Environment',
              'Success Criteria', 'Budget & Timeline', 'Key Stakeholders', 'Competitive Landscape', 'Decision Drivers']
-    found = sum(1 for a in areas if any(a.lower() in k.lower() for k in disc_sec.keys()))
-    return {
-        'completed': found, 'total': len(areas),
-        'percentage': round((found / len(areas)) * 100),
-        'missing': [a for a in areas if not any(a.lower() in k.lower() for k in disc_sec.keys())]
+    # Keywords that signal each area is covered — searched in full discovery text
+    signals = {
+        'Company Background':    ['company name', 'industry:', 'revenue:', 'hq:', 'employees:', 'founded'],
+        'Business Drivers':      ['business driver', 'business goal', 'pain point', 'problem', 'initiative'],
+        'Key Challenges':        ['challenge', 'blocker', 'pain point', 'risk', 'key challenge'],
+        'Technical Environment': ['tech stack', 'technical', 'infrastructure', 'platform', 'integration', 'email'],
+        'Success Criteria':      ['success criter', 'kpi', 'roi', 'outcome', 'quantif', 'payback'],
+        'Budget & Timeline':     ['budget', 'timeline', 'arr', 'fiscal', 'deal size', 'forecast', 'apr 2026'],
+        'Key Stakeholders':      ['stakeholder', 'champion', 'economic buyer', 'ravi', 'cfo', 'vp '],
+        'Competitive Landscape': ['competitor', 'competitive', 'incumbent', 'alternative', 'in-house'],
+        'Decision Drivers':      ['decision driver', 'decision process', 'evaluation', 'paper process', 'procurement'],
     }
+    text_lower = full_text.lower()
+    found, missing = 0, []
+    for area in areas:
+        has_section = any(area.lower() in k.lower() for k in disc_sec if disc_sec.get(k, '').strip())
+        has_keyword = any(sig in text_lower for sig in signals.get(area, [area.lower()]))
+        if has_section or has_keyword:
+            found += 1
+        else:
+            missing.append(area)
+    return {'completed': found, 'total': len(areas),
+            'percentage': round((found / len(areas)) * 100), 'missing': missing}
 
 
 def load_account(folder, name, parent=None):
@@ -273,11 +330,34 @@ def load_account(folder, name, parent=None):
     cl_sec = parse_md_sections(claude_md)
 
     stakeholders = deal.get("stakeholders", [])
-    meddpicc = compute_meddpicc(deal, {**disc_sec, **co_sec}, cl_sec, stakeholders)
-    risks = compute_risks(deal, disc_sec, meddpicc)
-    disc_comp = compute_discovery(disc_sec)
 
+    # Use JARVIS-generated meddpicc.md scores when available; fall back to computed
+    meddpicc_md = sanitize(read_file(folder / "meddpicc.md"))
+    meddpicc = parse_meddpicc_scores(meddpicc_md) or \
+               compute_meddpicc(deal, {**disc_sec, **co_sec}, cl_sec, stakeholders)
+
+    risks = compute_risks(deal, disc_sec, meddpicc)
+    # Pass full discovery text so keyword signals in appended intel are counted
+    disc_comp = compute_discovery(disc_sec, discovery_md)
+
+    # Next actions: CLAUDE.md first, then fall back to account_summary.md
     next_actions = extract_bullets(cl_sec.get('Next Actions', '') or cl_sec.get('Next Steps', ''))
+    if not next_actions:
+        sum_md = sanitize(read_file(folder / "account_summary.md"))
+        if sum_md:
+            sum_sec = parse_md_sections(sum_md)
+            for key, text in sum_sec.items():
+                if any(k in key.lower() for k in ('action', 'next step', 'recommendation')):
+                    next_actions = extract_bullets(text)
+                    if not next_actions:
+                        for line in text.split('\n'):
+                            line = line.strip().lstrip('#').strip()
+                            if len(line) > 25:
+                                next_actions = [line[:200]]
+                                break
+                    if next_actions:
+                        break
+
     pain_points = extract_bullets(cl_sec.get('Key Pain Points to Address', ''))
 
     prog = []
@@ -326,7 +406,7 @@ def load_account(folder, name, parent=None):
         "activities": deal.get("activities", []),
         "constraints": deal.get("constraints", []),
         "next_milestone": deal.get("next_milestone", {}),
-        "company_info": sanitize(company_md, 3000),
+        "company_info": sanitize(company_md),
         "discovery_notes": sanitize(discovery_md, 5000),
         "account_rules_md": sanitize(claude_md, 3000),
         "meddpicc": meddpicc,

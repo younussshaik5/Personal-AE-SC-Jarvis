@@ -16,6 +16,7 @@ from typing import Dict, List
 # own file writes internally.
 
 SKILL_OUTPUT_FILES: Dict[str, str] = {
+    "company_research":       "company_research.md",
     "proposal":               "proposal.md",
     "battlecard":             "battlecard.md",
     "demo_strategy":          "demo_strategy.md",
@@ -56,6 +57,7 @@ FILE_TRIGGERS: Dict[str, List[str]] = {
         "competitive_intelligence", # deep competitive analysis
         "technical_risk",           # technical blockers and integration risk
         "discovery",                # refresh gap-based discovery questions
+        "company_research",         # refresh company profile from latest intel
     ],
     "company_research.md": [
         "battlecard",
@@ -68,6 +70,7 @@ FILE_TRIGGERS: Dict[str, List[str]] = {
         "account_summary",          # dossier needs refresh
         "meddpicc",                 # deal data affects scores
         "risk_report",              # stage change = risk shift
+        "company_research",         # company profile refresh on deal update
     ],
 }
 

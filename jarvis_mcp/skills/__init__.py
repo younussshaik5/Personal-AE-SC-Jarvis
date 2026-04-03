@@ -3,6 +3,7 @@
 from .account_summary import AccountSummarySkill
 from .architecture_diagram import ArchitectureDiagramSkill
 from .battlecard import BattlecardSkill
+from .company_research import CompanyResearchSkill
 from .competitive_intelligence import CompetitiveIntelligenceSkill
 from .competitor_pricing import CompetitorPricingSkill
 from .conversation_extractor import ConversationExtractorSkill
@@ -33,6 +34,7 @@ SKILL_REGISTRY = {
     "account_summary": AccountSummarySkill,
     "architecture_diagram": ArchitectureDiagramSkill,
     "battlecard": BattlecardSkill,
+    "company_research": CompanyResearchSkill,
     "competitive_intelligence": CompetitiveIntelligenceSkill,
     "competitor_pricing": CompetitorPricingSkill,
     "conversation_extractor": ConversationExtractorSkill,
@@ -64,6 +66,7 @@ __all__ = [
     "AccountSummarySkill",
     "ArchitectureDiagramSkill",
     "BattlecardSkill",
+    "CompanyResearchSkill",
     "CompetitiveIntelligenceSkill",
     "CompetitorPricingSkill",
     "ConversationExtractorSkill",
