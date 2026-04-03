@@ -99,8 +99,8 @@ SKILL_CASCADES: Dict[str, Dict] = {
             "risk_report",
             "value_architecture",
             "account_summary",
-            "discovery",           # discovery gaps updated by fresh MEDDPICC scores
-            "knowledge_builder",   # stakeholder map from fresh MEDDPICC
+            "discovery",
+            "knowledge_builder",
         ],
         "priority": 3,
     },
@@ -111,9 +111,9 @@ SKILL_CASCADES: Dict[str, Dict] = {
         "priority": 4,
     },
 
-    # Fresh technical risk → meeting prep (SC needs to know blockers)
+    # Fresh technical risk → meeting prep + architecture diagram
     "technical_risk": {
-        "skills": ["meeting_prep"],
+        "skills": ["meeting_prep", "architecture_diagram"],
         "priority": 4,
     },
 
@@ -125,27 +125,27 @@ SKILL_CASCADES: Dict[str, Dict] = {
         "priority": 4,
     },
 
-    # Fresh value architecture → proposal (ROI now in context)
+    # Fresh value architecture → proposal
     "value_architecture": {
         "skills": ["proposal"],
         "priority": 4,
     },
 
-    # Fresh account summary → knowledge graph
+    # Fresh account summary → knowledge graph + HTML dashboard
     "account_summary": {
-        "skills": ["knowledge_builder"],
+        "skills": ["knowledge_builder", "html_generator"],
         "priority": 4,
     },
 
     # ── Wave 4 (priority 5) ───────────────────────────────────────────────────
 
-    # Fresh proposal → SOW derived from it
+    # Fresh proposal → SOW + documentation
     "proposal": {
-        "skills": ["sow"],
+        "skills": ["sow", "documentation"],
         "priority": 5,
     },
 
-    # Fresh demo strategy → final meeting prep (everything now in context)
+    # Fresh demo strategy → final meeting prep
     "demo_strategy": {
         "skills": ["meeting_prep"],
         "priority": 5,
@@ -156,6 +156,12 @@ SKILL_CASCADES: Dict[str, Dict] = {
         "skills": ["battlecard"],
         "priority": 5,
     },
+
+    # Fresh meeting prep → follow-up email (everything in context for next touch)
+    "meeting_prep": {
+        "skills": ["followup_email"],
+        "priority": 5,
+    },
 }
 
 # ── Skills never auto-queued ──────────────────────────────────────────────────
@@ -163,15 +169,14 @@ SKILL_CASCADES: Dict[str, Dict] = {
 # or are infrastructure/meta skills).
 
 SKIP_AUTO_QUEUE = {
-    "scaffold_account",         # user-only: creates new account
+    "scaffold_account",         # user-only: creates account folder
     "onboarding",               # user-only: setup wizard
     "deal_stage_tracker",       # user-only: manual stage update
     "system_health",            # user-only: diagnostics
     "custom_template",          # user-only: needs custom prompt
-    "html_generator",           # user-only: needs explicit request
-    "documentation",            # user-only: needs explicit request
-    "conversation_summarizer",  # user-only: needs transcript input
-    "meeting_summary",          # user-only: needs transcript input
-    "architecture_diagram",     # user-only: needs explicit request
-    "followup_email",           # user-only: needs meeting context
+    "conversation_summarizer",  # user-only: needs conversation transcript as input
+    "meeting_summary",          # user-only: needs meeting transcript as input
+    "conversation_extractor",   # user-only: needs raw conversation text as input
+    # followup_email, architecture_diagram, documentation, html_generator
+    # are auto-triggered via cascade — they work from account context alone
 }
