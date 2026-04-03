@@ -14,12 +14,12 @@ class ValueArchitectureSkill(BaseSkill):
             {
                 "name": "Business Problems & Quantified Value",
                 "prompt": f"{base} write:\n1. Business problems being solved (from discovery — use actual pain points)\n2. Quantified value per problem area where numbers exist in the data\n\nWhere numbers are not in the data, say 'To be quantified in discovery'. Generate ONLY this section.",
-                "max_tokens": 1000,
+                "max_tokens": 2000,
             },
             {
                 "name": "ROI Model & TCO Comparison",
                 "prompt": f"{base} build:\n1. ROI model using actual inputs (agents count, ARR, deal size from deal data):\n   - Conservative / Realistic / Optimistic scenarios\n   - Payback period calculation\n   - Year 1 ROI %\n2. TCO comparison: current state cost (incumbent + in-house) vs our solution\n\nUse actual numbers from the data. Where numbers are missing say 'To be quantified'. Generate ONLY this section.",
-                "max_tokens": 1200,
+                "max_tokens": 2000,
             },
             {
                 "name": "Executive Value Statement",

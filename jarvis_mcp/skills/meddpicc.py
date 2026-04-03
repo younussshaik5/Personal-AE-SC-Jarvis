@@ -10,7 +10,16 @@ class MeddpiccSkill(BaseSkill):
 
         base = f"For {account_name}.\n\nACCOUNT DATA:\n{ctx}\n\nUsing ONLY the data above,"
 
-        dim_instruction = "For this dimension provide:\n- Score: RED / AMBER / GREEN\n- Evidence: direct quote or reference from the data\n- Gap: what is unconfirmed or missing\n- Next action: specific question or task to advance this dimension\n\nDo NOT invent names, competitors, metrics, or timelines not in the data. Generate ONLY this dimension."
+        dim_instruction = (
+            "For this dimension provide ALL of the following:\n"
+            "- **Score:** RED / AMBER / GREEN\n"
+            "- **Evidence:** direct quote or reference from the data (if none, state 'No data found')\n"
+            "- **Gap:** what is unconfirmed or missing\n"
+            "- **Next action:** specific discovery question to advance this dimension\n\n"
+            "CRITICAL: You MUST produce content for every field above. "
+            "If the data is TBD or missing, score RED, state what is absent, and write the exact question to ask. "
+            "Do NOT invent facts. Do NOT leave any field blank. Generate ONLY this dimension."
+        )
 
         sections = [
             {

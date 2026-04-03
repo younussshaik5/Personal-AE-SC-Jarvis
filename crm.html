@@ -384,7 +384,7 @@ function renderReport(a){
     h+='<div class="sec"><div class="sec-h">Recent Activities <span style="color:var(--t2);font-weight:400">'+a.activities.length+'</span></div><div class="sec-b">'+(a.activities.length?a.activities.map(function(x){return'<div style="padding:8px 0;border-bottom:1px solid var(--bdr);display:flex;gap:8px;font-size:12px"><span style="color:var(--g)">&check;</span><div>'+x+'</div></div>'}).join(''):'<div class="empty">No activities recorded</div>')+'</div></div></div></div>';
 
     // JARVIS GENERATED INTELLIGENCE
-    var skillOrder=['account_summary','quick_insights','value_architecture','competitor_pricing','meeting_prep','demo_strategy','proposal','followup_email','technical_risk','sow'];
+    var skillOrder=['account_summary','quick_insights','discovery_questions','value_architecture','competitor_pricing','meeting_prep','demo_strategy','proposal','followup_email','technical_risk','sow'];
     var generated=skillOrder.filter(function(k){return a.skill_outputs[k]});
     var pending=skillOrder.filter(function(k){return!a.skill_outputs[k]});
 

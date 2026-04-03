@@ -144,6 +144,10 @@ class BaseSkill:
             "Do NOT invent facts, names, titles, competitors, metrics, or timelines. "
             "If a field is missing from the data, say 'TBD — needs discovery' rather than guessing. "
             "Every claim must be traceable to the provided context. "
+            "MANDATORY: Every section MUST contain substantive content. "
+            "A blank or empty section is NEVER acceptable — if data is missing, "
+            "state what is missing, why it matters, and the specific discovery question that would fill the gap. "
+            "Do NOT repeat the section heading at the start of your response. "
             "Output professional markdown."
         )
 
@@ -192,12 +196,19 @@ class BaseSkill:
         tasks = [asyncio.ensure_future(_gen(s)) for s in sections]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
+        import re
         parts = []
         for section, result in zip(sections, results):
             if isinstance(result, Exception):
                 parts.append(f"## {section['name']}\n\n❌ Generation failed: {result}")
             else:
-                parts.append(f"## {section['name']}\n\n{result}")
+                # Strip any leading heading the LLM duplicated (prevents double ## headers)
+                name_escaped = re.escape(section["name"])
+                cleaned = re.sub(
+                    rf"^#+\s+{name_escaped}\s*\n*", "", result.strip(),
+                    count=1, flags=re.IGNORECASE
+                ).strip()
+                parts.append(f"## {section['name']}\n\n{cleaned}")
 
         return "\n\n---\n\n".join(parts)
 

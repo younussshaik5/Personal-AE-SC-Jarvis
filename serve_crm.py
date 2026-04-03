@@ -75,6 +75,7 @@ SKILL_FILES = {
     "followup_email":           {"file": "followup_email.md",           "label": "Follow-up Email",        "icon": "mail",       "cmd": "generate_followup"},
     "technical_risk":           {"file": "technical_risk.md",           "label": "Technical Risk",         "icon": "cpu",        "cmd": "assess_technical_risk"},
     "sow":                      {"file": "sow.md",                      "label": "Statement of Work",      "icon": "clipboard",  "cmd": "generate_sow"},
+    "discovery_questions":      {"file": "discovery_questions.md",      "label": "Discovery Questions",    "icon": "search",     "cmd": "get_discovery"},
 }
 
 # ── Queue manager ─────────────────────────────────────────────────────────────
@@ -291,12 +292,16 @@ def load_account(folder, name, parent=None):
         if clean:
             prog.append({'name': clean, 'status': status})
 
+    # Minimum bytes of content to count as "generated" — files with only
+    # section headers (67–104 bytes) are treated as failed and re-queued.
+    _MIN_SKILL_BYTES = 200
+
     skill_outputs = {}
     for skill_key, skill_info in SKILL_FILES.items():
         filepath = folder / skill_info["file"]
         if filepath.exists():
             content = sanitize(read_file(filepath))
-            if content.strip():
+            if content.strip() and len(content.strip()) >= _MIN_SKILL_BYTES:
                 skill_outputs[skill_key] = content
 
     # Queue status for this account
