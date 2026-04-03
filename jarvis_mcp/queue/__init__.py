@@ -1,6 +1,6 @@
 """JARVIS Queue Bus — file watcher + priority queue + cascade worker."""
 
-from .skill_queue import SkillQueue, QueueJob, PRIORITY_HIGH, PRIORITY_MEDIUM, PRIORITY_LOW
+from .skill_queue import SkillQueue, QueueJob, PRIORITY_HIGH, PRIORITY_MEDIUM, PRIORITY_LOW, PRIORITY_TAIL
 from .queue_worker import QueueWorker
 from .file_watcher import FileWatcher
 from .dependency_graph import FILE_TRIGGERS, SKILL_CASCADES, SKIP_AUTO_QUEUE, SKILL_OUTPUT_FILES
@@ -17,4 +17,5 @@ __all__ = [
     "PRIORITY_HIGH",
     "PRIORITY_MEDIUM",
     "PRIORITY_LOW",
+    "PRIORITY_TAIL",
 ]

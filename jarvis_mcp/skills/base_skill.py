@@ -105,11 +105,15 @@ class BaseSkill:
 
         cr = context.get("company_research", "")
         if cr:
-            parts.append(f"=== COMPANY RESEARCH ===\n{cr[:4000]}")
+            parts.append(f"=== COMPANY RESEARCH ===\n{cr[:6000]}")
 
         disc = context.get("discovery", "")
         if disc:
-            parts.append(f"=== DISCOVERY NOTES ===\n{disc[:5000]}")
+            # Use TAIL of file — real intel is appended at the bottom;
+            # the top is the blank MEDDPICC template (~4000 chars of TBDs)
+            DISC_LIMIT = 14000
+            disc_content = disc[-DISC_LIMIT:] if len(disc) > DISC_LIMIT else disc
+            parts.append(f"=== DISCOVERY NOTES ===\n{disc_content}")
 
         # Evolution log — what skills ran recently and what they found
         evo = context.get("_evolution_log", "")
@@ -125,7 +129,7 @@ class BaseSkill:
                 "_evolution_log", "_skill_timeline"}
         for key, val in context.items():
             if key not in skip and isinstance(val, str) and val.strip():
-                parts.append(f"=== {key.upper().replace('_', ' ')} ===\n{val[:2000]}")
+                parts.append(f"=== {key.upper().replace('_', ' ')} ===\n{val[:3000]}")
 
         if not parts:
             return f"Account: {account_name}\n(No account data found — run discovery first)"
