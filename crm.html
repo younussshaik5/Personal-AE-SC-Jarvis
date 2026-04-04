@@ -231,6 +231,40 @@ tbody tr:last-child td{border-bottom:none}
   .pf{display:block!important;text-align:center;margin-top:20px;padding-top:8px;border-top:1px solid #ddd;font-size:9px;color:#999}
 }
 @media(max-width:860px){.sidebar{display:none}.cols{grid-template-columns:1fr}.mg{grid-template-columns:1fr}.hstrip{grid-template-columns:1fr 1fr}.cg4{grid-template-columns:1fr 1fr}.row3{grid-template-columns:1fr 1fr}}
+
+/* ── Audit Log Panel ─────────────────────────────────────────────── */
+.log-btn{background:none;border:1px solid var(--bdr);color:var(--t2);font-size:11px;font-weight:600;padding:5px 11px;border-radius:7px;cursor:pointer;display:flex;align-items:center;gap:6px;transition:all .15s}
+.log-btn:hover{border-color:var(--accent2);color:var(--accent2)}
+.log-btn .log-live{width:7px;height:7px;border-radius:50%;background:var(--t3);display:inline-block}
+.log-btn .log-live.active{background:#00c97a;box-shadow:0 0 0 2px rgba(0,201,122,.25);animation:pulse 1.4s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.log-drawer{position:fixed;top:0;right:-540px;width:520px;height:100vh;background:var(--s1);border-left:1px solid var(--bdr);z-index:9999;display:flex;flex-direction:column;transition:right .25s ease;box-shadow:-8px 0 40px rgba(0,0,0,.35)}
+.log-drawer.open{right:0}
+.log-drawer-head{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--bdr);flex-shrink:0}
+.log-drawer-head h3{font-size:13px;font-weight:700;flex:1;margin:0}
+.log-mode-tabs{display:flex;gap:4px;background:var(--s2);padding:3px;border-radius:7px}
+.log-mode-tab{font-size:11px;font-weight:600;padding:4px 10px;border-radius:5px;cursor:pointer;color:var(--t2);border:none;background:none}
+.log-mode-tab.active{background:var(--accent);color:#fff}
+.log-close{background:none;border:none;color:var(--t2);font-size:18px;cursor:pointer;line-height:1;padding:2px 4px}
+.log-close:hover{color:var(--t1)}
+.log-list{flex:1;overflow-y:auto;padding:8px 0;font-size:11.5px;font-family:'SF Mono',monospace}
+.log-entry{display:flex;gap:8px;padding:5px 14px;border-bottom:1px solid rgba(255,255,255,.03);align-items:flex-start;line-height:1.5}
+.log-entry:hover{background:var(--s2)}
+.log-ts{color:var(--t3);flex-shrink:0;font-size:10px;padding-top:2px;min-width:58px}
+.log-lvl{flex-shrink:0;font-size:9px;font-weight:700;padding:2px 5px;border-radius:4px;text-transform:uppercase;min-width:40px;text-align:center}
+.log-lvl.INFO{background:rgba(79,115,255,.15);color:#4f73ff}
+.log-lvl.WARNING{background:rgba(255,170,0,.15);color:#ffaa00}
+.log-lvl.ERROR,.log-lvl.CRITICAL{background:rgba(220,60,60,.18);color:#e05555}
+.log-lvl.DEBUG{background:rgba(255,255,255,.06);color:var(--t3)}
+.log-msg{color:var(--t1);flex:1;word-break:break-word;font-family:inherit}
+.log-msg.eng{font-family:-apple-system,sans-serif;font-size:12px}
+.log-msg b{color:var(--accent2)}
+.log-footer{padding:10px 14px;border-top:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.log-count{font-size:10px;color:var(--t3)}
+.log-clear{background:none;border:1px solid var(--bdr);color:var(--t3);font-size:10px;padding:3px 9px;border-radius:5px;cursor:pointer}
+.log-clear:hover{color:var(--t1);border-color:var(--t2)}
+.log-overlay{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:9998;display:none}
+.log-overlay.open{display:block}
 </style>
 </head>
 <body>
@@ -240,7 +274,28 @@ tbody tr:last-child td{border-bottom:none}
   <div class="topbar-r">
     <span id="qBadge" style="display:none" class="q-badge"></span>
     <button class="gen-all" onclick="generateAll()">⚡ Generate All</button>
+    <button class="log-btn" onclick="toggleLogs()" id="logBtn">
+      <span class="log-live" id="logLive"></span> Audit Logs
+    </button>
     <span id="lastRef" style="font-size:10px;color:var(--t3)"></span>
+  </div>
+</div>
+
+<!-- Audit Log Overlay + Drawer -->
+<div class="log-overlay" id="logOverlay" onclick="toggleLogs()"></div>
+<div class="log-drawer" id="logDrawer">
+  <div class="log-drawer-head">
+    <h3>JARVIS Audit Logs</h3>
+    <div class="log-mode-tabs">
+      <button class="log-mode-tab active" id="tabTech" onclick="setLogMode('tech')">Technical</button>
+      <button class="log-mode-tab" id="tabEng" onclick="setLogMode('eng')">Plain English</button>
+    </div>
+    <button class="log-close" onclick="toggleLogs()">✕</button>
+  </div>
+  <div class="log-list" id="logList"></div>
+  <div class="log-footer">
+    <span class="log-count" id="logCount">0 entries</span>
+    <button class="log-clear" onclick="clearLogs()">Clear</button>
   </div>
 </div>
 <div id="loading" style="padding:60px 24px;color:var(--t2)">Loading deal intelligence…</div>
@@ -716,6 +771,134 @@ function copyCmd(el){
 }
 
 window.addEventListener('load',init);
+
+// ── Audit Log Panel ───────────────────────────────────────────────────────────
+var _logOpen=false, _logMode='tech', _logPoll=null, _logSince=0, _logEntries=[], _logAutoScroll=true;
+
+function toggleLogs(){
+  _logOpen=!_logOpen;
+  document.getElementById('logDrawer').classList.toggle('open',_logOpen);
+  document.getElementById('logOverlay').classList.toggle('open',_logOpen);
+  if(_logOpen){
+    if(!_logPoll) startLogPoll();
+  } else {
+    if(_logPoll){clearInterval(_logPoll);_logPoll=null;}
+    document.getElementById('logLive').classList.remove('active');
+  }
+}
+
+function setLogMode(m){
+  _logMode=m;
+  document.getElementById('tabTech').classList.toggle('active',m==='tech');
+  document.getElementById('tabEng').classList.toggle('active',m==='eng');
+  renderLogs();
+}
+
+function startLogPoll(){
+  _logPoll=setInterval(fetchLogs, 2000);
+  fetchLogs();
+}
+
+async function fetchLogs(){
+  try{
+    var r=await fetch('/api/logs?since='+_logSince,{cache:'no-store'});
+    var d=await r.json();
+    if(d.logs&&d.logs.length){
+      _logEntries=_logEntries.concat(d.logs);
+      if(_logEntries.length>500) _logEntries=_logEntries.slice(-500);
+      _logSince=_logEntries[_logEntries.length-1].ts;
+      renderLogs();
+    }
+    document.getElementById('logLive').classList.add('active');
+  }catch(e){
+    document.getElementById('logLive').classList.remove('active');
+  }
+}
+
+function renderLogs(){
+  var list=document.getElementById('logList');
+  var atBottom=list.scrollHeight-list.scrollTop-list.clientHeight<40;
+  var html='';
+  _logEntries.forEach(function(e){
+    var t=new Date(e.ts);
+    var ts=t.getHours().toString().padStart(2,'0')+':'+t.getMinutes().toString().padStart(2,'0')+':'+t.getSeconds().toString().padStart(2,'0');
+    var msg=_logMode==='eng'?translateLog(e):escLog(e.msg);
+    var engClass=_logMode==='eng'?' eng':'';
+    html+='<div class="log-entry">'+
+      '<span class="log-ts">'+ts+'</span>'+
+      '<span class="log-lvl '+e.level+'">'+e.level.substring(0,4)+'</span>'+
+      '<span class="log-msg'+engClass+'">'+msg+'</span>'+
+    '</div>';
+  });
+  list.innerHTML=html||'<div style="padding:24px;color:var(--t3);text-align:center;font-size:12px">Waiting for JARVIS activity…</div>';
+  document.getElementById('logCount').textContent=_logEntries.length+' entries';
+  if(atBottom) list.scrollTop=list.scrollHeight;
+}
+
+function escLog(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+
+function clearLogs(){_logEntries=[];_logSince=0;renderLogs();}
+
+// ── Plain-English log translator ──────────────────────────────────────────────
+function fSkill(s){return(s||'').replace(/_/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase();})}
+function fAcct(s){return(s||'').replace(/_/g,' ')}
+
+function translateLog(e){
+  var m=e.msg, x;
+  // Worker — skill running
+  if(x=m.match(/\[worker\] ▶ (\S+) \| (\S+) \| trigger=(\S+)/))
+    return '▶ Running <b>'+fSkill(x[1])+'</b> for <b>'+fAcct(x[2])+'</b> <span style="color:var(--t3)">('+x[3]+')</span>';
+  if(x=m.match(/\[worker\] ✓ (\S+) \| (\S+) \| ([\d.]+)s \| autonomous retry succeeded/))
+    return '✓ <b>'+fSkill(x[1])+'</b> for <b>'+fAcct(x[2])+'</b> completed in '+x[3]+'s after retry';
+  if(x=m.match(/\[worker\] ✓ (\S+) \| (\S+) \| ([\d.]+)s/))
+    return '✓ <b>'+fSkill(x[1])+'</b> for <b>'+fAcct(x[2])+'</b> completed in '+x[3]+'s';
+  if(x=m.match(/\[worker\] ✗ TIMEOUT (\S+) \| (\S+) \| ([\d.]+)s/))
+    return '⏱ <b>'+fSkill(x[1])+'</b> timed out for <b>'+fAcct(x[2])+'</b> after '+x[3]+'s — will retry';
+  if(x=m.match(/\[worker\] ✗ (\S+) \| (\S+) \| ([\d.]+)s \| retries exhausted/))
+    return '✗ <b>'+fSkill(x[1])+'</b> for <b>'+fAcct(x[2])+'</b> failed all retries — added to todo list';
+  if(x=m.match(/\[worker\] ✗ (\S+) \| (\S+) \| ([\d.]+)s \| (.*)/))
+    return '✗ <b>'+fSkill(x[1])+'</b> for <b>'+fAcct(x[2])+'</b> failed: '+x[4];
+  if(x=m.match(/\[worker\] wrote (\S+) for (\S+)/))
+    return 'Saved output file <b>'+x[1]+'</b> for <b>'+fAcct(x[2])+'</b>';
+  if(x=m.match(/\[worker\] feedback loop: new intel from (\S+) merged into (\S+)/))
+    return 'New intelligence from <b>'+fSkill(x[1])+'</b> extracted and saved to <b>'+fAcct(x[2].replace('/discovery.md',''))+'</b>';
+  if(x=m.match(/\[worker\] cascade dedup — (\S+) ran (\d+)s ago for (\S+)/))
+    return 'Skipping <b>'+fSkill(x[1])+'</b> for <b>'+fAcct(x[3])+'</b> — already ran '+x[2]+'s ago';
+  if(x=m.match(/\[worker\] Queue worker (started|stopped)/))
+    return 'JARVIS background worker '+x[1];
+  // Cascade / queue
+  if(x=m.match(/cascade: queued (\S+) for (\S+)/))
+    return 'Auto-queued <b>'+fSkill(x[1])+'</b> for <b>'+fAcct(x[2])+'</b> (cascade triggered)';
+  // Retry engine
+  if(x=m.match(/\[retry\] attempt (\d+)\/(\d+) \| (\S+) \| (\S+) \| strategy=(\S+) \| model_override=(\S+)/))
+    return 'Retry '+x[1]+'/'+x[2]+': trying <b>'+fSkill(x[3])+'</b> for <b>'+fAcct(x[4])+'</b> with '+x[5]+' strategy';
+  if(x=m.match(/\[retry\] verdict=(\S+) quality=(\d+) elapsed=([\d.]+)s \| (.*)/))
+    return 'Quality check: <b>'+x[1]+'</b> ('+x[2]+'/100) in '+x[3]+'s — '+x[4];
+  if(x=m.match(/\[retry\] todo created \| id=(\S+) \| (\S+) \| (\S+) \| (.*)/))
+    return '⚠ Human task created for <b>'+fSkill(x[2])+'</b> on <b>'+fAcct(x[3])+'</b>: '+x[4];
+  // File watcher
+  if(x=m.match(/\[watcher\] change: (.+)/))
+    return 'File changed: <b>'+x[1]+'</b> — intelligence update triggered';
+  if(x=m.match(/\[watcher\] queued (\S+) for (\S+)/))
+    return 'Added <b>'+fSkill(x[1])+'</b> to queue for <b>'+fAcct(x[2])+'</b>';
+  // Learning / feedback
+  if(x=m.match(/evolution log.*updated/i))
+    return 'JARVIS learning log updated';
+  // LLM calls
+  if(x=m.match(/\[llm\].*model=([\w\-\.\/]+)/))
+    return 'LLM call using model <b>'+x[1]+'</b>';
+  if(x=m.match(/rate.?limit/i))
+    return '⚠ API rate limit hit — JARVIS will retry automatically';
+  // Server startup
+  if(x=m.match(/Skills tracked: (\d+)/))
+    return 'JARVIS loaded <b>'+x[1]+'</b> skill types';
+  if(x=m.match(/CRM Dashboard.*http/))
+    return 'CRM server started and ready';
+  if(x=m.match(/ACCOUNTS: (.+)/))
+    return 'Accounts folder: <b>'+x[1]+'</b>';
+  // Generic — strip [brackets] and clean up
+  return escLog(m.replace(/\[[^\]]+\]\s*/g,'').trim()||m);
+}
 </script>
 </body>
 </html>

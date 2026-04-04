@@ -49,6 +49,27 @@ _load_env()
 logging.basicConfig(level=logging.INFO, format="[CRM] %(message)s", stream=sys.stderr)
 log = logging.getLogger(__name__)
 
+# ── Live log capture ──────────────────────────────────────────────────────────
+import collections as _col
+
+_log_buf: "collections.deque[dict]" = _col.deque(maxlen=500)
+_log_lock = threading.Lock()
+
+class _LogCapture(logging.Handler):
+    """Captures all log records into a ring buffer for /api/logs."""
+    def emit(self, record: logging.LogRecord) -> None:
+        with _log_lock:
+            _log_buf.append({
+                "ts":    int(record.created * 1000),  # epoch ms
+                "level": record.levelname,
+                "logger": record.name,
+                "msg":   record.getMessage(),
+            })
+
+_capture = _LogCapture()
+_capture.setLevel(logging.DEBUG)
+logging.getLogger().addHandler(_capture)
+
 # ── ACCOUNTS root ─────────────────────────────────────────────────────────────
 _env_root = os.getenv("ACCOUNTS_ROOT", "")
 _candidates = [
@@ -540,6 +561,16 @@ class CRMHandler(BaseHTTPRequestHandler):
             self._json(load_accounts_data())
         elif self.path == "/api/queue":
             self._json(_queue_status())
+        elif self.path.startswith("/api/logs"):
+            since = 0
+            if "?" in self.path:
+                for part in self.path.split("?", 1)[1].split("&"):
+                    if part.startswith("since="):
+                        try: since = int(part[6:])
+                        except ValueError: pass
+            with _log_lock:
+                logs = [e for e in _log_buf if e["ts"] > since]
+            self._json({"logs": logs})
         elif self.path in ("/", ""):
             self._serve_file(_here / "crm.html", "text/html")
         else:
