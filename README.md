@@ -97,11 +97,17 @@ Everything gets appended to `discovery.md` with a timestamp and source — never
 ### The cascade (what happens after any update)
 
 ```
-discovery.md updated (by anything above)
+discovery.md or deal_stage.json updated (by anything above)
   |
-  ├─ HIGH priority queue fires immediately:
-  |    meddpicc, risk_report, battlecard, competitive_intelligence,
-  |    value_architecture, technical_risk, discovery gaps
+  ├─ FIRST: intelligence_brief (Nemotron, priority 2)
+  |    Reads ALL files → synthesizes intelligence_brief.md
+  |    BriefCoordinator begins accumulating skill deltas into brief
+  |
+  └─ intelligence_brief completes → HIGH priority cascade fires:
+       meddpicc, risk_report, battlecard, competitive_intelligence,
+       value_architecture, technical_risk, discovery gaps
+       (each reads intelligence_brief.md as primary context)
+       (each delta appended to brief as skills complete)
   |
   ├─ meddpicc completes → cascades:
   |    risk_report, account_summary, knowledge_builder
@@ -120,7 +126,7 @@ Loop stops when IntelligenceExtractor returns NO_NEW_INTEL.
 At that point, everything is consistent and up to date.
 ```
 
-**Result:** Within 2-5 minutes of any input, all 14+ output files for the account are regenerated. Each knows what the previous found. The deal intelligence converges automatically.
+**Result:** Within 2-5 minutes of any input, all 15+ output files for the account are regenerated. Each knows what every previous skill found — and the intelligence brief keeps getting richer as the cascade runs.
 
 > **Confirmed end-to-end:** file watcher starts on Claude Desktop boot, skill calls route through the intelligence layer, outputs feed back into discovery.md, cycle guard prevents infinite loops, cascade runs in correct priority order.
 
@@ -131,18 +137,34 @@ At that point, everything is consistent and up to date.
 | `_skill_timeline.json` | When each skill last ran, what triggered it, success/error |
 | `_evolution_log.md` | Append-only log — every entry timestamped and sourced, read by all skills |
 
+### Two-stage intelligence architecture
+
+Every skill run goes through two stages:
+
+**Stage 1 — Nemotron synthesis (intelligence_brief)**
+Nemotron-120B reads ALL account files with zero truncation (discovery notes, MEDDPICC, battlecard, risk report, company research, evolution log) and synthesizes a comprehensive `intelligence_brief.md`. This is the single source of truth for the deal.
+
+**Stage 2 — Skill execution**
+All other skills (meddpicc, battlecard, proposal, etc.) read `intelligence_brief.md` as their primary context instead of raw files. Every skill starts with the full deal picture — not fragments.
+
+**BriefCoordinator — live enrichment**
+After each skill completes, a coordinator appends its key findings as a delta block to `intelligence_brief.md`. This means Wave 2 skills read a richer brief than Wave 1 — the brief gets smarter as the cascade runs. On the next intelligence_brief run, Nemotron absorbs all accumulated deltas into the new synthesis and the file resets clean.
+
+Zero extra API calls — coordinator is pure file I/O.
+
 ### Model routing — right model for each task
 
 | Type | Skills | Chain (failover order) |
 |---|---|---|
-| `reasoning` | MEDDPICC, risk, competitive, value arch, technical risk | **Nemotron-120B (1M ctx)** → kimi-k2-thinking → step-3.5-flash → qwq-32b |
+| `synthesis` | Intelligence Brief only | **Nemotron-120B (1M ctx)** with extended reasoning — dedicated key |
+| `reasoning` | MEDDPICC, risk, competitive, value arch, technical risk | kimi-k2-thinking → step-3.5-flash → qwq-32b |
 | `writing` | Proposals, SOW, battlecards, demo strategy, docs | kimi-k2-instruct → qwq-32b → kimi-k2-thinking |
 | `fast` | Quick insights, meeting prep, summaries, follow-ups, extraction | kimi-k2-instruct → qwen2-7b → kimi-k2-thinking |
 | `default` | Everything else | kimi-k2-instruct → kimi-k2-thinking → qwq-32b |
 
-**Nemotron-120B** (`nvidia/nemotron-3-super-120b-a12b`) is the primary reasoning model. It has a 1M token context window — all account files (discovery notes, MEDDPICC, battlecard, risk report, company research) are fed in full with no truncation. Every reasoning skill now has the complete deal picture, not just fragments. Falls back to kimi-k2-thinking automatically if unavailable.
+**Nemotron-120B** (`nvidia/nemotron-3-super-120b-a12b`) is reserved exclusively for intelligence synthesis. Its 1M token context window absorbs every account file at once — no truncation, no sampling. All reasoning skills (kimi, step3.5, qwq) then read the synthesized brief rather than raw files, so they reason over a clean, complete picture.
 
-If a key hits rate limits on model 1, it cascades to model 2 automatically. With 6 keys across 4 model options, failures are essentially impossible.
+If a key hits rate limits on model 1, it cascades to model 2 automatically. With 6 keys across 5 model options, failures are essentially impossible.
 
 ---
 
@@ -358,7 +380,7 @@ Create it with: `"Create account TataTeleservices with parent Tata"`
 
 ---
 
-## The 25 Skills
+## The 26 Skills
 
 ### Start here (try these first)
 
@@ -370,7 +392,7 @@ Create it with: `"Create account TataTeleservices with parent Tata"`
 | `"Meeting prep for Acme Corp"` | Who's attending, what to ask, objection handlers, hard ask |
 | `"Quick insights on Acme Corp"` | Fast snapshot — risk level, next recommended action |
 
-### All 24 skills
+### All 26 skills
 
 <details>
 <summary>Deal Intelligence</summary>
@@ -450,6 +472,15 @@ Create it with: `"Create account TataTeleservices with parent Tata"`
 | Skill | What it generates |
 |---|---|
 | `company_research` | Structured company profile — overview, business model, pain points, tech stack, competitive landscape, budget & timeline, key contacts, strategic initiatives — auto-generated from all account intel |
+
+</details>
+
+<details>
+<summary>Intelligence</summary>
+
+| Skill | What it generates |
+|---|---|
+| `intelligence_brief` | Full-context synthesis via Nemotron-120B — reads every account file at once, produces `intelligence_brief.md` as the primary context source for all downstream skills. Runs automatically before the reasoning cascade; you can also trigger it manually to force a full re-synthesis. |
 
 </details>
 
@@ -753,16 +784,18 @@ Make sure you're running it inside WSL (Ubuntu) or Git Bash, not the regular Win
 | What | What it actually is |
 |---|---|
 | Claude Desktop | The app you chat in. Loads JARVIS as a plugin. |
-| JARVIS MCP Server | Python process exposing 27 tools via MCP protocol |
-| Multi-model router | Routes each task to the right model (reasoning/writing/fast) with cascade failover |
-| NVIDIA NIM | Hosted inference API — **nemotron-3-super-120b** (1M ctx, primary reasoning), kimi-k2-thinking, kimi-k2-instruct, qwq-32b, qwen2-7b, step-3.5-flash |
+| JARVIS MCP Server | Python process exposing 28 tools via MCP protocol |
+| Multi-model router | Routes each task to the right model type (synthesis/reasoning/writing/fast) with cascade failover |
+| NVIDIA NIM | Hosted inference API — **nemotron-3-super-120b** (1M ctx, synthesis only), kimi-k2-thinking, kimi-k2-instruct, qwq-32b, qwen2-7b, step-3.5-flash |
+| IntelligenceBriefSkill | Nemotron-powered synthesis — reads ALL account files with zero truncation, writes `intelligence_brief.md` as primary context for all downstream skills |
+| BriefCoordinator | Pure async Python — appends key findings from each completed skill as delta blocks to `intelligence_brief.md`; zero extra API calls; per-account asyncio.Lock prevents write corruption |
 | File Watcher | watchdog OS-level monitor — detects source file changes + any new file dropped in |
 | Skill Queue | Priority queue (HIGH → MEDIUM → LOW) with deduplication |
-| Queue Worker | Async background worker — runs skills, triggers feedback loop + cascade |
+| Queue Worker | Async background worker — runs skills, triggers BriefCoordinator delta append + cascade |
 | IntelligenceExtractor | LLM-powered — extracts structured deal intel from any text (files, outputs, chat) |
 | KnowledgeMerger | Appends extracted intel to discovery.md — append-only, timestamped, never overwrites |
 | SelfLearner | `_skill_timeline.json` + `_evolution_log.md` per account — read by all skills as context |
-| CRM Sidecar | Small web server at localhost:8000 — pipeline dashboard |
+| CRM Sidecar | Small web server at localhost:8000 — VP-level executive pipeline dashboard |
 
 ---
 
