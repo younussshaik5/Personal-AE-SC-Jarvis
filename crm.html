@@ -341,7 +341,22 @@ async function init(){
     document.getElementById('lastRef').textContent=new Date().toLocaleTimeString();
     renderSb();renderDash();updateQ();
     if(Q&&Q.is_active)startPoll();
+    startAutoRefresh();
   }catch(e){document.getElementById('loading').innerHTML='<span style="color:var(--r)">Error: '+e.message+'</span>'}
+}
+
+// ── Background auto-refresh (60s) — keeps D fresh without user action ─────
+function startAutoRefresh(){
+  setInterval(async function(){
+    if(_qp)return; // poll already handling refresh
+    try{
+      var r=await fetch('/api/accounts');var fresh=await r.json();
+      D=fresh;REG=D.skill_registry||{};
+      document.getElementById('lastRef').textContent=new Date().toLocaleTimeString();
+      if(cur){var a=D.accounts.find(x=>x.id===cur.id);if(a){cur=a;renderReport(a);}}
+      renderSb();renderDash();
+    }catch(e){}
+  },60000);
 }
 
 // ── Sidebar ───────────────────────────────────────────────────────
@@ -415,7 +430,8 @@ function tRow(a,sub){
 }
 
 // ── Open account ──────────────────────────────────────────────────
-function openAcct(id){
+async function openAcct(id){
+  // Show immediately with cached data, then refresh from server
   var a=D.accounts.find(x=>x.id===id);if(!a)return;
   cur=a;_tab='overview';
   document.getElementById('dash').style.display='none';
@@ -423,6 +439,14 @@ function openAcct(id){
   document.getElementById('mainArea').scrollTop=0;
   document.querySelectorAll('.sli').forEach(el=>el.classList.toggle('active',el.getAttribute('onclick')==="openAcct('"+id+"')"));
   renderReport(a);
+  // Re-fetch all account data to get latest skill outputs for this account
+  try{
+    var r=await fetch('/api/accounts');var fresh=await r.json();
+    D=fresh;REG=D.skill_registry||{};
+    document.getElementById('lastRef').textContent=new Date().toLocaleTimeString();
+    var fa=D.accounts.find(x=>x.id===id);
+    if(fa&&cur&&cur.id===id){cur=fa;renderReport(fa);renderSb();}
+  }catch(e){}
 }
 
 function goBack(){
