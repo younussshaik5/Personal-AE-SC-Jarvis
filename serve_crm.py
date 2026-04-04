@@ -145,6 +145,20 @@ def sanitize(text, max_len=None):
     return cleaned[:max_len] if max_len else cleaned
 
 
+def _has_real_content(text, min_lines=4):
+    """Return True only if text contains at least min_lines of actual prose —
+    not just headings (##), separators (---), or blank lines."""
+    import re as _re
+    count = 0
+    for line in text.splitlines():
+        s = line.strip()
+        if s and not s.startswith('#') and not _re.match(r'^-{2,}$', s):
+            count += 1
+            if count >= min_lines:
+                return True
+    return False
+
+
 def read_file(path):
     try:
         with open(path, 'r', encoding='utf-8') as f:
@@ -381,7 +395,9 @@ def load_account(folder, name, parent=None):
         filepath = folder / skill_info["file"]
         if filepath.exists():
             content = sanitize(read_file(filepath))
-            if content.strip() and len(content.strip()) >= _MIN_SKILL_BYTES:
+            if (content.strip()
+                    and len(content.strip()) >= _MIN_SKILL_BYTES
+                    and _has_real_content(content)):
                 skill_outputs[skill_key] = content
 
     # Queue status for this account

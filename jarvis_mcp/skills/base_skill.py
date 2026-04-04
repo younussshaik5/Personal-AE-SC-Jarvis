@@ -232,6 +232,8 @@ class BaseSkill:
                     rf"^#+\s+{name_escaped}\s*\n*", "", result.strip(),
                     count=1, flags=re.IGNORECASE
                 ).strip()
+                if not cleaned:
+                    cleaned = "_No data generated — add discovery notes and re-run this skill._"
                 parts.append(f"## {section['name']}\n\n{cleaned}")
 
         return "\n\n---\n\n".join(parts)
