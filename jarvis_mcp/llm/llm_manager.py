@@ -82,6 +82,10 @@ MODEL_ROUTING: Dict[str, List[Dict]] = {
         {"model": "moonshotai/kimi-k2-thinking", "temperature": 1,   "top_p": 0.9, "has_thinking": True},
         {"model": "qwen/qwq-32b",               "temperature": 0.6, "top_p": 0.7, "has_thinking": False},
     ],
+    "autonomous": [
+        {"model": "stepfun-ai/step-3.5-flash",  "temperature": 0.3, "top_p": 0.9, "has_thinking": True},
+        {"model": "moonshotai/kimi-k2-instruct", "temperature": 0.3, "top_p": 0.9, "has_thinking": False},
+    ],
 }
 
 

@@ -231,6 +231,19 @@ TOOLS.append(_tool(
     required=["account_name"]
 ))
 
+# ── Autonomous system ────────────────────────────────────────────────────────
+TOOLS.append(_tool(
+    "get_jarvis_todos",
+    "List open todos created by JARVIS autonomous retry engine — skills that failed all retries and need human review.",
+    {},
+))
+
+TOOLS.append(_tool(
+    "get_autonomous_status",
+    "Get JARVIS autonomous system status — attempt history, success rate, open todos.",
+    {},
+))
+
 log.info(f"Registered {len(TOOLS)} MCP tools")
 
 # ---------------------------------------------------------------------------

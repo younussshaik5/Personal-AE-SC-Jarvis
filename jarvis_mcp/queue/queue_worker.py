@@ -43,13 +43,15 @@ class QueueWorker:
         extractor=None,     # IntelligenceExtractor
         merger=None,        # KnowledgeMerger
         coordinator=None,   # BriefCoordinator — appends skill deltas to brief
+        retry_engine=None,  # RetryEngine — autonomous retry with quality validation
     ):
-        self.queue       = queue
-        self.skills      = skills
-        self.learner     = learner
-        self.extractor   = extractor
-        self.merger      = merger
-        self.coordinator = coordinator
+        self.queue        = queue
+        self.skills       = skills
+        self.learner      = learner
+        self.extractor    = extractor
+        self.merger       = merger
+        self.coordinator  = coordinator
+        self.retry_engine = retry_engine
         self._running  = False
         self._task: asyncio.Task = None
         # Dedup: track recently completed (account::skill) → timestamp
@@ -90,53 +92,91 @@ class QueueWorker:
         SKILL_TIMEOUT = 600  # 10 min — LLM calls are slow but shouldn't hang forever
         log.info(f"[worker] ▶ {job.skill_name} | {job.account_name} | trigger={job.trigger}")
 
+        output_file = SKILL_OUTPUT_FILES.get(job.skill_name)
+
         try:
-            result = await asyncio.wait_for(
-                skill.generate(job.account_name),
-                timeout=SKILL_TIMEOUT,
-            )
-            elapsed = round(time.time() - t0, 1)
+            # ── Autonomous retry path ─────────────────────────────────────────
+            if self.retry_engine and output_file:
+                # Give up to 3× the single-skill timeout across all retry attempts
+                result = await asyncio.wait_for(
+                    self.retry_engine.execute_with_retry(
+                        skill, job.account_name, job.skill_name
+                    ),
+                    timeout=SKILL_TIMEOUT * 3,
+                )
+                elapsed = round(time.time() - t0, 1)
 
-            if result and result.strip().startswith("❌"):
-                log.warning(f"[worker] ✗ {job.skill_name} | {job.account_name} | {elapsed}s | LLM error")
-                if self.learner:
-                    await self.learner.record(job.account_name, job.skill_name, job.trigger, status="error")
-            else:
-                log.info(f"[worker] ✓ {job.skill_name} | {job.account_name} | {elapsed}s")
-
-                # Persist output to disk
-                output_file = SKILL_OUTPUT_FILES.get(job.skill_name)
-                if output_file and result:
+                if result is None:
+                    # All retries exhausted — todo already persisted to autonomous_memory
+                    log.warning(
+                        f"[worker] ✗ {job.skill_name} | {job.account_name} | {elapsed}s "
+                        f"| retries exhausted — todo created"
+                    )
+                    if self.learner:
+                        await self.learner.record(
+                            job.account_name, job.skill_name, job.trigger, status="error"
+                        )
+                else:
+                    log.info(
+                        f"[worker] ✓ {job.skill_name} | {job.account_name} | {elapsed}s "
+                        f"| autonomous retry succeeded"
+                    )
                     await skill.write_output(job.account_name, output_file, result)
                     log.info(f"[worker] wrote {output_file} for {job.account_name}")
-
-                # Track for cascade dedup
-                self._recent_runs[f"{job.account_name}::{job.skill_name}"] = time.time()
-
-                # 1. Record in evolution log
-                if self.learner:
-                    await self.learner.record(job.account_name, job.skill_name, job.trigger, status="ok")
-
-                # 2. Feedback loop — extract new intel from output, merge into discovery.md.
-                # Safe for all triggers because:
-                # - KnowledgeMerger.was_self_written() has 300s cooldown per account
-                # - FileWatcher cycle guard checks was_self_written() → suppresses re-trigger
-                # Net effect: skills enrich discovery.md once per run cycle, no infinite loop.
-                if self.extractor and self.merger and result:
-                    asyncio.ensure_future(
-                        self._feedback_safe(job.account_name, job.skill_name, result)
-                    )
-
-                # 3. Append key findings to intelligence_brief.md (fire-and-forget)
-                if self.coordinator and result:
-                    asyncio.ensure_future(
-                        self.coordinator.append_delta(
-                            job.account_name, job.skill_name, result
+                    self._recent_runs[f"{job.account_name}::{job.skill_name}"] = time.time()
+                    if self.learner:
+                        await self.learner.record(
+                            job.account_name, job.skill_name, job.trigger, status="ok"
                         )
-                    )
+                    if self.extractor and self.merger:
+                        asyncio.ensure_future(
+                            self._feedback_safe(job.account_name, job.skill_name, result)
+                        )
+                    if self.coordinator:
+                        asyncio.ensure_future(
+                            self.coordinator.append_delta(
+                                job.account_name, job.skill_name, result
+                            )
+                        )
+                    await self._cascade(job)
 
-                # 4. Cascade downstream skills (max depth = 1)
-                await self._cascade(job)
+            # ── Standard path (no retry engine or no output file) ─────────────
+            else:
+                result = await asyncio.wait_for(
+                    skill.generate(job.account_name),
+                    timeout=SKILL_TIMEOUT,
+                )
+                elapsed = round(time.time() - t0, 1)
+
+                if result and result.strip().startswith("❌"):
+                    log.warning(
+                        f"[worker] ✗ {job.skill_name} | {job.account_name} | {elapsed}s | LLM error"
+                    )
+                    if self.learner:
+                        await self.learner.record(
+                            job.account_name, job.skill_name, job.trigger, status="error"
+                        )
+                else:
+                    log.info(f"[worker] ✓ {job.skill_name} | {job.account_name} | {elapsed}s")
+                    if output_file and result:
+                        await skill.write_output(job.account_name, output_file, result)
+                        log.info(f"[worker] wrote {output_file} for {job.account_name}")
+                    self._recent_runs[f"{job.account_name}::{job.skill_name}"] = time.time()
+                    if self.learner:
+                        await self.learner.record(
+                            job.account_name, job.skill_name, job.trigger, status="ok"
+                        )
+                    if self.extractor and self.merger and result:
+                        asyncio.ensure_future(
+                            self._feedback_safe(job.account_name, job.skill_name, result)
+                        )
+                    if self.coordinator and result:
+                        asyncio.ensure_future(
+                            self.coordinator.append_delta(
+                                job.account_name, job.skill_name, result
+                            )
+                        )
+                    await self._cascade(job)
 
         except asyncio.TimeoutError:
             elapsed = round(time.time() - t0, 1)

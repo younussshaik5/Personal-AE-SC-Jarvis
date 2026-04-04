@@ -21,6 +21,7 @@ from .account_hierarchy import AccountHierarchy
 from .queue import SkillQueue, QueueWorker, FileWatcher, PRIORITY_HIGH, SKILL_OUTPUT_FILES
 from .queue.coordinator import BriefCoordinator
 from .learning import SelfLearner, IntelligenceExtractor, KnowledgeMerger
+from .autonomous import AutonomousMemory, RetryEngine
 
 
 # Setup logging
@@ -62,6 +63,12 @@ class JarvisServer:
             merger=self.merger,
             coordinator=self.coordinator,
         )
+
+        # ── Autonomous retry engine ─────────────────────────────────────────
+        self.autonomous_memory = AutonomousMemory()
+        self.retry_engine      = RetryEngine(self.llm, self.config, self.autonomous_memory)
+        self.queue_worker.retry_engine = self.retry_engine
+
         self.file_watcher = FileWatcher(
             self.skill_queue, self.config.accounts_root,
             extractor=self.extractor,
@@ -160,6 +167,10 @@ class JarvisServer:
             "build_knowledge_graph",
             "quick_insights",
             "generate_custom_template",
+
+            # Autonomous system
+            "get_jarvis_todos",
+            "get_autonomous_status",
         ]
 
 
@@ -172,6 +183,12 @@ class JarvisServer:
         # Handle onboarding tools
         if tool_name.startswith("onboarding_"):
             return await self.handle_onboarding_tool(tool_name, arguments)
+
+        # Handle autonomous system tools
+        if tool_name == "get_jarvis_todos":
+            return await self._handle_get_jarvis_todos(arguments)
+        if tool_name == "get_autonomous_status":
+            return await self._handle_get_autonomous_status(arguments)
 
         # Map tool names to skills (scaffold_account is handled directly via SKILL_REGISTRY)
         tool_to_skill = {
@@ -266,6 +283,41 @@ class JarvisServer:
             self.logger.error(f"Onboarding error: {e}")
             return {"error": str(e)}
 
+
+    async def _handle_get_jarvis_todos(self, arguments: dict) -> dict:
+        """Return open todos created by the autonomous retry engine."""
+        try:
+            todos = self.autonomous_memory.get_todos(resolved=False)
+            if not todos:
+                return {"result": "✅ No open todos — all skills resolving autonomously."}
+            import datetime
+            lines = ["## JARVIS Autonomous Todos\n"]
+            for t in todos:
+                created = datetime.datetime.fromtimestamp(t["created_at"]).strftime("%Y-%m-%d %H:%M")
+                lines.append(
+                    f"- **[{t['id']}]** `{t['skill']}` / `{t['account']}`\n"
+                    f"  Reason: {t['reason']}\n"
+                    f"  Strategies tried: {', '.join(t.get('strategies_tried', []))}\n"
+                    f"  Created: {created}\n"
+                )
+            return {"result": "\n".join(lines)}
+        except Exception as e:
+            return {"error": str(e)}
+
+    async def _handle_get_autonomous_status(self, arguments: dict) -> dict:
+        """Return autonomous memory summary — attempt history, success rate, open todos."""
+        try:
+            s = self.autonomous_memory.summary()
+            lines = [
+                "## JARVIS Autonomous Status\n",
+                f"- Skills tracked: {s['skills_tracked']}",
+                f"- Skills with a success: {s['skills_successful']}",
+                f"- Open todos (need human): {s['pending_todos']}",
+                f"- Global insights accumulated: {s['global_insights']}",
+            ]
+            return {"result": "\n".join(lines)}
+        except Exception as e:
+            return {"error": str(e)}
 
     async def log_conversation(self, user_message: str, assistant_response: str, skill_used: str = None):
         """Log chat for learning - called by Claude after each interaction."""
