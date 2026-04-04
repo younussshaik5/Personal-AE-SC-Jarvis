@@ -163,7 +163,7 @@ class QueueManager:
 
     @staticmethod
     def _is_skeleton(filepath: Path) -> bool:
-        """Return True if a skill file exists but contains only headings/separators — no real content."""
+        """Return True if a skill file exists but contains only headings/separators/placeholders — no real content."""
         import re as _re
         try:
             text = filepath.read_text(encoding="utf-8").strip()
@@ -172,7 +172,10 @@ class QueueManager:
             real = 0
             for line in text.splitlines():
                 s = line.strip()
-                if s and not s.startswith("#") and not _re.match(r"^-{2,}$", s):
+                if (s
+                        and not s.startswith("#")
+                        and not _re.match(r"^-{2,}$", s)
+                        and not s.startswith("_No data generated")):
                     real += 1
                     if real >= 4:
                         return False

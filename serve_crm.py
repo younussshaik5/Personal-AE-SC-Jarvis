@@ -110,26 +110,37 @@ def _add_to_queue(account: str, skill_key: str) -> str:
 _worker_lock = threading.Lock()
 
 def _queue_worker():
-    """Background thread: processes queue, then watches for new jobs every 30s."""
+    """Background thread: processes queue, watches for new/changed/skeleton files every 30s."""
     # Give the server a moment to start
     time.sleep(3)
 
-    # Scan for missing skills on startup
+    # Scan for missing/skeleton skills on startup
     if _queue:
         changed = _queue.scan_changed_files(ACCOUNTS_ROOT)
         missing = _queue.scan_missing_skills(ACCOUNTS_ROOT, SKILL_FILES)
         if changed + missing:
-            log.info(f"Startup scan: {changed} changed files, {missing} missing skills queued")
+            log.info(f"Startup scan: {changed} changed files, {missing} missing/skeleton skills queued")
 
+    _scan_cycle = 0
     while True:
         with _worker_lock:
-            pending = _queue.get_pending() if _queue else []
-            if pending:
-                log.info(f"Processing {len(pending)} queued jobs…")
-                try:
-                    asyncio.run(_run_queue_async())
-                except Exception as e:
-                    log.error(f"Queue processing error: {e}")
+            if _queue:
+                # Every 2 cycles (~60s): re-scan for files changed by JARVIS MCP tools
+                # (e.g. deal_stage.json updated via update_deal_stage, process_meeting, etc.)
+                _scan_cycle += 1
+                if _scan_cycle % 2 == 0:
+                    changed = _queue.scan_changed_files(ACCOUNTS_ROOT)
+                    missing = _queue.scan_missing_skills(ACCOUNTS_ROOT, SKILL_FILES)
+                    if changed + missing:
+                        log.info(f"Periodic scan: {changed} changed, {missing} missing/skeleton queued")
+
+                pending = _queue.get_pending()
+                if pending:
+                    log.info(f"Processing {len(pending)} queued jobs…")
+                    try:
+                        asyncio.run(_run_queue_async())
+                    except Exception as e:
+                        log.error(f"Queue processing error: {e}")
         time.sleep(30)
 
 async def _run_queue_async():
@@ -147,12 +158,15 @@ def sanitize(text, max_len=None):
 
 def _has_real_content(text, min_lines=4):
     """Return True only if text contains at least min_lines of actual prose —
-    not just headings (##), separators (---), or blank lines."""
+    not just headings (##), separators (---), blank lines, or placeholder text."""
     import re as _re
     count = 0
     for line in text.splitlines():
         s = line.strip()
-        if s and not s.startswith('#') and not _re.match(r'^-{2,}$', s):
+        if (s
+                and not s.startswith('#')
+                and not _re.match(r'^-{2,}$', s)
+                and not s.startswith('_No data generated')):
             count += 1
             if count >= min_lines:
                 return True
