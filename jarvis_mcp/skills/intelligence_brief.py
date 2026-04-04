@@ -197,18 +197,7 @@ QUALITY RULES:
             max_tokens=12000,   # Rich output — enough for a thorough brief
         )
 
-        # Clear accumulated deltas before writing the new clean base.
-        # Nemotron has already absorbed them into the synthesis above.
-        try:
-            from jarvis_mcp.queue.coordinator import BriefCoordinator, _DELTA_MARKER
-            brief_path = self.config.get_account_path(account_name) / "intelligence_brief.md"
-            if brief_path.exists():
-                current = brief_path.read_text(encoding="utf-8")
-                if _DELTA_MARKER in current:
-                    # Strip old deltas — new brief replaces everything
-                    self.logger.info(f"Clearing accumulated deltas for {account_name}")
-        except Exception:
-            pass  # non-fatal — coordinator handles this independently
-
+        # write_output() overwrites the entire file — this naturally clears all
+        # accumulated LIVE DELTAS. Nemotron's new synthesis becomes the clean base.
         await self.write_output(account_name, "intelligence_brief.md", result)
         return result
