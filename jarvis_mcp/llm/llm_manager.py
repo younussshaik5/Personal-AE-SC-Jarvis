@@ -35,8 +35,10 @@ _TIMEOUT  = 120
 # Order = preference. Cascade to next model only if all keys fail on current model.
 
 MODEL_ROUTING: Dict[str, List[Dict]] = {
-    "reasoning": [
-        # 1M context — primary for all deep analysis; has_thinking uses reasoning_budget
+    "synthesis": [
+        # Nemotron 120B — ONLY for IntelligenceBriefSkill.
+        # 1M token context, reads all account files, writes the brief.
+        # No other skill should use this type.
         {
             "model": "nvidia/nemotron-3-super-120b-a12b",
             "temperature": 0.6, "top_p": 0.9, "has_thinking": True,
@@ -46,7 +48,10 @@ MODEL_ROUTING: Dict[str, List[Dict]] = {
                 "reasoning_budget": 16384,
             },
         },
-        # Best for: MEDDPICC scoring, risk reports, competitive analysis, value architecture
+    ],
+    "reasoning": [
+        # kimi → step3.5 → qwq — file generation for all reasoning skills:
+        # MEDDPICC, risk_report, battlecard, competitive_intel, value_arch, technical_risk
         {"model": "moonshotai/kimi-k2-thinking", "temperature": 1,   "top_p": 0.9, "has_thinking": True},
         {"model": "stepfun-ai/step-3.5-flash",   "temperature": 1,   "top_p": 0.9, "has_thinking": True},
         {"model": "qwen/qwq-32b",                "temperature": 0.6, "top_p": 0.7, "has_thinking": False},

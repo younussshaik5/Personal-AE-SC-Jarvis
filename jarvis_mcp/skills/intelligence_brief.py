@@ -26,7 +26,7 @@ class IntelligenceBriefSkill(BaseSkill):
     then all reasoning skills cascade from its output.
     """
 
-    MODEL_TYPE = "reasoning"   # → Nemotron 120B (1M ctx, reasoning_budget=16384)
+    MODEL_TYPE = "synthesis"   # → Nemotron 120B only (1M ctx, reasoning_budget=16384)
 
     async def generate(self, account_name: str, **kwargs) -> str:
         context = await self.read_account_files(account_name)
