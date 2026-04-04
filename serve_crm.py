@@ -354,8 +354,14 @@ def load_account(folder, name, parent=None):
     # Pass full discovery text so keyword signals in appended intel are counted
     disc_comp = compute_discovery(disc_sec, discovery_md)
 
-    # Next actions: CLAUDE.md first, then fall back to account_summary.md
-    next_actions = extract_bullets(cl_sec.get('Next Actions', '') or cl_sec.get('Next Steps', ''))
+    # Next actions: deal_stage.json open_actions first, then CLAUDE.md, then account_summary.md
+    _raw_open = deal.get("open_actions", []) or deal.get("next_actions", [])
+    next_actions = [
+        (f"{a.get('action','')} [{a.get('owner','')} · {a.get('deadline','')}]" if isinstance(a, dict) else str(a))
+        for a in _raw_open if a
+    ] if _raw_open else []
+    if not next_actions:
+        next_actions = extract_bullets(cl_sec.get('Next Actions', '') or cl_sec.get('Next Steps', ''))
     if not next_actions:
         sum_md = sanitize(read_file(folder / "account_summary.md"))
         if sum_md:
@@ -419,7 +425,10 @@ def load_account(folder, name, parent=None):
         "last_updated": deal.get("last_updated", "Unknown"),
         "stakeholders": stakeholders,
         "competitive_situation": deal.get("competitive_situation", {}),
-        "activities": deal.get("activities", []),
+        "activities": [
+            (f"{a.get('date','')} — {a.get('type','')}: {a.get('notes','')}" if isinstance(a, dict) else str(a))
+            for a in deal.get("activities", [])
+        ],
         "constraints": deal.get("constraints", []),
         "next_milestone": deal.get("next_milestone", {}),
         "company_info": sanitize(company_md),
