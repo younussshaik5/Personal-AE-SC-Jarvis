@@ -161,8 +161,27 @@ class QueueManager:
 
     # ── Scanning ──────────────────────────────────────────────────────────────
 
+    @staticmethod
+    def _is_skeleton(filepath: Path) -> bool:
+        """Return True if a skill file exists but contains only headings/separators — no real content."""
+        import re as _re
+        try:
+            text = filepath.read_text(encoding="utf-8").strip()
+            if len(text) < 50:
+                return True
+            real = 0
+            for line in text.splitlines():
+                s = line.strip()
+                if s and not s.startswith("#") and not _re.match(r"^-{2,}$", s):
+                    real += 1
+                    if real >= 4:
+                        return False
+            return True
+        except Exception:
+            return False
+
     def scan_missing_skills(self, accounts_root: Path, skill_files: Dict) -> int:
-        """Queue all missing skill output files across all accounts. Returns count."""
+        """Queue all missing or skeleton skill output files across all accounts. Returns count."""
         if not accounts_root.exists():
             return 0
         count = 0
@@ -175,6 +194,13 @@ class QueueManager:
                 if skill_key not in skill_files:
                     continue
                 filepath = folder / skill_files[skill_key]["file"]
+                if filepath.exists() and self._is_skeleton(filepath):
+                    # Delete skeleton so it is treated as missing and re-generated cleanly
+                    try:
+                        filepath.unlink()
+                        log.info(f"Removed skeleton file {filepath.name} for {account} — will regenerate")
+                    except Exception:
+                        pass
                 if not filepath.exists():
                     self.add_job(account, skill_key, priority=5)
                     count += 1
