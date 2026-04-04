@@ -589,6 +589,7 @@ class CRMHandler(BaseHTTPRequestHandler):
         body = json.dumps(data, ensure_ascii=True).encode()
         self.send_response(code)
         self.send_header("Content-type", "application/json")
+        self.send_header("Cache-Control", "no-store, no-cache, must-revalidate")
         self._cors()
         self.end_headers()
         self.wfile.write(body)

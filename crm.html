@@ -334,7 +334,7 @@ function parseRole(r){
 // ── Init ──────────────────────────────────────────────────────────
 async function init(){
   try{
-    var r=await fetch('/api/accounts');D=await r.json();REG=D.skill_registry||{};Q=D.queue||null;
+    var r=await fetch('/api/accounts',{cache:'no-store'});D=await r.json();REG=D.skill_registry||{};Q=D.queue||null;
     if(!D.accounts||!D.accounts.length){document.getElementById('loading').innerHTML='<span style="color:var(--r)">No accounts found.</span>';return;}
     document.getElementById('loading').style.display='none';
     document.getElementById('ws').style.display='flex';
@@ -350,7 +350,7 @@ function startAutoRefresh(){
   setInterval(async function(){
     if(_qp)return; // poll already handling refresh
     try{
-      var r=await fetch('/api/accounts');var fresh=await r.json();
+      var r=await fetch('/api/accounts',{cache:'no-store'});var fresh=await r.json();
       D=fresh;REG=D.skill_registry||{};
       document.getElementById('lastRef').textContent=new Date().toLocaleTimeString();
       if(cur){var a=D.accounts.find(x=>x.id===cur.id);if(a){cur=a;renderReport(a);}}
@@ -431,22 +431,22 @@ function tRow(a,sub){
 
 // ── Open account ──────────────────────────────────────────────────
 async function openAcct(id){
-  // Show immediately with cached data, then refresh from server
+  // Highlight sidebar immediately
+  document.querySelectorAll('.sli').forEach(el=>el.classList.toggle('active',el.getAttribute('onclick')==="openAcct('"+id+"')"));
+  // Always fetch fresh data so switching accounts always shows the right content
+  try{
+    var r=await fetch('/api/accounts',{cache:'no-store'});
+    var fresh=await r.json();
+    D=fresh;REG=D.skill_registry||{};
+    document.getElementById('lastRef').textContent=new Date().toLocaleTimeString();
+  }catch(e){}
   var a=D.accounts.find(x=>x.id===id);if(!a)return;
   cur=a;_tab='overview';
   document.getElementById('dash').style.display='none';
   document.getElementById('detail').style.display='block';
   document.getElementById('mainArea').scrollTop=0;
-  document.querySelectorAll('.sli').forEach(el=>el.classList.toggle('active',el.getAttribute('onclick')==="openAcct('"+id+"')"));
   renderReport(a);
-  // Re-fetch all account data to get latest skill outputs for this account
-  try{
-    var r=await fetch('/api/accounts');var fresh=await r.json();
-    D=fresh;REG=D.skill_registry||{};
-    document.getElementById('lastRef').textContent=new Date().toLocaleTimeString();
-    var fa=D.accounts.find(x=>x.id===id);
-    if(fa&&cur&&cur.id===id){cur=fa;renderReport(fa);renderSb();}
-  }catch(e){}
+  renderSb();
 }
 
 function goBack(){
@@ -686,7 +686,7 @@ function startPoll(){
       var r=await fetch('/api/queue');Q=await r.json();updateQ();
       if(!Q.is_active){
         clearInterval(_qp);_qp=null;
-        var r2=await fetch('/api/accounts');D=await r2.json();REG=D.skill_registry||{};
+        var r2=await fetch('/api/accounts',{cache:'no-store'});D=await r2.json();REG=D.skill_registry||{};
         document.getElementById('lastRef').textContent=new Date().toLocaleTimeString();
         if(cur){var a=D.accounts.find(x=>x.id===cur.id);if(a){cur=a;renderReport(a);}}
         renderDash();renderSb();
