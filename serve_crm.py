@@ -49,26 +49,32 @@ _load_env()
 logging.basicConfig(level=logging.INFO, format="[CRM] %(message)s", stream=sys.stderr)
 log = logging.getLogger(__name__)
 
-# ── Live log capture ──────────────────────────────────────────────────────────
-import collections as _col
+# ── Activity log reader (shared file written by jarvis_mcp_server.py) ─────────
+_ACTIVITY_LOG = Path.home() / ".jarvis" / "activity.log"
 
-_log_buf: "collections.deque[dict]" = _col.deque(maxlen=500)
-_log_lock = threading.Lock()
-
-class _LogCapture(logging.Handler):
-    """Captures all log records into a ring buffer for /api/logs."""
-    def emit(self, record: logging.LogRecord) -> None:
-        with _log_lock:
-            _log_buf.append({
-                "ts":    int(record.created * 1000),  # epoch ms
-                "level": record.levelname,
-                "logger": record.name,
-                "msg":   record.getMessage(),
-            })
-
-_capture = _LogCapture()
-_capture.setLevel(logging.DEBUG)
-logging.getLogger().addHandler(_capture)
+def _read_activity_logs(since: int = 0) -> list:
+    """
+    Read JSON-line log entries from ~/.jarvis/activity.log written by JARVIS MCP.
+    Returns entries with ts > since, capped at the last 500 lines of the file.
+    """
+    if not _ACTIVITY_LOG.exists():
+        return []
+    try:
+        lines = _ACTIVITY_LOG.read_text(encoding="utf-8", errors="ignore").splitlines()
+        entries = []
+        for line in lines[-500:]:           # only tail the last 500 lines
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                e = json.loads(line)
+                if e.get("ts", 0) > since:
+                    entries.append(e)
+            except (json.JSONDecodeError, ValueError):
+                pass
+        return entries
+    except Exception:
+        return []
 
 # ── ACCOUNTS root ─────────────────────────────────────────────────────────────
 _env_root = os.getenv("ACCOUNTS_ROOT", "")
@@ -568,8 +574,7 @@ class CRMHandler(BaseHTTPRequestHandler):
                     if part.startswith("since="):
                         try: since = int(part[6:])
                         except ValueError: pass
-            with _log_lock:
-                logs = [e for e in _log_buf if e["ts"] > since]
+            logs = _read_activity_logs(since)
             self._json({"logs": logs})
         elif self.path in ("/", ""):
             self._serve_file(_here / "crm.html", "text/html")

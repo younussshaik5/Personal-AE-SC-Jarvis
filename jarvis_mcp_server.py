@@ -50,6 +50,43 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
+# ── Shared activity log file (read by CRM /api/logs) ─────────────────────────
+import json as _json_mod
+import threading as _threading_mod
+from pathlib import Path as _Path
+
+_ACTIVITY_LOG = _Path.home() / ".jarvis" / "activity.log"
+_ACTIVITY_LOG.parent.mkdir(parents=True, exist_ok=True)
+_log_file_lock = _threading_mod.Lock()
+
+class _JSONFileHandler(logging.Handler):
+    """Writes every INFO+ log record as a JSON-line to ~/.jarvis/activity.log."""
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            line = _json_mod.dumps({
+                "ts":     int(record.created * 1000),
+                "level":  record.levelname,
+                "logger": record.name,
+                "msg":    record.getMessage(),
+            })
+            with _log_file_lock:
+                with open(_ACTIVITY_LOG, "a", encoding="utf-8") as fh:
+                    fh.write(line + "\n")
+                # Keep file bounded: trim to last 2000 lines when it exceeds ~4000
+                try:
+                    raw = _ACTIVITY_LOG.read_bytes()
+                    if raw.count(b"\n") > 4000:
+                        keep = b"\n".join(raw.split(b"\n")[-2000:])
+                        _ACTIVITY_LOG.write_bytes(keep)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+_jfh = _JSONFileHandler()
+_jfh.setLevel(logging.INFO)
+logging.getLogger().addHandler(_jfh)
+
 # ---------------------------------------------------------------------------
 # Boot JARVIS
 # ---------------------------------------------------------------------------
