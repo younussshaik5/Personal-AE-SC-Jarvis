@@ -19,6 +19,7 @@ from .agents import AgentOrchestrator
 from .context_detector import ContextDetector
 from .account_hierarchy import AccountHierarchy
 from .queue import SkillQueue, QueueWorker, FileWatcher, PRIORITY_HIGH, SKILL_OUTPUT_FILES
+from .queue.coordinator import BriefCoordinator
 from .learning import SelfLearner, IntelligenceExtractor, KnowledgeMerger
 
 
@@ -49,15 +50,17 @@ class JarvisServer:
         self._initialize_orchestrator()
 
         # ── Queue bus + self-learning ────────────────────────────────────────
-        self.learner    = SelfLearner(self.config.accounts_root)
-        self.extractor  = IntelligenceExtractor(self.llm)
-        self.merger     = KnowledgeMerger(self.config.accounts_root)
+        self.learner     = SelfLearner(self.config.accounts_root)
+        self.extractor   = IntelligenceExtractor(self.llm)
+        self.merger      = KnowledgeMerger(self.config.accounts_root)
+        self.coordinator = BriefCoordinator(self.config)
         self.skill_queue  = SkillQueue()
         self.queue_worker = QueueWorker(
             self.skill_queue, self.skills,
             learner=self.learner,
             extractor=self.extractor,
             merger=self.merger,
+            coordinator=self.coordinator,
         )
         self.file_watcher = FileWatcher(
             self.skill_queue, self.config.accounts_root,

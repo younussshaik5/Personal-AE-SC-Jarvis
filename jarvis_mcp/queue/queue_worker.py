@@ -40,14 +40,16 @@ class QueueWorker:
         queue: SkillQueue,
         skills: Dict[str, Any],
         learner=None,
-        extractor=None,   # IntelligenceExtractor
-        merger=None,      # KnowledgeMerger
+        extractor=None,     # IntelligenceExtractor
+        merger=None,        # KnowledgeMerger
+        coordinator=None,   # BriefCoordinator — appends skill deltas to brief
     ):
-        self.queue     = queue
-        self.skills    = skills
-        self.learner   = learner
-        self.extractor = extractor
-        self.merger    = merger
+        self.queue       = queue
+        self.skills      = skills
+        self.learner     = learner
+        self.extractor   = extractor
+        self.merger      = merger
+        self.coordinator = coordinator
         self._running  = False
         self._task: asyncio.Task = None
         # Dedup: track recently completed (account::skill) → timestamp
@@ -125,7 +127,15 @@ class QueueWorker:
                         self._feedback_safe(job.account_name, job.skill_name, result)
                     )
 
-                # 3. Cascade downstream skills (max depth = 1)
+                # 3. Append key findings to intelligence_brief.md (fire-and-forget)
+                if self.coordinator and result:
+                    asyncio.ensure_future(
+                        self.coordinator.append_delta(
+                            job.account_name, job.skill_name, result
+                        )
+                    )
+
+                # 4. Cascade downstream skills (max depth = 1)
                 await self._cascade(job)
 
         except asyncio.TimeoutError:

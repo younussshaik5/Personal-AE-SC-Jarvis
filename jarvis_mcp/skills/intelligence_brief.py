@@ -38,6 +38,15 @@ class IntelligenceBriefSkill(BaseSkill):
         # Nemotron's 1M context handles everything.  We pass every file complete.
         raw_parts = []
 
+        # Previous brief (BASE + accumulated LIVE DELTAS from coordinator).
+        # Nemotron reads this first so it can absorb all delta findings from
+        # the previous cycle into the new clean base synthesis.
+        prev_brief = context.get("intelligence_brief", "")
+        if prev_brief and len(prev_brief.strip()) > 200:
+            raw_parts.append(
+                f"=== PREVIOUS BRIEF + SKILL DELTAS (absorb and integrate everything) ===\n{prev_brief}"
+            )
+
         ds = context.get("deal_stage", "")
         if ds:
             raw_parts.append(f"=== DEAL DATA (structured) ===\n{ds}")
@@ -54,7 +63,7 @@ class IntelligenceBriefSkill(BaseSkill):
         skip = {
             "deal_stage", "discovery", "company_research",
             "CLAUDE", "_deal", "_evolution_log", "_skill_timeline",
-            "intelligence_brief",   # never include a stale brief in itself
+            "intelligence_brief",   # already included above as PREVIOUS BRIEF
         }
         for key, val in sorted(context.items()):
             if key not in skip and isinstance(val, str) and val.strip():
@@ -170,6 +179,10 @@ QUALITY RULES:
 - If something is TBD, say exactly what question would resolve it
 - Include verbatim quotes from discovery notes where they add evidence
 - This brief replaces ALL raw files for downstream skills — be complete
+- IMPORTANT: If PREVIOUS BRIEF + SKILL DELTAS section is present above,
+  absorb ALL findings from the LIVE SKILL DELTAS into your synthesis.
+  Do NOT output a LIVE SKILL DELTAS or delta section — incorporate
+  everything from the deltas into the appropriate main sections.
 ═══════════════════════════════════════════════════════════"""
 
         self.logger.info(
@@ -183,6 +196,19 @@ QUALITY RULES:
             system_prompt=self.grounded_system_prompt(),
             max_tokens=12000,   # Rich output — enough for a thorough brief
         )
+
+        # Clear accumulated deltas before writing the new clean base.
+        # Nemotron has already absorbed them into the synthesis above.
+        try:
+            from jarvis_mcp.queue.coordinator import BriefCoordinator, _DELTA_MARKER
+            brief_path = self.config.get_account_path(account_name) / "intelligence_brief.md"
+            if brief_path.exists():
+                current = brief_path.read_text(encoding="utf-8")
+                if _DELTA_MARKER in current:
+                    # Strip old deltas — new brief replaces everything
+                    self.logger.info(f"Clearing accumulated deltas for {account_name}")
+        except Exception:
+            pass  # non-fatal — coordinator handles this independently
 
         await self.write_output(account_name, "intelligence_brief.md", result)
         return result
