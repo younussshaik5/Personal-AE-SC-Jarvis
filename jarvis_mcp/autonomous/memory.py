@@ -93,7 +93,7 @@ class AutonomousMemory:
         """
         Record a single attempt for account+skill.
 
-        outcome: success | skeleton | reasoning_dump | error | partial
+        outcome: good | partial | weak | skeleton | reasoning_dump | error
         """
         key = self._key(account, skill)
         entry = self._data["skills"].setdefault(key, {
@@ -113,7 +113,7 @@ class AutonomousMemory:
         entry["last_error"] = error
         entry["last_attempt_at"] = time.time()
 
-        if outcome in ("success", "partial"):
+        if outcome in ("good", "partial"):
             entry["last_success_at"] = time.time()
 
         self._save()
@@ -206,7 +206,7 @@ class AutonomousMemory:
         skills = self._data["skills"]
         successful = sum(
             1 for v in skills.values()
-            if any(o in ("success", "partial") for o in v.get("outcomes", []))
+            if any(o in ("good", "partial") for o in v.get("outcomes", []))
         )
         pending_todos = len(self.get_todos(resolved=False))
         return {
