@@ -161,9 +161,17 @@ class QueueManager:
 
     # ── Scanning ──────────────────────────────────────────────────────────────
 
+    _REASONING_STARTERS = (
+        "we need to", "i need to", "let me ", "okay, i", "okay i",
+        "first, ", "to write the", "to generate the", "to produce",
+        "from the intelligence", "from the deal data", "from the account",
+        "let me search", "let me analyze", "looking at the",
+    )
+
     @staticmethod
     def _is_skeleton(filepath: Path) -> bool:
-        """Return True if a skill file exists but contains only headings/separators/placeholders — no real content."""
+        """Return True if a skill file exists but contains only headings/separators/
+        placeholders/inline-reasoning — no real generated content."""
         import re as _re
         try:
             text = filepath.read_text(encoding="utf-8").strip()
@@ -172,10 +180,12 @@ class QueueManager:
             real = 0
             for line in text.splitlines():
                 s = line.strip()
+                sl = s.lower()
                 if (s
                         and not s.startswith("#")
                         and not _re.match(r"^-{2,}$", s)
-                        and not s.startswith("_No data generated")):
+                        and not s.startswith("_No data generated")
+                        and not any(sl.startswith(p) for p in QueueManager._REASONING_STARTERS)):
                     real += 1
                     if real >= 4:
                         return False

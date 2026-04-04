@@ -156,17 +156,27 @@ def sanitize(text, max_len=None):
     return cleaned[:max_len] if max_len else cleaned
 
 
+_REASONING_STARTERS = (
+    "we need to", "i need to", "let me ", "okay, i", "okay i",
+    "first, ", "to write the", "to generate the", "to produce",
+    "from the intelligence", "from the deal data", "from the account",
+    "let me search", "let me analyze", "looking at the",
+)
+
 def _has_real_content(text, min_lines=4):
     """Return True only if text contains at least min_lines of actual prose —
-    not just headings (##), separators (---), blank lines, or placeholder text."""
+    not just headings (##), separators (---), blank lines, placeholder text,
+    or inline LLM reasoning traces."""
     import re as _re
     count = 0
     for line in text.splitlines():
         s = line.strip()
+        sl = s.lower()
         if (s
                 and not s.startswith('#')
                 and not _re.match(r'^-{2,}$', s)
-                and not s.startswith('_No data generated')):
+                and not s.startswith('_No data generated')
+                and not any(sl.startswith(p) for p in _REASONING_STARTERS)):
             count += 1
             if count >= min_lines:
                 return True

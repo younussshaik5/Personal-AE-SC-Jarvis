@@ -232,6 +232,20 @@ class BaseSkill:
                     rf"^#+\s+{name_escaped}\s*\n*", "", result.strip(),
                     count=1, flags=re.IGNORECASE
                 ).strip()
+                # Reject responses that are inline LLM reasoning rather than real content
+                # (qwq-32b and some models output chain-of-thought without <think> tags)
+                if cleaned:
+                    _first = next(
+                        (l.strip().lower() for l in cleaned.splitlines()
+                         if l.strip() and not l.startswith('#')),
+                        ""
+                    )
+                    _REASONING_STARTERS = (
+                        "we need to", "i need to", "let me ", "okay, i", "okay i",
+                        "first, ", "to write the", "to generate the", "to produce",
+                    )
+                    if any(_first.startswith(p) for p in _REASONING_STARTERS):
+                        cleaned = ""
                 if not cleaned:
                     cleaned = "_No data generated — add discovery notes and re-run this skill._"
                 parts.append(f"## {section['name']}\n\n{cleaned}")
