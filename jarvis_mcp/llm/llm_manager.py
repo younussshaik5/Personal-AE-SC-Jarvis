@@ -18,6 +18,7 @@ Model types:
 """
 
 import os
+import re
 import asyncio
 import logging
 import time
@@ -29,6 +30,14 @@ log = logging.getLogger(__name__)
 
 _BASE_URL = "https://integrate.api.nvidia.com/v1"
 _TIMEOUT  = 120
+
+# Strip <think>...</think> blocks that some models (qwq-32b, step-3.5-flash)
+# emit inline in the main content stream instead of via reasoning_content field.
+_THINK_RE = re.compile(r"<think>.*?</think>", re.DOTALL | re.IGNORECASE)
+
+def _strip_thinking(text: str) -> str:
+    """Remove inline <think>...</think> blocks and normalise leading whitespace."""
+    return _THINK_RE.sub("", text).lstrip("\n").strip()
 
 # ── Model routing table ───────────────────────────────────────────────────────
 # Each entry: model id, params, has_thinking (streams reasoning_content — we discard it)
@@ -177,7 +186,7 @@ class LLMManager:
                 content = getattr(chunk.choices[0].delta, "content", None)
                 if content:
                     result.append(content)
-            return "".join(result)
+            return _strip_thinking("".join(result))
 
         except Exception as e:
             log.debug(f"Streaming failed ({model_cfg['model']}): {e} — retrying without stream")
@@ -188,7 +197,7 @@ class LLMManager:
             content = completion.choices[0].message.content
             if not content:
                 raise ValueError(f"LLM returned None content for {model_cfg['model']}")
-            return content
+            return _strip_thinking(content)
 
     # ── Main generate ─────────────────────────────────────────────────────────
 
