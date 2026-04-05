@@ -335,7 +335,11 @@ def _start_crm_server() -> None:
             import serve_crm
             port = int(os.getenv("CRM_PORT", "8000"))
             log.info(f"CRM dashboard starting on http://localhost:{port}")
-            _wb.open(f"http://localhost:{port}")
+            # Open browser 1.5s after server starts — gives it time to bind the socket
+            def _open_browser():
+                _time.sleep(1.5)
+                _wb.open(f"http://localhost:{port}")
+            _threading.Thread(target=_open_browser, daemon=True, name="crm-browser").start()
             serve_crm.start_server(port=port)
         except OSError as e:
             if "Address already in use" in str(e):
