@@ -31,16 +31,23 @@ log = logging.getLogger(__name__)
 _BASE_URL = "https://integrate.api.nvidia.com/v1"
 _TIMEOUT  = 120
 
-# Strip <think>...</think> blocks that some models (qwq-32b, step-3.5-flash)
-# emit inline in the main content stream instead of via reasoning_content field.
-_THINK_RE = re.compile(r"<think>.*?</think>", re.DOTALL | re.IGNORECASE)
+# Strip thinking blocks that models emit inline in the content stream.
+# Handles: <think>, <thinking>, unclosed blocks (truncated responses).
+_THINK_RE         = re.compile(r"<think(?:ing)?>.*?</think(?:ing)?>", re.DOTALL | re.IGNORECASE)
+_UNCLOSED_THINK_RE = re.compile(r"<think(?:ing)?>.*$",                re.DOTALL | re.IGNORECASE)
 
 class _EmptyResponseError(Exception):
     """Raised when a model returns a successful but empty response."""
 
 def _strip_thinking(text: str) -> str:
-    """Remove inline <think>...</think> blocks and normalise leading whitespace."""
-    return _THINK_RE.sub("", text).lstrip("\n").strip()
+    """
+    Remove all thinking/reasoning blocks from model output:
+      1. Complete  <think>...</think>  and  <thinking>...</thinking>  blocks
+      2. Unclosed  <think>...  blocks (response truncated mid-think)
+    """
+    text = _THINK_RE.sub("", text)          # complete blocks
+    text = _UNCLOSED_THINK_RE.sub("", text) # unclosed / truncated blocks
+    return text.lstrip("\n").strip()
 
 # ── Model routing table ───────────────────────────────────────────────────────
 # Each entry: model id, params, has_thinking (streams reasoning_content — we discard it)
