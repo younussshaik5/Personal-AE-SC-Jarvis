@@ -183,6 +183,57 @@ def sanitize(text, max_len=None):
     return cleaned[:max_len] if max_len else cleaned
 
 
+def _parse_stakeholders_from_md(text: str) -> list:
+    """
+    Parse stakeholders from all '### New Stakeholders' sections in discovery.md.
+    Used as fallback when deal_stage.json has no stakeholders.
+    """
+    stakeholders = []
+    seen_names = set()
+    in_section = False
+    for line in text.splitlines():
+        s = line.strip()
+        if re.match(r"^###?\s+New Stakeholders", s, re.IGNORECASE):
+            in_section = True
+            continue
+        if in_section:
+            if s.startswith("##"):
+                in_section = False
+                continue
+            if not s or s.startswith("#"):
+                continue
+            content = re.sub(r"^[-*]\s+", "", s)
+            m = re.match(r"\*\*(.+?)\*\*\s*[–\-:]\s*(.*)", content)
+            if m:
+                name = m.group(1).strip()
+                rest = m.group(2).strip()
+            elif content:
+                parts = content.split(",", 1)
+                name = parts[0].strip()
+                rest = content
+            else:
+                continue
+            if not name or name.lower() in seen_names:
+                continue
+            seen_names.add(name.lower())
+            parts = re.split(r",\s*", rest, 1)
+            title = parts[0].strip() if parts else ""
+            notes = parts[1].strip() if len(parts) > 1 else ""
+            combined = rest.lower()
+            if "economic buyer" in combined or "budget" in combined or "final decision" in combined:
+                role = "Economic Buyer"
+            elif "champion" in combined or "advocate" in combined:
+                role = "Champion"
+            elif "blocker" in combined or "detractor" in combined:
+                role = "Blocker"
+            elif "technical" in combined or "it " in combined or "cio" in combined:
+                role = "Technical Evaluator"
+            else:
+                role = "Stakeholder"
+            stakeholders.append({"name": name, "title": title, "role": role, "notes": rest[:200]})
+    return stakeholders
+
+
 _REASONING_STARTERS = (
     "we need to", "i need to", "let me ", "okay, i", "okay i",
     "first, ", "to write the", "to generate the", "to produce",
@@ -395,6 +446,9 @@ def load_account(folder, name, parent=None):
     cl_sec = parse_md_sections(claude_md)
 
     stakeholders = deal.get("stakeholders", [])
+    # Fallback: parse stakeholders from discovery.md when deal_stage.json has none
+    if not stakeholders and discovery_md:
+        stakeholders = _parse_stakeholders_from_md(discovery_md)
 
     # Use JARVIS-generated meddpicc.md scores when available; fall back to computed
     meddpicc_md = sanitize(read_file(folder / "meddpicc.md"))

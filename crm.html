@@ -780,6 +780,7 @@ function toggleLogs(){
   document.getElementById('logDrawer').classList.toggle('open',_logOpen);
   document.getElementById('logOverlay').classList.toggle('open',_logOpen);
   if(_logOpen){
+    renderLogs();           // show cached entries immediately, don't wait for fetch
     if(!_logPoll) startLogPoll();
   } else {
     if(_logPoll){clearInterval(_logPoll);_logPoll=null;}

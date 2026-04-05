@@ -18,12 +18,13 @@ Also updates deal_stage.json if hard deal facts are found
 """
 
 import json
+import re
 import asyncio
 import logging
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 
 log = logging.getLogger(__name__)
 
@@ -71,7 +72,7 @@ class KnowledgeMerger:
         self._locks: Dict[str, asyncio.Lock] = {}
         # Cycle guard: "account_name" → timestamp of our last write
         self._self_writes: Dict[str, float] = {}
-        self.SELF_WRITE_COOLDOWN = 300.0  # 5 min cooldown — skills take 3-5 min to run
+        self.SELF_WRITE_COOLDOWN = 1800.0  # 30 min cooldown — full cascade takes 20-40 min
 
     def was_self_written(self, account_name: str) -> bool:
         """Returns True if we wrote to this account's discovery.md within the cooldown window."""
@@ -155,11 +156,126 @@ class KnowledgeMerger:
             self._self_writes[account_name] = time.monotonic()
 
             log.info(f"[merger] Appended intel to {account_name}/discovery.md (from {source})")
+
+            # Sync any extracted stakeholders to deal_stage.json
+            self._sync_stakeholders_to_deal_stage(path, intel, account_name)
+
             return True
 
         except Exception as e:
             log.error(f"[merger] Write failed for {account_name}: {e}")
             return False
+
+    # ── Stakeholder + deal fact sync ──────────────────────────────────────────
+
+    @staticmethod
+    def _parse_stakeholders_from_intel(intel: str) -> List[Dict]:
+        """
+        Parse structured stakeholders from an ### New Stakeholders section.
+        Handles formats:
+          - **Name** – title/company, role (notes)
+          - **Name**: description
+          - - Name, title
+        """
+        stakeholders = []
+        in_section = False
+        for line in intel.splitlines():
+            stripped = line.strip()
+            if re.match(r"^###?\s+New Stakeholders", stripped, re.IGNORECASE):
+                in_section = True
+                continue
+            if in_section:
+                if stripped.startswith("##"):
+                    break  # next section
+                if not stripped or stripped.startswith("#"):
+                    continue
+                # Strip leading bullet
+                content = re.sub(r"^[-*]\s+", "", stripped)
+                # Extract bold name: **Name**
+                m = re.match(r"\*\*(.+?)\*\*\s*[–\-:]\s*(.*)", content)
+                if m:
+                    name = m.group(1).strip()
+                    rest = m.group(2).strip()
+                    # Split rest into title and notes at first comma or dash
+                    parts = re.split(r",\s*", rest, 1)
+                    title = parts[0].strip() if parts else ""
+                    notes = parts[1].strip() if len(parts) > 1 else ""
+                    # Extract role signals
+                    combined = (rest + " " + notes).lower()
+                    if "economic buyer" in combined or "budget" in combined:
+                        role = "Economic Buyer"
+                    elif "champion" in combined or "advocate" in combined:
+                        role = "Champion"
+                    elif "blocker" in combined or "detractor" in combined:
+                        role = "Blocker"
+                    elif "technical" in combined or "it " in combined:
+                        role = "Technical Evaluator"
+                    else:
+                        role = "Stakeholder"
+                    stakeholders.append({
+                        "name": name,
+                        "title": title,
+                        "role": role,
+                        "notes": rest[:200],
+                    })
+                elif content:
+                    # Plain bullet — use as name/notes
+                    parts = content.split(",", 1)
+                    stakeholders.append({
+                        "name": parts[0].strip(),
+                        "title": parts[1].strip() if len(parts) > 1 else "",
+                        "role": "Stakeholder",
+                        "notes": content[:200],
+                    })
+        return stakeholders
+
+    def _sync_stakeholders_to_deal_stage(
+        self, account_path: Path, intel: str, account_name: str
+    ) -> None:
+        """
+        Parse stakeholders from intel and merge (dedupe by name) into deal_stage.json.
+        Runs synchronously — called from inside the async lock context.
+        """
+        new_stakeholders = self._parse_stakeholders_from_intel(intel)
+        if not new_stakeholders:
+            return
+
+        deal_stage_path = account_path / "deal_stage.json"
+        try:
+            if deal_stage_path.exists():
+                with open(deal_stage_path, "r", encoding="utf-8") as f:
+                    deal = json.load(f)
+            else:
+                deal = {}
+        except Exception as e:
+            log.warning(f"[merger] Could not read deal_stage.json for {account_name}: {e}")
+            return
+
+        existing = deal.setdefault("stakeholders", [])
+        existing_names = {
+            (s.get("name") or "").strip().lower()
+            for s in existing
+            if isinstance(s, dict)
+        }
+
+        added = 0
+        for s in new_stakeholders:
+            if s["name"].lower() not in existing_names:
+                existing.append(s)
+                existing_names.add(s["name"].lower())
+                added += 1
+
+        if added:
+            deal["stakeholders"] = existing
+            try:
+                with open(deal_stage_path, "w", encoding="utf-8") as f:
+                    json.dump(deal, f, indent=2)
+                log.info(
+                    f"[merger] Synced {added} new stakeholder(s) to "
+                    f"{account_name}/deal_stage.json"
+                )
+            except Exception as e:
+                log.error(f"[merger] Failed to write deal_stage.json for {account_name}: {e}")
 
     async def merge_from_skill_output(
         self,

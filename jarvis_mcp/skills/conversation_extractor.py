@@ -15,13 +15,13 @@ class ConversationExtractorSkill(BaseSkill):
             {
                 "name": "MEDDPICC Signals Extracted",
                 "prompt": f"{base} extract all MEDDPICC signals from the text. For each signal found, identify the dimension (M/E/D/D/P/I/C/C), the exact quote or reference, and its significance.\n\nGenerate ONLY this section.",
-                "model_type": "text",
+                "model_type": "fast",
                 "max_tokens": 1000,
             },
             {
                 "name": "Key Intelligence & Action Items",
                 "prompt": f"{base} extract:\n1. New stakeholders or roles mentioned\n2. Competitive signals or references\n3. Timeline or urgency indicators\n4. Action items and commitments made\n5. Risks or concerns raised\n\nGenerate ONLY this section.",
-                "model_type": "text",
+                "model_type": "fast",
                 "max_tokens": 1000,
             },
         ]

@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Dict, Optional, Set
 
 from .skill_queue import SkillQueue, PRIORITY_HIGH
-from .dependency_graph import FILE_TRIGGERS, SKIP_AUTO_QUEUE
+from .dependency_graph import FILE_TRIGGERS, SKIP_AUTO_QUEUE, SKILL_OUTPUT_FILES
 
 log = logging.getLogger(__name__)
 
@@ -125,24 +125,49 @@ class FileWatcher:
 
     async def _startup_scan(self) -> None:
         """
-        On startup, queue skills for any account that already has meaningful data.
-        This handles JARVIS restarts — existing accounts don't need a file change
-        to trigger skill generation; if the source files exist and have content,
-        queue them immediately.
+        On startup, queue skills that are MISSING or skeleton for each account.
+        Skips skills whose output already exists with real content (>= 200 bytes).
+        This prevents re-generating everything on every JARVIS restart.
         """
         if not self.accounts_root.exists():
             return
         await asyncio.sleep(2.0)  # Let queue worker fully start first
+
         for acct in self.accounts_root.iterdir():
             if not acct.is_dir():
                 continue
             account_name = acct.name
-            for filename, _skills in FILE_TRIGGERS.items():
-                filepath = acct / filename
-                if not filepath.exists():
+            queued = 0
+            skills_seen: set = set()
+
+            for filename, trigger_skills in FILE_TRIGGERS.items():
+                if not (acct / filename).exists():
                     continue
-                log.info(f"[watcher] startup scan: queuing triggers for {account_name}/{filename}")
-                await self._enqueue_triggers(account_name, filename)
+                for skill_name in trigger_skills:
+                    if skill_name in SKIP_AUTO_QUEUE or skill_name in skills_seen:
+                        continue
+                    skills_seen.add(skill_name)
+                    output_file = SKILL_OUTPUT_FILES.get(skill_name)
+                    if output_file:
+                        output_path = acct / output_file
+                        if output_path.exists() and output_path.stat().st_size >= 200:
+                            continue  # Already generated with real content — skip
+                    log.info(
+                        f"[watcher] startup: queuing {skill_name} for {account_name} "
+                        f"(output missing or skeleton)"
+                    )
+                    await self.queue.put(
+                        account_name=account_name,
+                        skill_name=skill_name,
+                        priority=PRIORITY_HIGH,
+                        trigger=f"startup:{filename}",
+                    )
+                    queued += 1
+
+            if queued:
+                log.info(f"[watcher] startup scan: {queued} skill(s) queued for {account_name}")
+            else:
+                log.info(f"[watcher] startup scan: {account_name} all outputs present — nothing to queue")
 
     # ── Watchdog path ─────────────────────────────────────────────────────────
 

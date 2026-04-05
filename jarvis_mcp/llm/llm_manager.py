@@ -35,6 +35,9 @@ _TIMEOUT  = 120
 # emit inline in the main content stream instead of via reasoning_content field.
 _THINK_RE = re.compile(r"<think>.*?</think>", re.DOTALL | re.IGNORECASE)
 
+class _EmptyResponseError(Exception):
+    """Raised when a model returns a successful but empty response."""
+
 def _strip_thinking(text: str) -> str:
     """Remove inline <think>...</think> blocks and normalise leading whitespace."""
     return _THINK_RE.sub("", text).lstrip("\n").strip()
@@ -190,7 +193,14 @@ class LLMManager:
                 content = getattr(chunk.choices[0].delta, "content", None)
                 if content:
                     result.append(content)
-            return _strip_thinking("".join(result))
+            final = _strip_thinking("".join(result))
+            if not final:
+                raise _EmptyResponseError(f"empty stream from {model_cfg['model']}")
+            return final
+
+        except _EmptyResponseError:
+            # Propagate directly — don't fall into non-streaming retry
+            raise ValueError(f"LLM returned empty content for {model_cfg['model']}")
 
         except Exception as e:
             log.debug(f"Streaming failed ({model_cfg['model']}): {e} — retrying without stream")
@@ -201,7 +211,10 @@ class LLMManager:
             content = completion.choices[0].message.content
             if not content:
                 raise ValueError(f"LLM returned None content for {model_cfg['model']}")
-            return _strip_thinking(content)
+            final = _strip_thinking(content)
+            if not final:
+                raise ValueError(f"LLM returned empty content after stripping for {model_cfg['model']}")
+            return final
 
     # ── Main generate ─────────────────────────────────────────────────────────
 

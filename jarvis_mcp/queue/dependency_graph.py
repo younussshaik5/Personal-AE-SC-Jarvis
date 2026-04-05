@@ -63,9 +63,10 @@ FILE_TRIGGERS: Dict[str, List[str]] = {
         "account_summary",
     ],
     "deal_stage.json": [
-        "intelligence_brief",       # re-synthesise on deal data change
-        "quick_insights",           # fast — runs in parallel
-        "account_summary",          # fast — runs in parallel
+        # No intelligence_brief here — deal stage updates are frequent and cheap.
+        # Full re-synthesis is wasteful for a stage/notes change.
+        "quick_insights",           # fast — reflects new stage immediately
+        "account_summary",          # fast — updates deal dossier
     ],
 }
 
@@ -89,11 +90,30 @@ SKILL_CASCADES: Dict[str, Dict] = {
             "risk_report",              # deal risk from complete picture
             "value_architecture",       # ROI model with all value signals
             "account_summary",          # full deal dossier
+            "quick_insights",           # fast snapshot — always reflects latest state
         ],
         "priority": 2,   # HIGH — same as file trigger priority
     },
 
     # ── Wave 1 (priority 3) ───────────────────────────────────────────────────
+
+    # Company research completed → update all competitive + demo outputs
+    "company_research": {
+        "skills": ["battlecard", "competitive_intelligence", "demo_strategy", "account_summary"],
+        "priority": 3,
+    },
+
+    # Meeting processed → re-score MEDDPICC, refresh summary, risk, and snapshot
+    "meeting_summary": {
+        "skills": ["meddpicc", "account_summary", "risk_report", "quick_insights"],
+        "priority": 3,
+    },
+
+    # Conversation summarized → re-score MEDDPICC, refresh summary
+    "conversation_summarizer": {
+        "skills": ["meddpicc", "account_summary"],
+        "priority": 3,
+    },
 
     # Fresh signals extracted → re-score MEDDPICC
     "conversation_extractor": {
@@ -109,7 +129,7 @@ SKILL_CASCADES: Dict[str, Dict] = {
 
     # ── Wave 2 (priority 3-4) ─────────────────────────────────────────────────
 
-    # Fresh MEDDPICC → risk, value arch, summary, discovery gaps, knowledge graph
+    # Fresh MEDDPICC → risk, value arch, summary, discovery gaps, knowledge graph, snapshot
     "meddpicc": {
         "skills": [
             "risk_report",
@@ -117,8 +137,15 @@ SKILL_CASCADES: Dict[str, Dict] = {
             "account_summary",
             "discovery",
             "knowledge_builder",
+            "quick_insights",
         ],
         "priority": 3,
+    },
+
+    # Fresh discovery questions → update meeting prep
+    "discovery": {
+        "skills": ["meeting_prep"],
+        "priority": 4,
     },
 
     # Fresh battlecard → demo strategy and pricing analysis
@@ -173,9 +200,15 @@ SKILL_CASCADES: Dict[str, Dict] = {
         "priority": 5,
     },
 
-    # Fresh meeting prep → follow-up email (everything in context for next touch)
+    # Fresh meeting prep → follow-up email
     "meeting_prep": {
         "skills": ["followup_email"],
+        "priority": 5,
+    },
+
+    # Fresh knowledge graph → refresh HTML dashboard
+    "knowledge_builder": {
+        "skills": ["html_generator"],
         "priority": 5,
     },
 }
