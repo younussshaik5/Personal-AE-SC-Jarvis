@@ -319,48 +319,13 @@ async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
 
 
 # ---------------------------------------------------------------------------
-# CRM auto-start (background thread — doesn't block MCP stdio)
-# ---------------------------------------------------------------------------
-import threading as _threading
-
-def _start_crm_server() -> None:
-    """Launch CRM dashboard in a daemon thread so it starts with the MCP server."""
-    import time as _time
-    import webbrowser as _wb
-
-    def _run():
-        # Small delay so JARVIS finishes loading before CRM imports it
-        _time.sleep(3)
-        try:
-            import serve_crm
-            port = int(os.getenv("CRM_PORT", "8000"))
-            log.info(f"CRM dashboard starting on http://localhost:{port}")
-            # Open browser 1.5s after server starts — gives it time to bind the socket
-            def _open_browser():
-                _time.sleep(1.5)
-                _wb.open(f"http://localhost:{port}")
-            _threading.Thread(target=_open_browser, daemon=True, name="crm-browser").start()
-            serve_crm.start_server(port=port)
-        except OSError as e:
-            if "Address already in use" in str(e):
-                log.info("CRM server already running — skipping auto-start")
-            else:
-                log.error(f"CRM server failed to start: {e}")
-        except Exception as e:
-            log.error(f"CRM server failed to start: {e}")
-
-    t = _threading.Thread(target=_run, daemon=True, name="crm-server")
-    t.start()
-
-
-# ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 async def main():
     log.info("Starting JARVIS MCP server…")
 
-    # Auto-start CRM dashboard alongside MCP
-    _start_crm_server()
+    # CRM is started by crm_sidecar.py (jarvis-crm MCP server in claude_desktop_config.json)
+    # No need to start it here — crm_sidecar.py owns that lifecycle.
 
     # Start the self-evolving queue bus (file watcher + worker + cascade)
     if _jarvis:

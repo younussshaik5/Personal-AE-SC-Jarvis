@@ -91,6 +91,7 @@ aiofiles>=23.0.0
 certifi>=2024.0.0
 python-dotenv>=1.0.0
 openai>=1.0.0
+watchdog>=3.0.0
 EOF
 
 echo "   Installing packages..."
