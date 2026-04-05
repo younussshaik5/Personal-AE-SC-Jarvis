@@ -104,31 +104,40 @@ discovery.md or deal_stage.json updated (by anything above)
   |    BriefCoordinator begins accumulating skill deltas into brief
   |
   └─ intelligence_brief completes → HIGH priority cascade fires:
-       meddpicc, risk_report, battlecard, competitive_intelligence,
-       value_architecture, technical_risk, discovery gaps
+       meddpicc, battlecard, competitive_intelligence, technical_risk,
+       discovery, risk_report, value_architecture, account_summary,
+       quick_insights
        (each reads intelligence_brief.md as primary context)
-       (each delta appended to brief as skills complete)
+       (BriefCoordinator appends each skill's key findings as delta)
   |
-  ├─ meddpicc completes → cascades:
-  |    risk_report, account_summary, knowledge_builder
-  |    → each output also scanned for new intel → merged back → loop continues
-  |
-  ├─ risk_report completes → cascades:
-  |    meeting_prep, demo_strategy
-  |
-  ├─ value_architecture completes → cascades:
-  |    proposal
-  |
-  └─ proposal completes → cascades:
-       sow
+  ├─ meddpicc → risk_report, value_architecture, account_summary,
+  |             discovery, knowledge_builder, quick_insights
+  ├─ battlecard → demo_strategy, competitor_pricing
+  ├─ competitive_intelligence → battlecard
+  ├─ technical_risk → meeting_prep, architecture_diagram
+  ├─ risk_report → meeting_prep, demo_strategy
+  ├─ value_architecture → proposal → sow, documentation
+  ├─ discovery → meeting_prep → followup_email
+  ├─ account_summary → knowledge_builder → html_generator
+  ├─ demo_strategy → meeting_prep
+  └─ company_research → battlecard, competitive_intelligence,
+                        demo_strategy, account_summary
 
-Loop stops when IntelligenceExtractor returns NO_NEW_INTEL.
-At that point, everything is consistent and up to date.
+User action (process_meeting / summarize_conversation / extract_intelligence)
+  → meeting_summary / conversation_summarizer / conversation_extractor
+    → meddpicc, account_summary, risk_report, quick_insights
+      → full downstream cascade above
+
+Cycle guard: FEEDBACK_SKILLS write extracted intel to discovery.md.
+The file watcher suppresses re-triggering intelligence_brief for 30 min
+after each merger write — preventing the cascade from restarting itself
+while still running. After the cascade exhausts, the system goes quiet
+until new source data arrives.
 ```
 
-**Result:** Within 2-5 minutes of any input, all 15+ output files for the account are regenerated. Each knows what every previous skill found — and the intelligence brief keeps getting richer as the cascade runs.
+**Result:** After any input, the full cascade runs in the background — typically 1-3 hours for all skills across one account (skills run sequentially to stay within NVIDIA rate limits). Each skill reads the intelligence brief plus all deltas accumulated so far — so later skills in the cascade always have richer context than earlier ones.
 
-> **Confirmed end-to-end:** file watcher starts on Claude Desktop boot, skill calls route through the intelligence layer, outputs feed back into discovery.md, cycle guard prevents infinite loops, cascade runs in correct priority order.
+> **Confirmed end-to-end:** file watcher starts on Claude Desktop boot, skill calls route through the intelligence layer, outputs feed back into discovery.md, cycle guard (30-min cooldown) prevents re-triggering while the cascade is still running, cascade runs in correct priority order.
 
 ### What gets added to every account folder
 
@@ -380,7 +389,7 @@ Create it with: `"Create account TataTeleservices with parent Tata"`
 
 ---
 
-## The 26 Skills
+## The 27 Skills
 
 ### Start here (try these first)
 
@@ -839,6 +848,9 @@ Then register in `jarvis_mcp/skills/__init__.py`, add the tool in `jarvis_mcp_se
 | What works | Status |
 |---|---|
 | 27 skills generate grounded outputs | ✅ |
+| Autonomous retry with quality validation | ✅ |
+| Rate limit recovery — waits and retries automatically | ✅ |
+| Startup scan — skips already-generated outputs on restart | ✅ |
 | Multi-model routing with cascade failover | ✅ |
 | File watcher starts on Claude Desktop boot | ✅ |
 | Any dropped file auto-ingested into knowledge base | ✅ |
@@ -855,7 +867,7 @@ Then register in `jarvis_mcp/skills/__init__.py`, add the tool in `jarvis_mcp_se
 | No multi-user support | One person per installation |
 | Deal data stored as plain text | Anyone with file access reads everything |
 | NVIDIA keys in `.env` plain text | Single point of compromise |
-| No retry logic if NVIDIA is down | Failed queue jobs are dropped |
+| No multi-device sync | Deal data tied to one machine |
 | No sync across devices | Tied to one machine |
 
 Bottom line: fork it, run `setup.sh`, add your NVIDIA keys, restart Claude Desktop. It works for one salesperson managing their own deals. For a company deploying it across a team — that's a different build.
