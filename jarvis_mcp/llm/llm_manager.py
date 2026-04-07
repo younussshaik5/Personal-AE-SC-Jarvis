@@ -1,20 +1,30 @@
 """
-LLM Manager for JARVIS — Multi-model routing with NVIDIA key-pool rotation.
+LLM Manager for JARVIS — Swarm routing with NVIDIA key-pool rotation.
 
-Routing strategy:
-  Each model_type maps to an ordered list of models.
-  Requests try model[0] across all keys first.
-  If all keys are exhausted/rate-limited for model[0], cascade to model[1], etc.
+Architecture: Swarm race (not sequential failover)
+  For each generate() call, all available (model, key) workers fire in parallel.
+  The first worker to return a valid response wins — all others are cancelled.
+  This means rate-limits on one model never block another model from responding.
 
 Key pool:
-  NVIDIA_API_KEY, NVIDIA_API_KEY_2 ... NVIDIA_API_KEY_N
-  Round-robin rotation with per (key, model) rate-limit tracking.
+  NVIDIA_API_KEY, NVIDIA_API_KEY_2 ... NVIDIA_API_KEY_N (up to 20)
+  Round-robin key selection distributes load across parallel section calls.
 
 Model types:
+  synthesis  — 1M context: intelligence_brief synthesis (Nemotron 120B only, single call)
   reasoning  — deep analysis: MEDDPICC, risk, competitive, value architecture
   writing    — long-form: proposals, SOW, battlecards, documentation
   fast       — quick tasks: summaries, insights, follow-ups, meeting prep
+  autonomous — background queue worker tasks
   default    — general purpose fallback
+
+Swarm behaviour:
+  1. Build worker list: one (model, key) per model in chain — best available key,
+     skip entirely if all keys for that model are rate-limited.
+  2. Fire all workers simultaneously.
+  3. First valid response wins — cancel remaining tasks.
+  4. If all fail with only rate-limits → wait for soonest cooldown → retry.
+  5. If any hard error (auth/connection) → return error immediately.
 """
 
 import os
@@ -51,7 +61,8 @@ def _strip_thinking(text: str) -> str:
 
 # ── Model routing table ───────────────────────────────────────────────────────
 # Each entry: model id, params, has_thinking (streams reasoning_content — we discard it)
-# Order = preference. Cascade to next model only if all keys fail on current model.
+# Order = preference for swarm race (first in list gets best available key).
+# All models in the list fire simultaneously — first valid response wins.
 
 MODEL_ROUTING: Dict[str, List[Dict]] = {
     "synthesis": [
@@ -69,20 +80,21 @@ MODEL_ROUTING: Dict[str, List[Dict]] = {
         },
     ],
     "reasoning": [
-        # kimi → step3.5 → qwq — file generation for all reasoning skills:
-        # MEDDPICC, risk_report, battlecard, competitive_intel, value_arch, technical_risk
+        # Swarm: kimi + qwq fire simultaneously — first valid response wins.
+        # Skills: MEDDPICC, risk_report, battlecard, competitive_intel, value_arch, technical_risk
         {"model": "moonshotai/kimi-k2-thinking", "temperature": 1,   "top_p": 0.9, "has_thinking": True},
-        {"model": "stepfun-ai/step-3.5-flash",   "temperature": 1,   "top_p": 0.9, "has_thinking": True},
         {"model": "qwen/qwq-32b",                "temperature": 0.6, "top_p": 0.7, "has_thinking": False},
     ],
     "writing": [
-        # Best for: proposals, SOW, documentation, battlecards
+        # Swarm: kimi-instruct preferred (fast, clean prose), qwq as parallel fallback.
+        # Skills: proposals, SOW, documentation, battlecards
         {"model": "moonshotai/kimi-k2-instruct", "temperature": 0.6, "top_p": 0.9, "has_thinking": False},
-        {"model": "qwen/qwq-32b",               "temperature": 0.6, "top_p": 0.7, "has_thinking": False},
+        {"model": "qwen/qwq-32b",                "temperature": 0.6, "top_p": 0.7, "has_thinking": False},
         {"model": "moonshotai/kimi-k2-thinking", "temperature": 1,   "top_p": 0.9, "has_thinking": True},
     ],
     "fast": [
-        # Best for: quick insights, follow-up emails, meeting prep, summaries
+        # Swarm: kimi-instruct + qwen2-7b fire simultaneously.
+        # Skills: quick insights, follow-up emails, meeting prep, summaries
         {"model": "moonshotai/kimi-k2-instruct", "temperature": 0.6, "top_p": 0.9, "has_thinking": False},
         {"model": "qwen/qwen2-7b-instruct",      "temperature": 0.7, "top_p": 0.8, "has_thinking": False},
         {"model": "moonshotai/kimi-k2-thinking", "temperature": 1,   "top_p": 0.9, "has_thinking": True},
@@ -90,23 +102,24 @@ MODEL_ROUTING: Dict[str, List[Dict]] = {
     "default": [
         {"model": "moonshotai/kimi-k2-instruct", "temperature": 0.6, "top_p": 0.9, "has_thinking": False},
         {"model": "moonshotai/kimi-k2-thinking", "temperature": 1,   "top_p": 0.9, "has_thinking": True},
-        {"model": "qwen/qwq-32b",               "temperature": 0.6, "top_p": 0.7, "has_thinking": False},
+        {"model": "qwen/qwq-32b",                "temperature": 0.6, "top_p": 0.7, "has_thinking": False},
     ],
     "autonomous": [
-        {"model": "stepfun-ai/step-3.5-flash",  "temperature": 0.3, "top_p": 0.9, "has_thinking": True},
+        # Background queue worker — kimi-instruct is fast and reliable
         {"model": "moonshotai/kimi-k2-instruct", "temperature": 0.3, "top_p": 0.9, "has_thinking": False},
+        {"model": "qwen/qwq-32b",                "temperature": 0.3, "top_p": 0.7, "has_thinking": False},
     ],
 }
 
 
 class LLMManager:
     """
-    NVIDIA key-pool LLM manager with multi-model routing and cascade failover.
+    NVIDIA key-pool LLM manager with swarm race routing.
 
-    Failover order:
-      1. Try model[0] — rotate across all available keys
-      2. All keys exhausted for model[0] → cascade to model[1]
-      3. Repeat until a response is received or all models fail
+    Swarm race:
+      All models in the chain fire simultaneously (one best-available key each).
+      First valid response wins — all others are cancelled.
+      Rate-limits on one model never block another model from running.
     """
 
     def __init__(self, config):
@@ -144,7 +157,7 @@ class LLMManager:
 
     def _mark_rate_limited(self, key_id: str, model: str, cooldown: int = 60) -> None:
         self._rate_limited_until[self._rl_key(key_id, model)] = time.time() + cooldown
-        log.warning(f"🚫 [{key_id}] [{model}] rate-limited for {cooldown}s — will try next key/model")
+        log.warning(f"🚫 [{key_id}] [{model}] rate-limited for {cooldown}s")
 
     # ── Key rotation ──────────────────────────────────────────────────────────
 
@@ -169,6 +182,96 @@ class LLMManager:
         )
         return self._keys[earliest], f"key-{earliest}"
 
+    # ── Swarm worker helpers ──────────────────────────────────────────────────
+
+    def _build_swarm(self, model_chain: List[Dict]) -> List[Tuple[Dict, str, str]]:
+        """
+        Build the swarm worker list for a race.
+
+        Returns one (model_cfg, api_key, key_id) per model in the chain,
+        using the best available (non-rate-limited) key for each model.
+        Models where ALL keys are rate-limited are excluded from the swarm.
+        """
+        swarm = []
+        for model_cfg in model_chain:
+            key, key_id = self._next_key_for_model(model_cfg["model"])
+            if key is None:
+                continue
+            if not self._is_available(key_id, model_cfg["model"]):
+                # All keys for this model are rate-limited — skip it
+                continue
+            swarm.append((model_cfg, key, key_id))
+        return swarm
+
+    def _soonest_available_wait(self, model_chain: List[Dict]) -> float:
+        """Seconds until the soonest rate-limited worker becomes available."""
+        now = time.time()
+        soonest = min(
+            (self._rate_limited_until.get(self._rl_key(f"key-{i}", cfg["model"]), 0)
+             for i in range(len(self._keys))
+             for cfg in model_chain),
+            default=0,
+        )
+        return max(soonest - now + 1, 5)  # at least 5s buffer
+
+    async def _run_worker(
+        self,
+        model_cfg: Dict,
+        api_key: str,
+        key_id: str,
+        messages: list,
+        max_tokens: int,
+        loop: asyncio.AbstractEventLoop,
+    ) -> str:
+        """
+        Run one swarm worker: single (model, key) attempt.
+        Handles rate-limit marking and logging. Re-raises all exceptions
+        so the swarm coordinator can decide what to do.
+        """
+        model_name = model_cfg["model"]
+        call_timeout = model_cfg.get("timeout", _TIMEOUT)
+
+        log.info(f"🐝 [{key_id}] [{model_name}] launching")
+        t0 = time.time()
+
+        try:
+            result = await asyncio.wait_for(
+                loop.run_in_executor(
+                    None, self._llm_call, api_key, model_cfg, messages, max_tokens
+                ),
+                timeout=call_timeout,
+            )
+            elapsed = round(time.time() - t0, 1)
+            log.info(f"✅ [{key_id}] [{model_name}] responded in {elapsed}s")
+            return result
+
+        except asyncio.TimeoutError:
+            elapsed = round(time.time() - t0, 1)
+            log.warning(f"⏱ [{key_id}] [{model_name}] timed out after {elapsed}s")
+            raise
+
+        except RateLimitError:
+            self._mark_rate_limited(key_id, model_name)
+            raise
+
+        except APIConnectionError as e:
+            log.error(f"❌ [{key_id}] [{model_name}] connection failed: {str(e)[:80]}")
+            raise
+
+        except APIError as e:
+            msg = str(e)
+            if "401" in msg or "Unauthorized" in msg:
+                log.error(f"🔑 [{key_id}] [{model_name}] invalid API key")
+            elif "404" in msg or "not found" in msg.lower():
+                log.warning(f"⚠️ [{key_id}] [{model_name}] model unavailable")
+            else:
+                log.error(f"❌ [{key_id}] [{model_name}] API error: {msg[:80]}")
+            raise
+
+        except Exception as e:
+            log.warning(f"⚠️ [{key_id}] [{model_name}] failed: {str(e)[:100]}")
+            raise
+
     # ── Sync LLM call (runs in executor) ─────────────────────────────────────
 
     def _llm_call(self, api_key: str, model_cfg: Dict, messages: list, max_tokens: int) -> str:
@@ -187,7 +290,6 @@ class LLMManager:
             "stream":      True,
         }
 
-        # Pass extra_body if model requires it (e.g. Nemotron reasoning_budget)
         if model_cfg.get("extra_body"):
             params["extra_body"] = model_cfg["extra_body"]
 
@@ -206,7 +308,6 @@ class LLMManager:
             return final
 
         except _EmptyResponseError:
-            # Propagate directly — don't fall into non-streaming retry
             raise ValueError(f"LLM returned empty content for {model_cfg['model']}")
 
         except Exception as e:
@@ -223,7 +324,7 @@ class LLMManager:
                 raise ValueError(f"LLM returned empty content after stripping for {model_cfg['model']}")
             return final
 
-    # ── Main generate ─────────────────────────────────────────────────────────
+    # ── Main generate — swarm race ────────────────────────────────────────────
 
     async def generate(
         self,
@@ -246,119 +347,93 @@ class LLMManager:
         if not self._keys:
             return "❌ No NVIDIA API keys configured — add NVIDIA_API_KEY to .env and restart."
 
-        # Resolve model chain for this task type
         model_chain = MODEL_ROUTING.get(model_type) or MODEL_ROUTING["default"]
-
         loop = asyncio.get_event_loop()
 
-        # Retry loop — on rate limits, wait for the shortest cooldown and try again.
-        # Only gives up on hard errors (auth failure, no keys, connection refused).
         attempt_num = 0
         while True:
             attempt_num += 1
-            all_errors: List[str] = []
-            has_only_rate_limits = True  # will flip if we see a hard error
 
-            for model_cfg in model_chain:
-                model_name = model_cfg["model"]
-                model_errors: List[str] = []
-                n = len(self._keys)
+            # Build swarm: one available (model, key) worker per model in chain.
+            # Models where all keys are rate-limited are excluded.
+            swarm = self._build_swarm(model_chain)
 
-                for _ in range(n):
-                    api_key, key_id = self._next_key_for_model(model_name)
-                    if api_key is None:
-                        break
-
-                    if not self._is_available(key_id, model_name):
-                        remaining = int(
-                            self._rate_limited_until.get(self._rl_key(key_id, model_name), 0) - time.time()
-                        )
-                        model_errors.append(f"{key_id}: rate-limited ({remaining}s)")
-                        continue
-
-                    log.info(f"LLM → [{key_id}] [{model_name}] | type={model_type} | {max_tokens}tok")
-                    t0 = time.time()
-
-                    # Per-model timeout: respect model_cfg["timeout"] or global _TIMEOUT
-                    call_timeout = model_cfg.get("timeout", _TIMEOUT)
-
-                    try:
-                        result = await asyncio.wait_for(
-                            loop.run_in_executor(
-                                None, self._llm_call, api_key, model_cfg, messages, max_tokens
-                            ),
-                            timeout=call_timeout,
-                        )
-                        elapsed = round(time.time() - t0, 1)
-                        log.info(f"✅ [{key_id}] [{model_name}] responded in {elapsed}s")
-                        return result
-
-                    except asyncio.TimeoutError:
-                        elapsed = round(time.time() - t0, 1)
-                        log.warning(f"⏱ [{key_id}] [{model_name}] timed out after {elapsed}s")
-                        model_errors.append(f"{key_id}: timeout")
-                        has_only_rate_limits = False
-
-                    except RateLimitError:
-                        self._mark_rate_limited(key_id, model_name)
-                        model_errors.append(f"{key_id}: rate-limited")
-
-                    except APIConnectionError as e:
-                        log.error(f"❌ [{key_id}] [{model_name}] connection failed: {str(e)[:80]}")
-                        model_errors.append(f"{key_id}: connection error")
-                        has_only_rate_limits = False
-
-                    except APIError as e:
-                        msg = str(e)
-                        if "401" in msg or "Unauthorized" in msg:
-                            log.error(f"🔑 [{key_id}] [{model_name}] invalid API key")
-                            model_errors.append(f"{key_id}: auth failed")
-                            has_only_rate_limits = False
-                        elif "404" in msg or "not found" in msg.lower():
-                            log.warning(f"⚠️ [{key_id}] [{model_name}] model unavailable — cascading")
-                            model_errors.append(f"{key_id}: model unavailable")
-                            has_only_rate_limits = False
-                            break
-                        else:
-                            log.error(f"❌ [{key_id}] [{model_name}] API error: {msg[:80]}")
-                            model_errors.append(f"{key_id}: {msg[:60]}")
-                            has_only_rate_limits = False
-
-                    except Exception as e:
-                        # Catches ValueError("LLM returned None content") and any other unexpected errors
-                        log.warning(f"⚠️ [{key_id}] [{model_name}] unexpected error: {str(e)[:100]} — cascading")
-                        model_errors.append(f"{key_id}: {str(e)[:60]}")
-                        has_only_rate_limits = False
-
-                summary = " | ".join(model_errors)
-                log.warning(f"All keys failed for [{model_name}]: {summary} — cascading to next model")
-                all_errors.append(f"[{model_name}]: {summary}")
-
-            # All models exhausted this pass.
-            # If ALL failures were rate-limits, wait for the soonest key to free up and retry.
-            if has_only_rate_limits and self._keys:
-                now = time.time()
-                soonest = min(
-                    (self._rate_limited_until.get(self._rl_key(f"key-{i}", cfg["model"]), 0)
-                     for i in range(len(self._keys))
-                     for chain in MODEL_ROUTING.values()
-                     for cfg in chain),
-                    default=0,
-                )
-                wait = max(soonest - now + 1, 5)  # at least 5s buffer
+            if not swarm:
+                # Every model's keys are rate-limited — wait for soonest
+                wait = self._soonest_available_wait(model_chain)
                 log.warning(
-                    f"All keys rate-limited (attempt {attempt_num}) — "
-                    f"waiting {wait:.0f}s for cooldown, then retrying…"
+                    f"All workers rate-limited (attempt {attempt_num}) — "
+                    f"waiting {wait:.0f}s for cooldown…"
                 )
                 await asyncio.sleep(wait)
-                continue  # retry the whole model chain
+                continue
 
-            # Hard failure (auth/connection/model error) — don't retry
-            break
+            model_labels = [
+                f"[{kid}]{mc['model'].split('/')[-1]}"
+                for mc, _, kid in swarm
+            ]
+            log.info(
+                f"🐝 Swarm [{model_type}]: {len(swarm)} workers racing — "
+                + ", ".join(model_labels)
+            )
 
-        error_detail = " || ".join(all_errors)
-        log.error(f"All models failed for type={model_type}: {error_detail}")
-        return f"❌ All models exhausted for '{model_type}': {error_detail}"
+            # Fire all swarm workers simultaneously
+            task_meta: Dict[asyncio.Task, Tuple[Dict, str]] = {}
+            for mc, k, kid in swarm:
+                t = asyncio.create_task(
+                    self._run_worker(mc, k, kid, messages, max_tokens, loop)
+                )
+                task_meta[t] = (mc, kid)
+
+            pending = set(task_meta.keys())
+            errors: List[str] = []
+            has_hard_error = False
+
+            while pending:
+                done, pending = await asyncio.wait(
+                    pending, return_when=asyncio.FIRST_COMPLETED
+                )
+                for task in done:
+                    try:
+                        result = task.result()
+                        # Winner — cancel remaining in-flight tasks
+                        for t in pending:
+                            t.cancel()
+                        mc, kid = task_meta[task]
+                        log.info(
+                            f"🏁 [{kid}] [{mc['model']}] won the swarm race "
+                            f"(type={model_type})"
+                        )
+                        return result
+
+                    except asyncio.CancelledError:
+                        pass  # expected: cancelled loser tasks
+
+                    except RateLimitError as e:
+                        mc, kid = task_meta[task]
+                        errors.append(f"[{kid}][{mc['model']}]: rate-limited")
+                        # has_hard_error stays False — rate limits are retryable
+
+                    except Exception as e:
+                        mc, kid = task_meta[task]
+                        errors.append(f"[{kid}][{mc['model']}]: {str(e)[:60]}")
+                        has_hard_error = True
+
+            # All swarm workers finished without a valid response.
+            if has_hard_error:
+                break  # hard errors (auth, connection, empty) — don't retry
+
+            # Only rate limits — wait for soonest key to free up, then retry
+            wait = self._soonest_available_wait(model_chain)
+            log.warning(
+                f"Swarm rate-limited (attempt {attempt_num}) — "
+                f"waiting {wait:.0f}s…"
+            )
+            await asyncio.sleep(wait)
+
+        error_detail = " || ".join(errors)
+        log.error(f"Swarm failed [{model_type}]: {error_detail}")
+        return f"❌ All swarm workers failed for '{model_type}': {error_detail}"
 
     # ── Parallel batch ────────────────────────────────────────────────────────
 
@@ -368,7 +443,7 @@ class LLMManager:
         model_type: str = "default",
         **kwargs,
     ) -> List[str]:
-        """Fire all prompts simultaneously — keys and models rotate automatically."""
+        """Fire all prompts simultaneously — each prompt runs its own swarm race."""
         log.info(f"batch_generate: {len(prompts)} prompts | type={model_type} | {len(self._keys)} keys")
         tasks = [
             asyncio.ensure_future(self.generate(p, model_type=model_type, **kwargs))
