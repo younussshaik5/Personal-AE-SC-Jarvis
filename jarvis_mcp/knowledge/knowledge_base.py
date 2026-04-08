@@ -1,10 +1,26 @@
+import os
 import json
+import logging
 from pathlib import Path
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 
+log = logging.getLogger(__name__)
+
+_EMBED_MODEL  = "nvidia/nv-embedqa-e5-v5"
+_EMBED_BASE   = "https://integrate.api.nvidia.com/v1"
+_EMBED_DIM    = 1024   # NV-Embed output dimension
+_FALLBACK_DIM = 100    # TF-vector fallback dimension
+
+
 class KnowledgeBase:
-    """Manages vector storage, embeddings, and knowledge retrieval."""
+    """
+    Manages vector storage, embeddings, and knowledge retrieval.
+
+    Embeddings: NVIDIA NV-Embed-QA-E5-v5 (1024-dim semantic vectors) via the
+    same NVIDIA key pool used by LLMManager.  Falls back to term-frequency
+    vectors when the API key is missing or the call fails.
+    """
 
     def __init__(self, account_path: str):
         self.account_path = Path(account_path)
@@ -50,19 +66,42 @@ class KnowledgeBase:
         return doc_id
 
     def _create_embedding(self, text: str) -> List[float]:
+        """
+        NVIDIA NV-Embed semantic embedding (1024-dim).
+        Falls back to term-frequency vector if API key is absent or call fails.
+        """
+        api_key = os.getenv("NVIDIA_API_KEY", "")
+        if not api_key:
+            return self._create_embedding_fallback(text)
+        try:
+            from openai import OpenAI
+            client = OpenAI(base_url=_EMBED_BASE, api_key=api_key)
+            response = client.embeddings.create(
+                input=[text[:2048]],   # NV-Embed token limit
+                model=_EMBED_MODEL,
+                encoding_format="float",
+            )
+            embedding = response.data[0].embedding
+            log.debug(f"Semantic embedding: {len(embedding)}-dim for {len(text)} chars")
+            return embedding
+        except Exception as e:
+            log.warning(f"Embedding API failed ({e}) — using TF fallback")
+            return self._create_embedding_fallback(text)
+
+    def _create_embedding_fallback(self, text: str) -> List[float]:
+        """100-dim term-frequency vector — used when NVIDIA embed API is unavailable."""
         words = text.lower().split()
-        word_freq = {}
+        word_freq: Dict[str, int] = {}
         for word in words:
             word_freq[word] = word_freq.get(word, 0) + 1
 
-        top_words = sorted(word_freq.items(), key=lambda x: x[1], reverse=True)[:100]
+        top_words = sorted(word_freq.items(), key=lambda x: x[1], reverse=True)[:_FALLBACK_DIM]
         max_freq = top_words[0][1] if top_words else 1
 
         embedding = [freq / max_freq for _, freq in top_words]
-        while len(embedding) < 100:
+        while len(embedding) < _FALLBACK_DIM:
             embedding.append(0.0)
-
-        return embedding[:100]
+        return embedding[:_FALLBACK_DIM]
 
     async def retrieve_relevant(self, query: str, top_k: int = 5) -> List[Dict[str, Any]]:
         query_embedding = self._create_embedding(query)

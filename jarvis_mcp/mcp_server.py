@@ -75,6 +75,11 @@ class JarvisServer:
             merger=self.merger,
         )
 
+        # Wire skill_queue into SystemHealthSkill so it can report real queue depth
+        sh = self.skills.get("system_health")
+        if sh:
+            sh.skill_queue = self.skill_queue
+
         # Agent background tasks
         self.agent_task = None
         self.orchestration_running = False
@@ -217,6 +222,7 @@ class JarvisServer:
             "build_knowledge_graph":        "knowledge_builder",
             "quick_insights":               "quick_insights",
             "generate_custom_template":     "custom_template",
+            "system_health":                "system_health",
         }
 
         skill_name = tool_to_skill.get(tool_name)

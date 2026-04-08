@@ -268,6 +268,14 @@ TOOLS.append(_tool(
     required=["account_name"]
 ))
 
+# ── System diagnostics ───────────────────────────────────────────────────────
+TOOLS.append(_tool(
+    "system_health",
+    "JARVIS system diagnostics — NVIDIA key pool status, queue depth, skill timeline, uptime.",
+    _account_arg,
+    required=["account_name"]
+))
+
 # ── Autonomous system ────────────────────────────────────────────────────────
 TOOLS.append(_tool(
     "get_jarvis_todos",

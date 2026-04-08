@@ -12,9 +12,7 @@ class AgentOrchestrator:
         from .file_monitor_agent import FileMonitorAgent
         from .vectorizer_agent import VectorizerAgent
         from .context_aggregator_agent import ContextAggregatorAgent
-        from .outcome_predictor_agent import OutcomePredictorAgent
         from .bottleneck_detector_agent import BottleneckDetectorAgent
-        from .evolution_optimizer_agent import EvolutionOptimizerAgent
         from ..knowledge.knowledge_base import KnowledgeBase
         from ..evolution.file_evolver import FileEvolver
         from ..evolution.conversation_analyzer import ConversationAnalyzer
@@ -24,14 +22,12 @@ class AgentOrchestrator:
         self.account_path = Path(account_path)
         self.orchestration_log = self.account_path / ".orchestration_log.json"
         self.kb = KnowledgeBase(str(self.account_path))
-        
+
         # LEARNING AGENTS
         self.file_monitor = FileMonitorAgent(str(self.account_path))
         self.vectorizer = VectorizerAgent(self.kb)
         self.context_aggregator = ContextAggregatorAgent(self.kb)
-        self.outcome_predictor = OutcomePredictorAgent(str(self.account_path))
         self.bottleneck_detector = BottleneckDetectorAgent(str(self.account_path))
-        self.evolution_optimizer = EvolutionOptimizerAgent(str(self.account_path))
         
         # EVOLUTION/AUTONOMY SYSTEM
         self.file_evolver = FileEvolver(str(self.account_path))
