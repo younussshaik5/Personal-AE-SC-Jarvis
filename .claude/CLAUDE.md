@@ -1,27 +1,64 @@
 # JARVIS — Claude Behavior Instructions
 
-You are working alongside JARVIS, an autonomous AI sales assistant running as an MCP server inside Claude Desktop. Use JARVIS tools automatically — don't wait to be asked.
+You are assisting a sales professional with JARVIS, an autonomous AI sales assistant. This file guides Claude (both in Code and Desktop) on how to work with JARVIS effectively.
+
+## How to Detect JARVIS Project Context
+
+**If opened at project root (contains install.py, setup.sh, jarvis_mcp_launcher.py):**
+- User is at the project level
+- Help with setup, configuration, and overall pipeline management
+- Run `install.py` if not already set up
+- Suggest checking ACCOUNTS folder for active deals
+
+**If opened at account level (inside ~/JARVIS/ACCOUNTS/[AccountName]/):**
+- User is working on a specific deal
+- Read deal_stage.json, discovery.md, company_research.md first
+- Focus on that account only
+- Offer to run skills for that specific deal
+- Suggest next actions based on deal health
+
+**If in ACCOUNTS folder itself:**
+- Show all active deals with current status
+- Flag any RED/AMBER risks
+- Suggest which deals need attention
 
 ## Who the User Is
-Sales professional handling both AE and SC responsibilities. One person, both roles. Use MEDDPICC for all deal analysis. Be direct, concise, action-oriented.
+Sales professional (AE or SC) managing 5-15 active deals. Uses MEDDPICC for deal qualification. Values speed, accuracy, and context. Non-technical — may be in Claude Code or Claude Desktop.
 
 ---
 
-## NVIDIA API Key Setup (Guide New Users)
+## Setup & API Key Management
 
-JARVIS uses **Kimi K2 Thinking** via NVIDIA NIM. All skills require an NVIDIA API key.
+### First Time Setup
 
-**If JARVIS skill calls return key errors:**
-1. Go to https://build.nvidia.com/ → sign up (free tier available)
-2. Copy your API key (starts with `nvapi-`)
-3. Edit `.env` in the JARVIS project folder
-4. Set `NVIDIA_API_KEY=nvapi-your-key-here`
-5. Restart Claude Desktop (⌘Q → reopen)
+If user just downloaded the project:
 
-**If `.env` doesn't exist:** user needs to run `bash setup.sh` first — it will interactively ask for keys.
+1. **Run setup:** `python install.py` (works on Windows, Mac, Linux)
+2. **Provide API key:** When prompted, get free key from https://build.nvidia.com
+3. **Wait 2-3 minutes** for full installation
+4. **Restart Claude Desktop** (important!)
+5. **Then use in Claude Code/Desktop**
 
-**Why multiple keys?**
-JARVIS fires parallel LLM calls per skill (e.g. MEDDPICC generates 9 dimensions simultaneously). With 1 key you can hit NVIDIA rate limits mid-generation. With multiple keys, requests round-robin automatically — no retries, no waiting. Add up to 5 keys as `NVIDIA_API_KEY`, `NVIDIA_API_KEY_2` ... `NVIDIA_API_KEY_5` in `.env`.
+If `.env` doesn't exist or API key is missing:
+- Run `python install.py` again
+- Or manually edit `.env` and add: `NVIDIA_API_KEY=nvapi-your-key-here`
+
+### NVIDIA API Key Details
+
+JARVIS uses **Kimi K2 Thinking Model** via NVIDIA. All skills need this key.
+
+**If you see API key errors:**
+1. Check `.env` file exists in project root
+2. Verify key starts with `nvapi-`
+3. Add more keys if rate-limited:
+   ```
+   NVIDIA_API_KEY=nvapi-key1
+   NVIDIA_API_KEY_2=nvapi-key2
+   NVIDIA_API_KEY_3=nvapi-key3
+   ```
+4. Save `.env` and retry
+
+**Why multiple keys?** JARVIS runs parallel LLM calls (9 calls at once for MEDDPICC). One key hits rate limits. Multiple keys rotate automatically — no waiting.
 
 ---
 
@@ -57,29 +94,61 @@ JARVIS fires parallel LLM calls per skill (e.g. MEDDPICC generates 9 dimensions 
 
 ---
 
-## Automatic Behaviours
+## Smart Context Detection (Claude Code)
+
+### At Project Level
+When user opens the root folder in Claude Code:
+1. Read `install.py` to detect JARVIS project
+2. Check if setup is complete (does `.env` exist?)
+3. Check if ACCOUNTS folder exists
+4. If not set up: guide through `python install.py`
+5. If set up: list active deals from ACCOUNTS/
+6. Offer to open an account or create new one
+
+### At Account Level
+When user opens `ACCOUNTS/[AccountName]/` folder:
+1. Read `deal_stage.json` first (deal state, ARR, stakeholders)
+2. Read `discovery.md` (what we know about them)
+3. Read `company_research.md` (background)
+4. Read `CLAUDE.md` if it exists (account-specific notes)
+5. Display: **Current Status: [Stage] | ARR: $[X]k | Health: [RED/AMBER/GREEN]**
+6. Ask: "What do you need for this deal?" (MEDDPICC score, meeting prep, battlecard, etc.)
+
+### At ACCOUNTS Folder
+When user opens just the ACCOUNTS folder:
+1. List all subfolders (all active deals)
+2. Show each deal's status
+3. Flag RED/AMBER risks
+4. Suggest next actions for each
+
+---
+
+## Automatic Behaviours (MCP Tools)
 
 ### When user mentions or discusses an account:
 1. Call `get_account_summary` for that account first
-2. Present the current deal state (stage, ARR, stakeholders, risks)
-3. Suggest the most relevant next skill to run
+2. Present deal state: stage, ARR, probability, key stakeholders, biggest risks
+3. Suggest most relevant next action
 
 ### When user shares email / meeting notes / transcript:
 1. Call `extract_intelligence` with the text and account name
-2. Report what MEDDPICC signals were found
-3. Suggest updating `update_deal_stage` if stage changed
+2. Report MEDDPICC signals found: metrics, economic buyer, decision process, champion, etc.
+3. Suggest `update_deal_stage` if signals indicate stage change
 
 ### When user asks for meeting prep:
-1. Call `get_account_summary` → then `get_meeting_prep`
-2. Include: who's attending, their concerns, discovery questions, objection handlers, hard ask
+1. Call `get_account_summary` first
+2. Then `get_meeting_prep` for that account
+3. Include: who's attending, what they care about, discovery questions, objection handlers
 
-### When user asks about competitive situation:
-1. Call `get_battlecard` → incumbent vs our product
-2. Follow with `analyze_competitor_pricing` if pricing objection raised
+### When user asks about competitive threat:
+1. Call `get_battlecard` (your product vs their incumbent)
+2. Follow with `analyze_competitor_pricing` if budget/ROI concerns raised
+3. Suggest "killer questions" to expose competitor weaknesses
 
-### When user asks for deal health / pipeline:
-1. Call `quick_insights` for each active account
-2. Flag RED items — these need immediate action
+### When user asks for deal health check:
+1. Call `quick_insights` for the account
+2. Flag any RED (urgent action needed) or AMBER (watch closely) items
+3. Recommend specific next steps to improve health
 
 ---
 

@@ -230,28 +230,56 @@ class AccountScaffolder:
         
     def _create_claude_md_template(self, account_name: str) -> str:
         """Create CLAUDE.md template for account-specific configuration"""
-        template = f"""# {account_name} - Account Configuration
+        template = f"""# {account_name} - Deal-Specific Configuration
 
-## Models
-[Override specific models for this account if needed]
-- proposal: [model_name]
-- discovery: [model_name]
+## Quick Deal Summary
+- **Account**: {account_name}
+- **Current Stage**: [discovery / qualify / demo / negotiate / close]
+- **ARR Target**: $[X]k
+- **Timeline**: [deadline]
+- **Key Pain**: [primary problem they're solving]
+- **Champion**: [internal advocate name]
 
-## Cascades
-[Define account-specific cascade rules]
-- condition: action
+## Your Next Action
+[What should you work on this deal right now? Update this as you progress]
 
-## Skills
-[Define skill dependencies for this account]
-- skill_name: [dependent_skills]
+---
 
-## Evolution Suggestions
-[Auto-populated by config_evolver based on performance]
+## MEDDPICC Status (Track as you discover)
+- **M**etrics: [numbers, ROI, cost savings] - [ ] Confirmed
+- **E**conomic Buyer: [CFO/VP title] - [ ] Engaged
+- **D**ecision Criteria: [evaluation requirements] - [ ] Defined
+- **D**ecision Process: [procurement steps] - [ ] Mapped
+- **P**aper Process: [legal/security/contract requirements] - [ ] Started
+- **I**mplications: [pain points they mentioned] - [ ] Confirmed
+- **C**hampion: [internal advocate] - [ ] Aligned
+- **C**ompetition: [competing solutions] - [ ] Analyzed
 
-## Metadata
-- created_at: {datetime.now().isoformat()}
-- account: {account_name}
-- status: active
+## Skills to Run Next (In Priority Order)
+1. **Get Account Summary** — See full deal dossier
+2. **Track MEDDPICC** — Score all 8 dimensions
+3. **Quick Insights** — Fast deal health check
+4. **Get Risk Report** — Identify biggest blockers
+5. **Get Battlecard** — Prepare for competition
+6. **Get Meeting Prep** — Prepare for next meeting
+7. **Get Proposal** — When ready to close
+
+## Custom Notes
+[Add account-specific instructions, preferences, or special handling]
+
+## Competitors
+[Who are they evaluating? Update as you learn]
+
+## Key Stakeholders
+[Names, titles, what they care about]
+
+---
+
+**Last Updated**: {datetime.now().strftime('%Y-%m-%d')}
+**Status**: Active (update this as stage changes)
+**Owner**: [Your name]
+
+*Tip: Keep this file updated. Claude reads it automatically and adjusts recommendations based on what's here.*
 """
         return template
         
