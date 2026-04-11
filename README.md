@@ -204,6 +204,8 @@ One script handles everything — installs all dependencies, asks for your key, 
 
 ## Installation
 
+**Works on Windows, macOS, and Linux. One command. Same experience everywhere.**
+
 ### Step 1 — Download JARVIS
 
 Go to **github.com/younussshaik5/Personal-AE-SC-Jarvis**
@@ -212,60 +214,57 @@ Click the green **"Code"** button → **"Download ZIP"**
 
 Unzip the file somewhere easy to find (like your Desktop or Documents folder).
 
-### Step 2 — Open Terminal
+### Step 2 — Open Terminal/Command Prompt
 
-Terminal is a text-based window where you run commands. Don't worry — you only need to run one command, and it's copy-paste.
-
-**On Mac:**
-- Press **Cmd + Space**, type `Terminal`, press Enter
-- A black/white window opens — that's Terminal
+**On Mac or Linux:**
+- Open Terminal (Press Cmd+Space on Mac, search "Terminal")
 
 **On Windows:**
-- First, install WSL (Windows Subsystem for Linux) — it's a free Microsoft tool that lets you run these commands on Windows
-- Open the Microsoft Store, search "Ubuntu", install it
-- Open Ubuntu — that's your Terminal
-- *(If you're comfortable with Git Bash, that works too)*
+- Open Command Prompt (Press Windows key, type "cmd", press Enter)
+- *(You do NOT need WSL anymore — the setup works natively on Windows)*
 
-**On Linux:**
-- You already know where Terminal is
+### Step 3 — Run the Universal Setup
 
-### Step 3 — Run the Setup Script
-
-In Terminal, type `cd ` (with a space after it), then drag the JARVIS folder into the Terminal window. The folder path fills in automatically. Press Enter.
-
-Then copy-paste this and press Enter:
+In your Terminal/Command Prompt, navigate to the JARVIS folder and run:
 
 ```
-bash setup.sh
+python3 install.py
 ```
 
-**What happens next:**
-
-The script walks you through everything:
-
+Or on Windows:
 ```
-1. Checks if Python is installed (installs it automatically on Mac if not)
-2. Installs required packages
-3. Asks for your NVIDIA API key — paste the nvapi-... key you copied earlier
-4. Creates your ACCOUNTS folder at ~/JARVIS/ACCOUNTS/
-5. Connects JARVIS to Claude Desktop
-6. Runs a quick test to confirm everything works
+python install.py
 ```
 
-When it says "Setup Complete" — you're done.
+**That's it.** The installer handles everything:
+
+1. ✅ Checks Python is installed (3.9+)
+2. ✅ Creates a virtual environment
+3. ✅ Installs all dependencies
+4. ✅ Asks for your NVIDIA API key (paste the nvapi-... key)
+5. ✅ Creates your ACCOUNTS folder
+6. ✅ Configures Claude Desktop automatically
+7. ✅ Validates everything works
+
+When it says "✅ Setup Complete!" — you're done.
 
 ### Step 4 — Restart Claude Desktop
 
 **Important:** Close Claude Desktop completely, then reopen it.
-- Mac: press **Cmd + Q** (not just the red X — that keeps it running)
-- Windows: right-click the Claude icon in the taskbar → Quit
-- Then reopen Claude Desktop normally
+- **Mac:** Press **Cmd + Q** (not the red X button)
+- **Windows:** Right-click Claude in the taskbar → Quit → Reopen
+- **Linux:** Close and reopen Claude Desktop
 
 ### Step 5 — Confirm JARVIS Is Running
 
-In Claude Desktop, look at the chat input bar. You should see a **hammer icon (🔨)**. Click it — if you see tools like `get_account_summary`, `track_meddpicc`, `get_proposal` listed, JARVIS is live.
+Open a new chat in Claude Desktop. If JARVIS is running, you'll see tools available (the exact UI may vary, but the tools will be there when you start typing skill commands).
 
-You should also see a dashboard open at **http://localhost:8000** in your browser — that's your pipeline view.
+Try this to confirm:
+```
+"Create account Acme. They're a 500-person company, target $200k, March deadline."
+```
+
+JARVIS will create your first account folder and you're ready to go.
 
 ---
 
