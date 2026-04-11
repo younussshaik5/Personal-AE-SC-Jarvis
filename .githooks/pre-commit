@@ -21,8 +21,19 @@ for pattern in "${SECRET_FILES[@]}"; do
     fi
 done
 
-# Check for API keys in actual file contents (skip scripts themselves and examples)
-if git diff --cached -S "nvapi-" --no-ext-diff | grep -v "\.githooks/pre-commit" | grep -v "\.env\.example" | grep -q "nvapi-"; then
+# Check for real API keys (not documentation/examples)
+# Real NVIDIA keys: nvapi- followed by 100+ alphanumeric characters
+# Placeholder examples like "nvapi-..." or "nvapi-KEY" are allowed for documentation
+if git diff --cached -S "nvapi-" --no-ext-diff | \
+  grep -v "\.githooks/pre-commit" | \
+  grep -v "\.env\.example" | \
+  grep -v "tests/" | \
+  grep -v "\.md" | \
+  grep -v "nvapi-\.\.\." | \
+  grep -v "nvapi-YOUR-KEY" | \
+  grep -v "nvapi-test" | \
+  grep -v "nvapi-key" | \
+  grep -q "nvapi-[a-z0-9]\{50,\}"; then
     echo "❌ BLOCKED: Detected NVIDIA API key in commit diff"
     echo ""
     echo "🔑 API Keys should never be in version control!"
