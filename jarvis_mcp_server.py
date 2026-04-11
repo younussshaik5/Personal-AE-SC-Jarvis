@@ -59,17 +59,31 @@ class _JSONFileHandler(logging.Handler):
                 "msg":    record.getMessage(),
             })
             with _log_file_lock:
-                with open(_ACTIVITY_LOG, "a", encoding="utf-8") as fh:
-                    fh.write(line + "\n")
+                try:
+                    with open(_ACTIVITY_LOG, "a", encoding="utf-8") as fh:
+                        fh.write(line + "\n")
+                except IOError as e:
+                    # Log write failed, but don't crash the handler
+                    pass
+                except OSError as e:
+                    # Permission or other OS error
+                    pass
+
                 # Keep file bounded: trim to last 2000 lines when it exceeds ~4000
                 try:
                     raw = _ACTIVITY_LOG.read_bytes()
                     if raw.count(b"\n") > 4000:
                         keep = b"\n".join(raw.split(b"\n")[-2000:])
                         _ACTIVITY_LOG.write_bytes(keep)
-                except Exception:
+                except IOError as e:
+                    # Rotation failed, but don't crash — log file will grow
                     pass
-        except Exception:
+                except OSError as e:
+                    # Permission or other OS error during rotation
+                    pass
+        except Exception as e:
+            # Catch all for JSON encoding or other unexpected errors
+            # We silently drop this log record rather than crashing
             pass
 
 _jfh = _JSONFileHandler()
@@ -311,7 +325,7 @@ async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
         return [types.TextContent(type="text", text=str(result))]
 
     except Exception as exc:
-        log.error(f"Error in {name}: {exc}")
+        log.error(f"Error in {name}: {type(exc).__name__}: {exc}", exc_info=True)
         return [types.TextContent(type="text", text=f"❌ Error running {name}: {exc}")]
 
 
@@ -330,13 +344,30 @@ async def main():
         log.info("⚡ Queue bus started — file watcher + cascade worker active")
 
     log.info("JARVIS MCP server ready — waiting for Claude Desktop…")
-    async with stdio_server() as (read_stream, write_stream):
-        await server.run(
-            read_stream,
-            write_stream,
-            server.create_initialization_options()
-        )
+    try:
+        async with stdio_server() as (read_stream, write_stream):
+            await server.run(
+                read_stream,
+                write_stream,
+                server.create_initialization_options()
+            )
+    except asyncio.CancelledError:
+        log.info("JARVIS MCP server cancelled")
+    except Exception as e:
+        log.error(f"JARVIS MCP server error: {type(e).__name__}: {e}", exc_info=True)
+        raise
+    finally:
+        # Graceful shutdown — stop queue bus, cancel agent task, etc.
+        if _jarvis:
+            await _jarvis.shutdown()
+        log.info("JARVIS MCP server shutdown complete")
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        log.info("JARVIS MCP server interrupted by user")
+    except Exception as e:
+        log.error(f"JARVIS MCP server fatal error: {type(e).__name__}: {e}", exc_info=True)
+        sys.exit(1)

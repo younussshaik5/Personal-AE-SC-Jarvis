@@ -8,6 +8,7 @@ import sys
 import os
 import asyncio
 import signal
+import logging
 from pathlib import Path
 
 # Add project to path
@@ -16,6 +17,14 @@ sys.path.insert(0, str(project_root))
 
 from jarvis_mcp.mcp_server import JarvisServer
 from jarvis_mcp.platform_utils import PlatformUtils
+
+# Setup logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="[JARVIS MCP] %(message)s",
+    stream=sys.stderr
+)
+log = logging.getLogger(__name__)
 
 
 class MCPLauncher:
@@ -28,32 +37,38 @@ class MCPLauncher:
     async def start(self):
         """Start the JARVIS MCP server"""
         try:
-            print("[JARVIS MCP] Starting server...", file=sys.stderr)
+            log.info("Starting server…")
 
             # Initialize server
             self.server = JarvisServer()
             self.running = True
 
-            print("[JARVIS MCP] ✅ Server initialized successfully", file=sys.stderr)
-            print("[JARVIS MCP] 🤖 26 skills loaded and ready", file=sys.stderr)
-            print("[JARVIS MCP] 🚀 Ready for Claude Desktop connection", file=sys.stderr)
+            log.info(f"✅ Server initialized successfully")
+            log.info(f"🤖 Skills loaded and ready")
+            log.info(f"🚀 Ready for Claude Desktop connection")
 
             # Keep server running
             while self.running:
                 await asyncio.sleep(1)
 
+        except asyncio.CancelledError:
+            log.info("Server startup cancelled")
+            self.running = False
         except Exception as e:
-            print(f"[JARVIS MCP] ❌ Error: {e}", file=sys.stderr)
+            log.error(f"❌ Error: {type(e).__name__}: {e}", exc_info=True)
             self.running = False
             sys.exit(1)
 
     async def shutdown(self):
         """Gracefully shutdown server"""
-        print("[JARVIS MCP] Shutting down...", file=sys.stderr)
+        log.info("Shutting down…")
         self.running = False
         if self.server:
-            await self.server.shutdown()
-        print("[JARVIS MCP] ✅ Shutdown complete", file=sys.stderr)
+            try:
+                await self.server.shutdown()
+            except Exception as e:
+                log.error(f"Error during shutdown: {type(e).__name__}: {e}", exc_info=True)
+        log.info("✅ Shutdown complete")
 
     def handle_signal(self, signum=None, frame=None):
         """Handle shutdown signals (platform-aware signature)"""
@@ -68,8 +83,23 @@ async def main():
     PlatformUtils.register_signal_handlers(launcher.handle_signal)
 
     # Start server
-    await launcher.start()
+    try:
+        await launcher.start()
+    except KeyboardInterrupt:
+        log.info("Interrupted by user")
+    except Exception as e:
+        log.error(f"Fatal error: {type(e).__name__}: {e}", exc_info=True)
+        raise
+    finally:
+        await launcher.shutdown()
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        log.info("JARVIS MCP launcher interrupted")
+        sys.exit(0)
+    except Exception as e:
+        log.error(f"JARVIS MCP launcher fatal error: {type(e).__name__}: {e}", exc_info=True)
+        sys.exit(1)

@@ -92,7 +92,7 @@ class JarvisServer:
                 self.skills[skill_name] = skill_class(self.llm, self.config)
                 self.logger.info(f"✓ Initialized: {skill_name}")
             except Exception as e:
-                self.logger.error(f"✗ Failed to initialize {skill_name}: {e}")
+                self.logger.error(f"✗ Failed to initialize {skill_name}: {type(e).__name__}: {e}", exc_info=True)
 
         self.logger.info(f"✅ Initialized {len(self.skills)} skills")
 
@@ -106,7 +106,7 @@ class JarvisServer:
             else:
                 self.logger.warning("No account context detected - orchestrator disabled")
         except Exception as e:
-            self.logger.error(f"Failed to initialize orchestrator: {e}")
+            self.logger.error(f"Failed to initialize orchestrator: {type(e).__name__}: {e}", exc_info=True)
 
 
     async def start_background_orchestration(self):
@@ -135,7 +135,7 @@ class JarvisServer:
         except asyncio.CancelledError:
             self.logger.info("Autonomous system stopped")
         except Exception as e:
-            self.logger.error(f"Autonomous system error: {e}")
+            self.logger.error(f"Autonomous system error: {type(e).__name__}: {e}", exc_info=True)
 
     def _get_tool_list(self) -> list:
         """Get list of available tools"""
@@ -262,7 +262,7 @@ class JarvisServer:
 
             return {"result": result}
         except Exception as e:
-            self.logger.error(f"Error in {tool_name}: {e}")
+            self.logger.error(f"Error in {tool_name}: {type(e).__name__}: {e}", exc_info=True)
             return {"error": str(e)}
 
     async def handle_onboarding_tool(self, tool_name: str, arguments: dict) -> dict:
@@ -286,7 +286,7 @@ class JarvisServer:
             return {"error": f"Unknown onboarding action: {tool_name}"}
         
         except Exception as e:
-            self.logger.error(f"Onboarding error: {e}")
+            self.logger.error(f"Onboarding error: {type(e).__name__}: {e}", exc_info=True)
             return {"error": str(e)}
 
 
