@@ -51,6 +51,11 @@ class ConfigManager:
         self.nvidia_api_key = os.getenv("NVIDIA_API_KEY", "")
         self.anthropic_api_key = os.getenv("ANTHROPIC_API_KEY", "")
 
+        # Performance and timeout settings (configurable via environment)
+        self.skill_timeout = int(os.getenv("JARVIS_SKILL_TIMEOUT", "600"))
+        self.max_log_lines = int(os.getenv("JARVIS_MAX_LOG_LINES", "200"))
+        self.crm_port = int(os.getenv("CRM_PORT", "8000"))
+
     def get_accounts_root(self) -> Path:
         """Get the accounts root directory."""
         return self.accounts_root
@@ -124,6 +129,16 @@ class ConfigManager:
         # Check API keys
         if not self.nvidia_api_key:
             warnings.append("NVIDIA_API_KEY not set")
+
+        # Validate performance settings
+        if self.skill_timeout <= 0:
+            errors.append(f"JARVIS_SKILL_TIMEOUT must be positive, got {self.skill_timeout}")
+
+        if self.max_log_lines < 10:
+            errors.append(f"JARVIS_MAX_LOG_LINES should be at least 10, got {self.max_log_lines}")
+
+        if self.crm_port <= 0 or self.crm_port > 65535:
+            errors.append(f"CRM_PORT must be between 1 and 65535, got {self.crm_port}")
 
         return {
             "valid": len(errors) == 0,

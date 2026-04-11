@@ -39,6 +39,7 @@ class QueueWorker:
         self,
         queue: SkillQueue,
         skills: Dict[str, Any],
+        config=None,        # ConfigManager — provides SKILL_TIMEOUT and other settings
         learner=None,
         extractor=None,     # IntelligenceExtractor
         merger=None,        # KnowledgeMerger
@@ -47,6 +48,7 @@ class QueueWorker:
     ):
         self.queue        = queue
         self.skills       = skills
+        self.config       = config
         self.learner      = learner
         self.extractor    = extractor
         self.merger       = merger
@@ -57,6 +59,9 @@ class QueueWorker:
         # Dedup: track recently completed (account::skill) → timestamp
         self._recent_runs: Dict[str, float] = {}
         self.RECENT_RUN_WINDOW = 300  # 5 min — don't re-run same skill via cascade
+
+        # Get skill timeout from config or use default
+        self.SKILL_TIMEOUT = (config.skill_timeout if config else 600)  # 10 min default
 
     def start(self) -> None:
         if self._running:
@@ -89,8 +94,7 @@ class QueueWorker:
             return
 
         t0 = time.time()
-        SKILL_TIMEOUT = 600  # 10 min — LLM calls are slow but shouldn't hang forever
-        log.info(f"[worker] ▶ {job.skill_name} | {job.account_name} | trigger={job.trigger}")
+        log.info(f"[worker] ▶ {job.skill_name} | {job.account_name} | trigger={job.trigger} | timeout={self.SKILL_TIMEOUT}s")
 
         output_file = SKILL_OUTPUT_FILES.get(job.skill_name)
 
@@ -102,7 +106,7 @@ class QueueWorker:
                     self.retry_engine.execute_with_retry(
                         skill, job.account_name, job.skill_name
                     ),
-                    timeout=SKILL_TIMEOUT * 3,
+                    timeout=self.SKILL_TIMEOUT * 3,
                 )
                 elapsed = round(time.time() - t0, 1)
 
@@ -144,7 +148,7 @@ class QueueWorker:
             else:
                 result = await asyncio.wait_for(
                     skill.generate(job.account_name),
-                    timeout=SKILL_TIMEOUT,
+                    timeout=self.SKILL_TIMEOUT,
                 )
                 elapsed = round(time.time() - t0, 1)
 

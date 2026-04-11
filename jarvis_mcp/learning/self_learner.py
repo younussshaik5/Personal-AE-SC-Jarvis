@@ -18,6 +18,7 @@ Example _evolution_log.md entry:
 import json
 import asyncio
 import logging
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Any, Optional
@@ -26,7 +27,8 @@ log = logging.getLogger(__name__)
 
 TIMELINE_FILE  = "_skill_timeline.json"
 EVOLUTION_FILE = "_evolution_log.md"
-MAX_LOG_LINES  = 200  # keep rolling window to avoid unbounded growth
+# Get max log lines from environment or use default
+MAX_LOG_LINES  = int(os.getenv("JARVIS_MAX_LOG_LINES", "200"))  # keep rolling window to avoid unbounded growth
 
 
 class SelfLearner:
@@ -35,8 +37,11 @@ class SelfLearner:
     Thread-safe via asyncio lock per account.
     """
 
-    def __init__(self, accounts_root: Path):
+    def __init__(self, accounts_root: Path, config=None):
         self.accounts_root = accounts_root
+        self.config = config
+        # Use config's max_log_lines if available, otherwise use env/default
+        self.max_log_lines = (config.max_log_lines if config else MAX_LOG_LINES)
         self._locks: Dict[str, asyncio.Lock] = {}
 
     def _lock_for(self, account_name: str) -> asyncio.Lock:
@@ -125,12 +130,12 @@ class SelfLearner:
                             "# Auto-generated — do not edit manually\n",
                             "# Each entry = one skill run and what triggered it\n\n"]
 
-            # Append new line, then trim to MAX_LOG_LINES content lines
+            # Append new line, then trim to max_log_lines content lines
             existing.append(line)
             header = [l for l in existing if l.startswith("#")]
             content = [l for l in existing if not l.startswith("#")]
-            if len(content) > MAX_LOG_LINES:
-                content = content[-MAX_LOG_LINES:]
+            if len(content) > self.max_log_lines:
+                content = content[-self.max_log_lines:]
 
             with open(log_path, "w") as f:
                 f.writelines(header + ["\n"] + content)

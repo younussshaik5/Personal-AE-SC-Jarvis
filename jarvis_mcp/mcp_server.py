@@ -51,13 +51,14 @@ class JarvisServer:
         self._initialize_orchestrator()
 
         # ── Queue bus + self-learning ────────────────────────────────────────
-        self.learner     = SelfLearner(self.config.accounts_root)
+        self.learner     = SelfLearner(self.config.accounts_root, config=self.config)
         self.extractor   = IntelligenceExtractor(self.llm)
         self.merger      = KnowledgeMerger(self.config.accounts_root)
         self.coordinator = BriefCoordinator(self.config)
         self.skill_queue  = SkillQueue()
         self.queue_worker = QueueWorker(
             self.skill_queue, self.skills,
+            config=self.config,
             learner=self.learner,
             extractor=self.extractor,
             merger=self.merger,
