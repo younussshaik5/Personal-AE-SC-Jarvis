@@ -1,0 +1,23 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "JARVIS Orchestrator",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "jarvis.core.orchestrator"],
+      "port": 0
+    },
+    {
+      "name": "JARVIS Dashboard",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "jarvis.ui.server"],
+      "port": 8080
+    },
+    {
+      "name": "OpenCode Observer",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["mcp-opencode-observer/dist/index.js"],
+      "port": 3000
+    }
+  ]
+}
