@@ -266,6 +266,14 @@ Try this to confirm:
 
 JARVIS will create your first account folder and you're ready to go.
 
+### Important Notes
+
+**Project-Scoped:** This JARVIS instance is specific to this project folder. If you open a different JARVIS project in Claude Desktop, it will use that project's separate JARVIS instead. This prevents account data conflicts.
+
+**Lifecycle:** When you close Claude Desktop, JARVIS shuts down cleanly. When you reopen Claude, JARVIS restarts automatically. All your account data persists — you'll find everything exactly as you left it.
+
+**Need details?** See [LIFECYCLE_GUIDE.md](LIFECYCLE_GUIDE.md) for a complete explanation of when JARVIS starts/stops, what data persists, and what to do if something goes wrong.
+
 ---
 
 ## Your First 5 Minutes
