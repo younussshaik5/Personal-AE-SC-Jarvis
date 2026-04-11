@@ -1,29 +1,38 @@
 @echo off
-REM JARVIS Setup for Windows
-REM This script creates a virtual environment, installs dependencies, and configures Claude Desktop
+REM JARVIS MCP — Windows Setup (Sales People Edition)
+REM No terminal knowledge required. Just click and follow prompts.
 
 setlocal enabledelayedexpansion
 
 echo.
-echo ========================================
-echo  JARVIS Setup for Windows
-echo ========================================
+echo ╔════════════════════════════════════════════════════╗
+echo ║           JARVIS for Sales — Setup                ║
+echo ║                                                    ║
+echo ║  Don't worry, this is automated. Just follow      ║
+echo ║  the prompts. Takes about 2 minutes.              ║
+echo ╚════════════════════════════════════════════════════╝
 echo.
 
-REM Check Python
-echo Checking Python installation...
+REM ────────────────────────────────────────────────────────────────────────────
+REM STEP 1: Check Python
+REM ────────────────────────────────────────────────────────────────────────────
+echo Checking if Python is installed...
 python --version >nul 2>&1
 if errorlevel 1 (
     echo.
-    echo ERROR: Python not found on PATH
+    echo ❌ Python not found. Installing...
     echo.
-    echo Please download Python from https://www.python.org/
-    echo and make sure to check "Add Python to PATH" during installation.
+    echo Opening Microsoft Store to install Python 3.11...
     echo.
+    timeout /t 2 /nobreak >nul
+    start ms-windows-store://pdp/?productid=9NRWMJP3717K
+    echo.
+    echo After installing Python, close this window and run setup.bat again.
     pause
     exit /b 1
 )
 
+echo ✅ Python found:
 python --version
 
 REM Create virtual environment
@@ -62,31 +71,38 @@ if errorlevel 1 (
     echo WARNING: Some dependencies may have failed to install
 )
 
-REM Setup .env
+REM ────────────────────────────────────────────────────────────────────────────
+REM STEP 2: Setup .env with API Key
+REM ────────────────────────────────────────────────────────────────────────────
 echo.
-echo Setting up .env file...
+echo Setting up API key...
+echo.
+
 if exist .env (
-    echo .env already exists. Skipping...
+    echo ✅ .env already exists
 ) else (
-    if exist .env.example (
-        echo Creating .env from .env.example...
-        copy .env.example .env
-        echo.
-        echo Created .env file. You will need to edit it and add your NVIDIA API keys.
-    ) else (
-        echo.
-        echo Creating .env file...
+    echo ⚠️  Need NVIDIA API key (free, takes 1 minute):
+    echo.
+    echo 1. Go to: https://build.nvidia.com
+    echo 2. Sign up (free tier - no credit card needed)
+    echo 3. Click profile → API Keys → Generate Key
+    echo 4. Copy the key (starts with nvapi-)
+    echo.
+
+    set /p API_KEY="Paste your NVIDIA API key here: "
+
+    if not "!API_KEY!"=="" (
         (
-            echo # JARVIS v2 - Personal AE + SC Sales Assistant
-            echo # NVIDIA API KEY for NVIDIA NIM
-            echo.
-            echo NVIDIA_API_KEY=nvapi-your-key-here
-            echo.
-            echo # Optional
-            echo ANTHROPIC_API_KEY=
+            echo # JARVIS - Sales Intelligence Assistant
+            echo NVIDIA_API_KEY=!API_KEY!
         ) > .env
-        echo.
-        echo Created basic .env file. You will need to add your NVIDIA API keys.
+        echo ✅ API key saved
+    ) else (
+        (
+            echo # JARVIS - Sales Intelligence Assistant
+            echo NVIDIA_API_KEY=nvapi-your-key-here
+        ) > .env
+        echo ⚠️  No key entered. Edit .env later with your key.
     )
 )
 
@@ -104,28 +120,26 @@ if exist fix_mcp_config.py (
     echo You may need to manually configure Claude Desktop
 )
 
-REM Done
+REM ────────────────────────────────────────────────────────────────────────────
+REM DONE
+REM ────────────────────────────────────────────────────────────────────────────
 echo.
-echo ========================================
-echo  ✅ Setup Complete!
-echo ========================================
-echo.
-echo Next steps:
-echo.
-echo 1. Edit .env and add your NVIDIA API keys
-echo    - Go to https://build.nvidia.com/
-echo    - Sign up for free tier
-echo    - Copy your API key (starts with nvapi-)
-echo    - Edit .env and replace NVIDIA_API_KEY value
-echo.
-echo 2. Restart Claude Desktop (close and reopen)
-echo.
-echo 3. Test JARVIS in Claude:
-echo    - Type: /jarvis
-echo    - Or use any JARVIS tool like get_account_summary
-echo.
-echo For help:
-echo - Check README.md for more information
-echo - Review .env file for all configuration options
+echo ╔════════════════════════════════════════════════════╗
+echo ║              ✅ SETUP COMPLETE!                   ║
+echo ║                                                    ║
+echo ║  NEXT STEPS:                                      ║
+echo ║  1. Close Claude Desktop completely              ║
+echo ║     (Right-click icon → Quit)                    ║
+echo ║  2. Wait 3 seconds                               ║
+echo ║  3. Reopen Claude Desktop                        ║
+echo ║  4. Look for 🔨 icon in chat                    ║
+echo ║  5. Type: "Create account Acme Corp"            ║
+echo ║  6. You're ready to use JARVIS!                 ║
+echo ║                                                    ║
+echo ║  Your deal files are in:                         ║
+echo ║  %USERPROFILE%\JARVIS\ACCOUNTS\                ║
+echo ║                                                    ║
+echo ║  For help: Read README.md in the folder          ║
+echo ╚════════════════════════════════════════════════════╝
 echo.
 pause
