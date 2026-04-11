@@ -2,6 +2,16 @@
 
 You are assisting a sales professional with JARVIS, an autonomous AI sales assistant. This file guides Claude (both in Code and Desktop) on how to work with JARVIS effectively.
 
+## ⚠️ IMPORTANT: Project-Scoped JARVIS
+
+This JARVIS instance is **PROJECT-SPECIFIC**. It will ONLY activate when Claude is opened with this project folder. Each JARVIS project installation is independent with its own:
+- Virtual environment (venv/)
+- Configuration (.env)
+- Account data (.jarvis/ACCOUNTS/)
+- MCP server registration
+
+If you open a different JARVIS project folder, Claude will connect to that project's JARVIS instead. This prevents account confusion and ensures each project manages its own deals.
+
 ## How to Detect JARVIS Project Context
 
 **If opened at project root (contains install.py, setup.sh, jarvis_mcp_launcher.py):**

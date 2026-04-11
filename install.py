@@ -32,7 +32,9 @@ class JarvisInstaller:
         self.project_dir = Path(__file__).parent.resolve()
         self.venv_dir = self.project_dir / "venv"
         self.home_dir = Path.home()
-        self.jarvis_home = self.home_dir / "JARVIS"
+        # JARVIS_HOME is PROJECT-SPECIFIC, not global
+        # This ensures each JARVIS installation manages its own accounts
+        self.jarvis_home = self.project_dir / ".jarvis"
 
         # Claude Desktop config paths (platform-specific)
         if self.os_name == "Darwin":  # macOS
@@ -194,14 +196,16 @@ class JarvisInstaller:
         return True
 
     def step_5_create_jarvis_home(self) -> bool:
-        """Step 5: Create JARVIS home directory."""
+        """Step 5: Create JARVIS home directory (project-specific)."""
         self.log_header("Step 5: Creating JARVIS Home Directory")
 
         try:
             accounts_dir = self.jarvis_home / "ACCOUNTS"
             accounts_dir.mkdir(parents=True, exist_ok=True)
-            self.log("success", f"JARVIS home created at {self.jarvis_home} ✓")
-            self.log("info", f"Accounts folder: {accounts_dir}")
+            self.log("success", f"JARVIS home created (project-specific) ✓")
+            self.log("info", f"Location: {self.jarvis_home}")
+            self.log("info", f"Accounts: {accounts_dir}")
+            self.log("info", "This project's JARVIS is isolated from other projects")
             return True
         except Exception as e:
             self.log("error", f"Failed to create JARVIS home: {e}")
@@ -422,13 +426,17 @@ JARVIS_HOME={self.jarvis_home}
         print()
         print("   🎉 JARVIS is ready to use!")
         print()
+        print("   ⚠️  IMPORTANT: This JARVIS instance is project-specific")
+        print("   It will ONLY work when opened within this project folder")
+        print()
         print("   NEXT STEPS:")
         print()
         print("   1. Restart Claude Desktop completely")
         print("      • Windows: Close from system tray → reopen")
         print("      • macOS: Press Cmd+Q → reopen")
         print()
-        print("   2. Look for the 🔨 icon in Claude Desktop chat (JARVIS tools)")
+        print("   2. Open Claude Desktop with this project folder")
+        print("      (Or use Claude Code with the JARVIS project folder)")
         print()
         print("   3. Try creating your first account:")
         print('      "Create account Acme Corp. Target $200k, March deadline."')
@@ -436,9 +444,9 @@ JARVIS_HOME={self.jarvis_home}
         print("   4. Run your first skill:")
         print('      "Score MEDDPICC for Acme Corp"')
         print()
-        print(f"   Your account files are stored in: {self.jarvis_home}/ACCOUNTS/")
+        print(f"   📁 Your account files: {self.jarvis_home}/ACCOUNTS/")
         print()
-        print("   For help: Read README.md in the JARVIS project folder")
+        print("   For help: Read SALES_WORKFLOW.md or README.md in this folder")
         print()
 
     def print_failure(self) -> None:
