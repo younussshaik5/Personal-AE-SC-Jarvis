@@ -181,6 +181,15 @@ class JarvisServer:
 
     async def handle_tool_call(self, tool_name: str, arguments: dict) -> dict:
         """Handle tool call with FULL autonomous evolution and learning."""
+        # ── Validation ───────────────────────────────────────────────────────
+        # Validate tool_name
+        if not tool_name or not isinstance(tool_name, str):
+            return {"error": "Invalid tool_name: must be a non-empty string"}
+
+        # Validate arguments
+        if not isinstance(arguments, dict):
+            return {"error": "Invalid arguments: must be a dictionary"}
+
         # Safety check
         if not self.guard.is_safe():
             return {"error": "Safety check failed"}
@@ -229,8 +238,33 @@ class JarvisServer:
         if not skill_name or skill_name not in self.skills:
             return {"error": f"Unknown tool: {tool_name}"}
 
+        # ── Validate account_name for account-based tools ───────────────────
         # account_name for logging / learning — skill.execute() extracts it from arguments itself
         account_name = arguments.get("account_name", "")
+
+        # Tools that require account_name
+        tools_requiring_account = {
+            "get_proposal", "get_battlecard", "get_demo_strategy", "get_risk_report",
+            "get_value_architecture", "get_discovery", "get_competitive_intelligence",
+            "get_meeting_prep", "process_meeting", "summarize_conversation", "track_meddpicc",
+            "generate_sow", "generate_followup", "get_account_summary", "assess_technical_risk",
+            "analyze_competitor_pricing", "update_deal_stage", "generate_architecture",
+            "generate_documentation", "generate_html_report", "extract_intelligence",
+            "build_knowledge_graph", "quick_insights", "generate_custom_template",
+            "system_health"
+        }
+
+        if tool_name in tools_requiring_account:
+            if not account_name or not isinstance(account_name, str):
+                return {"error": f"Tool '{tool_name}' requires a valid account_name"}
+
+            # Sanitize account_name
+            account_name = account_name.strip()
+            if not account_name:
+                return {"error": "account_name cannot be empty after trimming whitespace"}
+
+            # Update arguments with sanitized account_name
+            arguments = {**arguments, "account_name": account_name}
 
         try:
             skill = self.skills[skill_name]

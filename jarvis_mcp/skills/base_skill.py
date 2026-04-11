@@ -24,16 +24,29 @@ class BaseSkill:
         self.logger = logging.getLogger(self.__class__.__name__)
 
     async def execute(self, arguments: Dict[str, Any]) -> str:
+        # Validate account_name
         account_name = arguments.get("account_name", "")
-        if not account_name:
-            return "❌ account_name is required."
+        if not account_name or not isinstance(account_name, str):
+            return "❌ account_name is required and must be a string."
+
+        # Validate that account exists
+        try:
+            account_path = self.config.get_account_path(account_name)
+            if not account_path.exists():
+                return f"❌ Account not found: {account_name}. Run scaffold_account first."
+        except ValueError as e:
+            return f"❌ Invalid account name: {e}"
+
         extra = {k: v for k, v in arguments.items() if k != "account_name"}
         try:
             result = await self.generate(account_name, **extra)
             return result or "✅ Done."
+        except asyncio.TimeoutError:
+            self.logger.error(f"execute() timeout for {account_name}", exc_info=True)
+            return f"❌ Timeout: Skill execution took too long for {account_name}"
         except Exception as e:
-            self.logger.error(f"execute() failed: {e}", exc_info=True)
-            return f"❌ Error: {e}"
+            self.logger.error(f"execute() failed for {account_name}: {type(e).__name__}: {e}", exc_info=True)
+            return f"❌ Error: {type(e).__name__}: {e}"
 
     async def read_account_files(self, account_name: str) -> Dict[str, str]:
         """Read all account files — .md files + deal_stage.json."""
@@ -56,42 +69,63 @@ class BaseSkill:
         if ds_file.exists():
             try:
                 ds_text = await read_file(ds_file)
-                ds = json.loads(ds_text)
-                context["_deal"] = ds  # raw dict for structured access
-                # Also build a human-readable summary
-                lines = [
-                    f"Account: {ds.get('account_name', account_name)}",
-                    f"Stage: {ds.get('stage', 'Unknown')}",
-                    f"Deal Size / ARR: ${ds.get('deal_size', ds.get('arr', 0)):,}",
-                    f"Win Probability: {int(ds.get('probability', 0) * 100)}%",
-                    f"Timeline / Forecast: {ds.get('timeline', ds.get('forecast_date', 'TBD'))}",
-                    f"Product: {ds.get('product', 'TBD')}",
-                    f"Agents: {ds.get('num_agents', 'TBD')}",
-                ]
-                # Stakeholders
-                for s in ds.get("stakeholders", []):
-                    if isinstance(s, dict):
-                        lines.append(f"Stakeholder: {s.get('name','?')} — {s.get('title','?')} ({s.get('role','?')}) | {s.get('notes','')}")
-                    else:
-                        lines.append(f"Stakeholder: {s}")
-                # Competitive
-                comp = ds.get("competitive_situation", {})
-                if comp:
-                    lines.append(f"Primary Competitor: {comp.get('primary_competitor','TBD')} — {comp.get('competitor_status','')}")
-                # Constraints
-                for c in ds.get("constraints", []):
-                    lines.append(f"Constraint: {c}")
-                # Activities
-                for a in ds.get("activities", [])[-5:]:  # last 5
-                    if isinstance(a, dict):
-                        lines.append(f"Activity [{a.get('date','')}]: {a.get('type','')} — {a.get('notes','')}")
-                # Next milestone
-                nm = ds.get("next_milestone", {})
-                if nm:
-                    lines.append(f"Next Milestone: {nm.get('activity','?')} by {nm.get('date','?')} — {nm.get('description','')}")
-                context["deal_stage"] = "\n".join(lines)
+                if not ds_text or not ds_text.strip():
+                    self.logger.warning(f"deal_stage.json is empty for {account_name}")
+                else:
+                    try:
+                        ds = json.loads(ds_text)
+                    except json.JSONDecodeError as e:
+                        self.logger.error(f"Invalid JSON in deal_stage.json for {account_name}: {e}")
+                        return context
+
+                    # Validate deal_stage has required fields
+                    if not isinstance(ds, dict):
+                        self.logger.error(f"deal_stage.json is not a dictionary for {account_name}")
+                        return context
+
+                    context["_deal"] = ds  # raw dict for structured access
+                    # Also build a human-readable summary
+                    lines = [
+                        f"Account: {ds.get('account_name', account_name)}",
+                        f"Stage: {ds.get('stage', 'Unknown')}",
+                        f"Deal Size / ARR: ${ds.get('deal_size', ds.get('arr', 0)):,}",
+                        f"Win Probability: {int(ds.get('probability', 0) * 100)}%",
+                        f"Timeline / Forecast: {ds.get('timeline', ds.get('forecast_date', 'TBD'))}",
+                        f"Product: {ds.get('product', 'TBD')}",
+                        f"Agents: {ds.get('num_agents', 'TBD')}",
+                    ]
+                    # Stakeholders
+                    stakeholders = ds.get("stakeholders", [])
+                    if isinstance(stakeholders, list):
+                        for s in stakeholders:
+                            if isinstance(s, dict):
+                                lines.append(f"Stakeholder: {s.get('name','?')} — {s.get('title','?')} ({s.get('role','?')}) | {s.get('notes','')}")
+                            else:
+                                lines.append(f"Stakeholder: {s}")
+                    # Competitive
+                    comp = ds.get("competitive_situation", {})
+                    if comp and isinstance(comp, dict):
+                        lines.append(f"Primary Competitor: {comp.get('primary_competitor','TBD')} — {comp.get('competitor_status','')}")
+                    # Constraints
+                    constraints = ds.get("constraints", [])
+                    if isinstance(constraints, list):
+                        for c in constraints:
+                            lines.append(f"Constraint: {c}")
+                    # Activities
+                    activities = ds.get("activities", [])
+                    if isinstance(activities, list):
+                        for a in activities[-5:]:  # last 5
+                            if isinstance(a, dict):
+                                lines.append(f"Activity [{a.get('date','')}]: {a.get('type','')} — {a.get('notes','')}")
+                    # Next milestone
+                    nm = ds.get("next_milestone", {})
+                    if nm and isinstance(nm, dict):
+                        lines.append(f"Next Milestone: {nm.get('activity','?')} by {nm.get('date','?')} — {nm.get('description','')}")
+                    context["deal_stage"] = "\n".join(lines)
+            except IOError as e:
+                self.logger.warning(f"Could not read deal_stage.json for {account_name}: {e}")
             except Exception as e:
-                self.logger.warning(f"Could not parse deal_stage.json: {e}")
+                self.logger.warning(f"Error processing deal_stage.json for {account_name}: {type(e).__name__}: {e}")
 
         return context
 
