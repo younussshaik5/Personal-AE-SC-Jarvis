@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+# Pre-commit hook to prevent accidental .env commits
+# Install: git config core.hooksPath .githooks
+
+echo "🔒 Checking for secrets before commit..."
+
+# List of files that should never be committed
+SECRET_FILES=(".env" "*.secret" "*.key" ".pem" ".aws/credentials" ".ssh/")
+
+for pattern in "${SECRET_FILES[@]}"; do
+    if git diff --cached --name-only | grep -E "$pattern"; then
+        echo "❌ BLOCKED: Attempt to commit secret file matching pattern: $pattern"
+        echo ""
+        echo "🔑 If you accidentally committed secrets:"
+        echo "   1. Revoke keys immediately at https://build.nvidia.com/admin/api-keys"
+        echo "   2. Run: git reset HEAD <file> && git checkout -- <file>"
+        echo "   3. Update .env with new keys"
+        echo "   4. Try commit again"
+        echo ""
+        exit 1
+    fi
+done
+
+# Check for API keys in actual file contents (skip scripts themselves and examples)
+if git diff --cached -S "nvapi-" --no-ext-diff | grep -v "\.githooks/pre-commit" | grep -v "\.env\.example" | grep -q "nvapi-"; then
+    echo "❌ BLOCKED: Detected NVIDIA API key in commit diff"
+    echo ""
+    echo "🔑 API Keys should never be in version control!"
+    echo "   - Store in .env (which is in .gitignore)"
+    echo "   - Revoke exposed keys immediately"
+    echo ""
+    exit 1
+fi
+
+# Check for real Anthropic keys (starts with sk-, not placeholder)
+if git diff --cached -S "ANTHROPIC_API_KEY=sk-" --no-ext-diff | grep -v "\.githooks/pre-commit" | grep -v "\.env\.example" | grep -q "ANTHROPIC_API_KEY=sk-"; then
+    echo "❌ BLOCKED: Detected Anthropic API key in commit diff"
+    exit 1
+fi
+
+echo "✅ No secrets detected"
+exit 0

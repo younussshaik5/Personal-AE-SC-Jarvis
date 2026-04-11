@@ -18,8 +18,25 @@ class AccountScaffolder:
     def __init__(self, accounts_root: Optional[str] = None):
         """Initialize scaffolder"""
         self.logger = logging.getLogger(__name__)
-        self.accounts_root = Path(accounts_root) if accounts_root else Path.home() / "Documents" / "claude space" / "ACCOUNTS"
-        self.accounts_root.mkdir(parents=True, exist_ok=True)
+        if accounts_root:
+            self.accounts_root = Path(accounts_root)
+        else:
+            # Fall back to environment variable or default
+            import os
+            jarvis_home = os.getenv("JARVIS_HOME")
+            if jarvis_home:
+                self.accounts_root = Path(jarvis_home) / "ACCOUNTS"
+            else:
+                raise RuntimeError(
+                    "JARVIS_HOME environment variable not set. "
+                    "Run setup.bat (Windows) or setup.sh (Mac/Linux) to initialize."
+                )
+
+        try:
+            self.accounts_root.mkdir(parents=True, exist_ok=True)
+        except OSError as e:
+            self.logger.error(f"Failed to create accounts root directory: {self.accounts_root}", exc_info=True)
+            raise
         
     def scaffold_account(self, 
                         account_name: str,
@@ -54,46 +71,69 @@ class AccountScaffolder:
             return {'status': 'already_exists', 'path': str(account_path)}
             
         # Create folder
-        account_path.mkdir(parents=True, exist_ok=True)
-        self.logger.info(f"Created account folder: {account_path}")
-        
+        try:
+            account_path.mkdir(parents=True, exist_ok=True)
+            self.logger.info(f"Created account folder: {account_path}")
+        except OSError as e:
+            self.logger.error(f"Failed to create account folder: {account_path}", exc_info=True)
+            raise
+
         result = {
             'status': 'created',
             'path': str(account_path),
             'files': {}
         }
-        
+
         # Create company_research.md
-        company_research = self._create_company_research(account_name, company_info)
-        research_path = account_path / "company_research.md"
-        with open(research_path, 'w') as f:
-            f.write(company_research)
-        result['files']['company_research'] = str(research_path)
-        self.logger.info(f"Created company_research.md")
-        
+        try:
+            company_research = self._create_company_research(account_name, company_info)
+            research_path = account_path / "company_research.md"
+            with open(research_path, 'w', encoding='utf-8') as f:
+                f.write(company_research)
+            result['files']['company_research'] = str(research_path)
+            self.logger.info(f"Created company_research.md")
+        except IOError as e:
+            self.logger.error(f"Failed to write company_research.md: {e}", exc_info=True)
+            raise
+
         # Create discovery.md
-        discovery = self._create_discovery_template(account_name)
-        discovery_path = account_path / "discovery.md"
-        with open(discovery_path, 'w') as f:
-            f.write(discovery)
-        result['files']['discovery'] = str(discovery_path)
-        self.logger.info(f"Created discovery.md")
-        
+        try:
+            discovery = self._create_discovery_template(account_name)
+            discovery_path = account_path / "discovery.md"
+            with open(discovery_path, 'w', encoding='utf-8') as f:
+                f.write(discovery)
+            result['files']['discovery'] = str(discovery_path)
+            self.logger.info(f"Created discovery.md")
+        except IOError as e:
+            self.logger.error(f"Failed to write discovery.md: {e}", exc_info=True)
+            raise
+
         # Create deal_stage.json
-        deal_stage = self._create_deal_stage_template(account_name)
-        deal_path = account_path / "deal_stage.json"
-        with open(deal_path, 'w') as f:
-            json.dump(deal_stage, f, indent=2)
-        result['files']['deal_stage'] = str(deal_path)
-        self.logger.info(f"Created deal_stage.json")
-        
+        try:
+            deal_stage = self._create_deal_stage_template(account_name)
+            deal_path = account_path / "deal_stage.json"
+            with open(deal_path, 'w', encoding='utf-8') as f:
+                json.dump(deal_stage, f, indent=2)
+            result['files']['deal_stage'] = str(deal_path)
+            self.logger.info(f"Created deal_stage.json")
+        except IOError as e:
+            self.logger.error(f"Failed to write deal_stage.json: {e}", exc_info=True)
+            raise
+        except TypeError as e:
+            self.logger.error(f"Failed to serialize deal_stage.json: {e}", exc_info=True)
+            raise
+
         # Create CLAUDE.md (account-specific config)
-        claude_md = self._create_claude_md_template(account_name)
-        claude_path = account_path / "CLAUDE.md"
-        with open(claude_path, 'w') as f:
-            f.write(claude_md)
-        result['files']['claude_md'] = str(claude_path)
-        self.logger.info(f"Created CLAUDE.md")
+        try:
+            claude_md = self._create_claude_md_template(account_name)
+            claude_path = account_path / "CLAUDE.md"
+            with open(claude_path, 'w', encoding='utf-8') as f:
+                f.write(claude_md)
+            result['files']['claude_md'] = str(claude_path)
+            self.logger.info(f"Created CLAUDE.md")
+        except IOError as e:
+            self.logger.error(f"Failed to write CLAUDE.md: {e}", exc_info=True)
+            raise
         
         result['message'] = f"✅ Account '{account_name}' scaffolded successfully"
         return result

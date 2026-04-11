@@ -147,9 +147,18 @@ class SelfLearner:
         if not timeline_path.exists():
             return {}
         try:
-            with open(timeline_path) as f:
+            with open(timeline_path, encoding="utf-8") as f:
                 return json.load(f)
-        except Exception:
+        except FileNotFoundError:
+            return {}
+        except json.JSONDecodeError as e:
+            log.warning(f"Invalid JSON in timeline file {timeline_path}: {e}")
+            return {}
+        except IOError as e:
+            log.warning(f"Disk I/O error reading timeline: {e}")
+            return {}
+        except Exception as e:
+            log.warning(f"Unexpected error reading timeline: {e}")
             return {}
 
     def stale_skills(self, account_name: str, max_age_hours: float = 24.0) -> list:

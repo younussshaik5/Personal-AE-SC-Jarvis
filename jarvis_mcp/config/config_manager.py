@@ -1,8 +1,12 @@
 """Configuration management for JARVIS."""
 
 import os
+import re
+import logging
 from pathlib import Path
 from typing import Optional, Dict, Any
+
+log = logging.getLogger(__name__)
 
 
 class ConfigManager:
@@ -10,21 +14,28 @@ class ConfigManager:
 
     def __init__(self):
         """Initialize config manager from environment variables."""
+        # Get JARVIS_HOME - fail if not set
+        jarvis_home = os.getenv("JARVIS_HOME")
+        if not jarvis_home:
+            raise RuntimeError(
+                "JARVIS_HOME environment variable not set. "
+                "Run setup.bat (Windows) or setup.sh (Mac/Linux) to initialize."
+            )
+
+        jarvis_home_path = Path(jarvis_home).expanduser()
+
+        # Verify JARVIS_HOME is accessible
+        if not jarvis_home_path.exists():
+            raise RuntimeError(
+                f"JARVIS_HOME does not exist: {jarvis_home_path}. "
+                "Run setup.bat or setup.sh to initialize."
+            )
+
         # Account paths
-        self.accounts_root = Path(
-            os.getenv(
-                "ACCOUNTS_ROOT",
-                Path.home() / "Documents" / "claude space" / "ACCOUNTS"
-            )
-        ).expanduser()
-        
+        self.accounts_root = jarvis_home_path / "ACCOUNTS"
+
         # Memory paths
-        self.memory_root = Path(
-            os.getenv(
-                "MEMORY_ROOT",
-                Path.home() / "Documents" / "claude space" / "MEMORY"
-            )
-        ).expanduser()
+        self.memory_root = jarvis_home_path / "MEMORY"
 
         # Create directories if they don't exist — fail fast with clear error if impossible
         try:
@@ -45,10 +56,49 @@ class ConfigManager:
         return self.accounts_root
 
     def get_account_path(self, account_name: str) -> Path:
-        """Get the path to an account directory."""
-        # Remove spaces and special characters for folder names
-        safe_name = account_name.replace(" ", "_").replace("/", "_")
-        return self.accounts_root / safe_name
+        """
+        Get the path to an account directory with security validation.
+
+        Prevents path traversal attacks by:
+        1. Validating account_name contains only safe characters
+        2. Resolving the final path and verifying it's within accounts_root
+        3. Rejecting any path components that escape the accounts directory
+
+        Args:
+            account_name: The account name (e.g., "AcmeCorp")
+
+        Returns:
+            Path object to the account directory
+
+        Raises:
+            ValueError: If account_name is invalid or attempts path traversal
+        """
+        # Validate: only alphanumeric, underscores, hyphens, and spaces
+        if not account_name or not isinstance(account_name, str):
+            raise ValueError("account_name must be a non-empty string")
+
+        # Normalize spaces to underscores, validate safe characters
+        safe_name = account_name.strip().replace(" ", "_")
+
+        # Whitelist: only allow [a-zA-Z0-9_-]
+        if not re.match(r"^[a-zA-Z0-9_\-]+$", safe_name):
+            raise ValueError(
+                f"Invalid account name '{account_name}'. "
+                "Only alphanumeric characters, underscores, and hyphens allowed."
+            )
+
+        # Build path
+        account_path = self.accounts_root / safe_name
+
+        # Security check: verify resolved path is within accounts_root
+        try:
+            account_path.resolve().relative_to(self.accounts_root.resolve())
+        except ValueError as e:
+            # Path is outside accounts_root
+            log.error(f"Path traversal attempt detected: {account_name}")
+            raise ValueError(f"Path traversal not allowed: {account_name}") from e
+
+        return account_path
 
     def get_memory_root(self) -> Path:
         """Get the memory root directory."""

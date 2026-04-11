@@ -180,11 +180,19 @@ class QueueWorker:
 
         except asyncio.TimeoutError:
             elapsed = round(time.time() - t0, 1)
-            log.error(f"[worker] ✗ TIMEOUT {job.skill_name} | {job.account_name} | {elapsed}s — killed")
+            log.error(f"[worker] ✗ TIMEOUT {job.skill_name} | {job.account_name} | {elapsed}s — killed", exc_info=True)
+            if self.learner:
+                await self.learner.record(
+                    job.account_name, job.skill_name, job.trigger, status="timeout"
+                )
 
         except Exception as e:
             elapsed = round(time.time() - t0, 1)
-            log.error(f"[worker] ✗ {job.skill_name} | {job.account_name} | {elapsed}s | {e}")
+            log.error(f"[worker] ✗ {job.skill_name} | {job.account_name} | {elapsed}s | {type(e).__name__}: {e}", exc_info=True)
+            if self.learner:
+                await self.learner.record(
+                    job.account_name, job.skill_name, job.trigger, status="exception"
+                )
 
         finally:
             await self.queue.done(job)

@@ -37,10 +37,21 @@ htmlcov/
 *~
 .DS_Store
 
-# Environment
+# Environment - NEVER COMMIT SECRETS
+# This is critical: .env contains API keys, credentials, and sensitive config
+# If you accidentally commit .env, revoke all keys immediately:
+# 1. Delete keys from cloud provider console
+# 2. Run: git filter-branch --force --index-filter "git rm -r --cached --ignore-unmatch .env"
+# 3. Regenerate all keys
 .env
 .env.local
 .env.*.local
+.env.secret
+.env.prod
+.env.staging
+*.secret
+*.key
+*.pem
 
 # Logs
 *.log

@@ -78,10 +78,17 @@ class RetryEngine:
 
             # ── Execute ───────────────────────────────────────────────────────
             t0 = time.time()
+            error_type = None
             try:
                 content = await self._run_skill(skill, account_name, model_override)
+            except asyncio.TimeoutError as e:
+                error_type = "timeout"
+                log.error(f"[retry] Skill timeout: {skill_name}", exc_info=True)
+                content = f"❌ Timeout: Skill execution exceeded time limit"
             except Exception as e:
-                content = f"❌ Exception: {e}"
+                error_type = type(e).__name__
+                log.error(f"[retry] Skill execution failed ({error_type}): {skill_name}", exc_info=True)
+                content = f"❌ {error_type}: {e}"
 
             elapsed = round(time.time() - t0, 1)
 
@@ -92,7 +99,7 @@ class RetryEngine:
             reason  = v["reason"]
 
             log.info(
-                f"[retry] verdict={verdict} quality={quality} elapsed={elapsed}s | {reason}"
+                f"[retry] verdict={verdict} quality={quality} error_type={error_type} elapsed={elapsed}s | {reason}"
             )
 
             # ── Record ────────────────────────────────────────────────────────

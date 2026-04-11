@@ -14,6 +14,8 @@ import subprocess
 import asyncio
 import logging
 import signal
+import atexit
+import threading
 from pathlib import Path
 
 # Load .env so CRM server inherits API keys without shell env vars
@@ -57,11 +59,47 @@ CRM_PORT = int(os.getenv("CRM_PORT", "8000"))
 
 # Global subprocess handle
 _crm_proc: subprocess.Popen | None = None
+_stderr_reader_thread: threading.Thread | None = None
+
+
+def _read_stderr_stream(process: subprocess.Popen, max_lines: int = 100):
+    """
+    Read stderr from subprocess in background thread to prevent buffer overflow.
+
+    Args:
+        process: The subprocess whose stderr to read
+        max_lines: Maximum lines to keep in buffer before dropping old lines
+    """
+    lines = []
+    try:
+        while True:
+            line = process.stderr.readline()
+            if not line:
+                break
+
+            line_str = line.decode("utf-8", errors="replace").rstrip()
+            if line_str:
+                log.debug(f"CRM stderr: {line_str}")
+                lines.append(line_str)
+
+                # Keep buffer bounded
+                if len(lines) > max_lines:
+                    lines.pop(0)
+    except Exception as e:
+        log.warning(f"Error reading CRM stderr: {e}")
 
 
 def start_crm_server():
-    """Start serve_crm.py as a background subprocess."""
-    global _crm_proc
+    """
+    Start serve_crm.py as a background subprocess with proper error handling.
+
+    Handles:
+    - Port conflicts (kills existing processes)
+    - Stderr buffering (background reader thread)
+    - Graceful shutdown with timeout
+    - Process cleanup
+    """
+    global _crm_proc, _stderr_reader_thread
 
     if not SERVE_CRM:
         log.error("serve_crm.py not found. CRM dashboard unavailable.")
@@ -71,9 +109,13 @@ def start_crm_server():
     if PlatformUtils:
         try:
             if not PlatformUtils.check_port_available(CRM_PORT):
+                log.info(f"Port {CRM_PORT} in use, killing existing process...")
                 PlatformUtils.kill_process_on_port(CRM_PORT)
-        except Exception:
-            pass
+                # Give it a moment to free the port
+                import time
+                time.sleep(1)
+        except Exception as e:
+            log.warning(f"Failed to kill process on port {CRM_PORT}: {e}")
 
     try:
         _crm_proc = subprocess.Popen(
@@ -82,25 +124,62 @@ def start_crm_server():
             stdout=subprocess.DEVNULL,
             stderr=subprocess.PIPE,
             env={**os.environ, "CRM_PORT": str(CRM_PORT)},
+            preexec_fn=None,  # Windows-safe
         )
+
+        # Start background thread to read stderr
+        _stderr_reader_thread = threading.Thread(
+            target=_read_stderr_stream,
+            args=(_crm_proc,),
+            daemon=True,
+            name="CRM-stderr-reader"
+        )
+        _stderr_reader_thread.start()
+
         log.info(f"CRM dashboard started — http://localhost:{CRM_PORT} (PID {_crm_proc.pid})")
         return True
     except Exception as e:
-        log.error(f"Failed to start CRM server: {e}")
+        log.error(f"Failed to start CRM server: {e}", exc_info=True)
         return False
 
 
 def stop_crm_server():
-    """Stop the CRM subprocess."""
-    global _crm_proc
-    if _crm_proc and _crm_proc.poll() is None:
-        log.info("Stopping CRM server…")
+    """
+    Stop the CRM subprocess gracefully with timeout.
+
+    Process:
+    1. Send SIGTERM (graceful shutdown)
+    2. Wait up to 5 seconds for process to exit
+    3. If still running, send SIGKILL (force kill)
+    4. Clean up stderr reader thread
+    """
+    global _crm_proc, _stderr_reader_thread
+
+    if not _crm_proc or _crm_proc.poll() is not None:
+        return  # Already dead
+
+    log.info(f"Stopping CRM server (PID {_crm_proc.pid})…")
+
+    try:
+        # Graceful shutdown
         _crm_proc.terminate()
+
         try:
+            # Wait with timeout
             _crm_proc.wait(timeout=5)
+            log.info("CRM server stopped gracefully")
         except subprocess.TimeoutExpired:
+            # Force kill if still running
+            log.warning("CRM server did not stop gracefully, killing…")
             _crm_proc.kill()
+            _crm_proc.wait(timeout=2)
+            log.info("CRM server killed")
+
+    except Exception as e:
+        log.error(f"Error stopping CRM server: {e}", exc_info=True)
+    finally:
         _crm_proc = None
+        _stderr_reader_thread = None
 
 
 def handle_exit(signum=None, frame=None):
@@ -108,13 +187,17 @@ def handle_exit(signum=None, frame=None):
     sys.exit(0)
 
 
-# Register platform-aware signal handlers (Windows-safe)
+# Register cleanup handlers - both signal handlers AND atexit for comprehensive coverage
+# Signal handlers for Unix/Mac (graceful shutdown via signals)
 if PlatformUtils:
     PlatformUtils.register_signal_handlers(handle_exit)
 else:
     # Fallback for when PlatformUtils is not available
     signal.signal(signal.SIGTERM, handle_exit)
     signal.signal(signal.SIGINT, handle_exit)
+
+# Register atexit handler - ensures cleanup even if process exits abnormally
+atexit.register(stop_crm_server)
 
 
 # ── MCP server ────────────────────────────────────────────────────────────────
