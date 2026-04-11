@@ -54,6 +54,24 @@ class PlatformUtils:
             return False
 
     @staticmethod
+    def find_available_port(start_port: int = 8000, max_attempts: int = 100) -> Optional[int]:
+        """
+        Find an available port starting from start_port.
+
+        Args:
+            start_port: Initial port to try (default: 8000)
+            max_attempts: Maximum number of ports to try (default: 100)
+
+        Returns:
+            Available port number, or None if no ports available
+        """
+        for offset in range(max_attempts):
+            port = start_port + offset
+            if PlatformUtils.check_port_available(port):
+                return port
+        return None
+
+    @staticmethod
     def kill_process_on_port(port: int) -> bool:
         """
         Kill process listening on port (platform-aware).

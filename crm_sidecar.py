@@ -55,7 +55,17 @@ _serve_crm_candidates = [
     _here.parent / "serve_crm.py",   # legacy: parent directory
 ]
 SERVE_CRM = next((p for p in _serve_crm_candidates if p.exists()), None)
-CRM_PORT = int(os.getenv("CRM_PORT", "8000"))
+
+# Get CRM port from environment (with fallback and validation)
+_crm_port_env = os.getenv("CRM_PORT", "8000")
+try:
+    CRM_PORT = int(_crm_port_env)
+    if CRM_PORT < 1 or CRM_PORT > 65535:
+        log.error(f"Invalid CRM_PORT {CRM_PORT}: must be 1-65535, using default 8000")
+        CRM_PORT = 8000
+except ValueError:
+    log.error(f"Invalid CRM_PORT '{_crm_port_env}': not an integer, using default 8000")
+    CRM_PORT = 8000
 
 # Global subprocess handle
 _crm_proc: subprocess.Popen | None = None
@@ -94,7 +104,7 @@ def start_crm_server():
     Start serve_crm.py as a background subprocess with proper error handling.
 
     Handles:
-    - Port conflicts (kills existing processes)
+    - Port conflicts (kills existing processes or finds available port)
     - Stderr buffering (background reader thread)
     - Graceful shutdown with timeout
     - Process cleanup
@@ -105,17 +115,40 @@ def start_crm_server():
         log.error("serve_crm.py not found. CRM dashboard unavailable.")
         return False
 
-    # Kill any existing process on port (cross-platform)
+    # Determine port to use (kill existing process or find available)
+    actual_port = CRM_PORT
     if PlatformUtils:
         try:
             if not PlatformUtils.check_port_available(CRM_PORT):
-                log.info(f"Port {CRM_PORT} in use, killing existing process...")
-                PlatformUtils.kill_process_on_port(CRM_PORT)
-                # Give it a moment to free the port
-                import time
-                time.sleep(1)
+                log.warning(f"Port {CRM_PORT} in use, attempting to kill existing process...")
+                if PlatformUtils.kill_process_on_port(CRM_PORT):
+                    # Give it a moment to free the port
+                    import time
+                    time.sleep(1)
+                else:
+                    # Could not kill existing process, try to find available port
+                    log.warning(f"Could not kill process on port {CRM_PORT}, finding available port...")
+                    available = PlatformUtils.find_available_port(CRM_PORT)
+                    if available:
+                        actual_port = available
+                        log.info(f"Using alternate port {actual_port} instead of {CRM_PORT}")
+                    else:
+                        log.error(f"Could not find available port starting from {CRM_PORT}")
+                        return False
         except Exception as e:
-            log.warning(f"Failed to kill process on port {CRM_PORT}: {e}")
+            log.warning(f"Error checking/using port {CRM_PORT}: {e}")
+            # Try to find available port as fallback
+            try:
+                available = PlatformUtils.find_available_port(8000, 50)
+                if available:
+                    actual_port = available
+                    log.info(f"Using fallback port {actual_port}")
+                else:
+                    log.error("Could not find any available port")
+                    return False
+            except Exception as e2:
+                log.error(f"Failed to find available port: {e2}")
+                return False
 
     try:
         _crm_proc = subprocess.Popen(
@@ -123,7 +156,7 @@ def start_crm_server():
             cwd=str(SERVE_CRM.parent),
             stdout=subprocess.DEVNULL,
             stderr=subprocess.PIPE,
-            env={**os.environ, "CRM_PORT": str(CRM_PORT)},
+            env={**os.environ, "CRM_PORT": str(actual_port)},
             preexec_fn=None,  # Windows-safe
         )
 
@@ -136,10 +169,10 @@ def start_crm_server():
         )
         _stderr_reader_thread.start()
 
-        log.info(f"CRM dashboard started — http://localhost:{CRM_PORT} (PID {_crm_proc.pid})")
+        log.info(f"CRM dashboard started — http://localhost:{actual_port} (PID {_crm_proc.pid})")
         return True
     except Exception as e:
-        log.error(f"Failed to start CRM server: {e}", exc_info=True)
+        log.error(f"Failed to start CRM server on port {actual_port}: {type(e).__name__}: {e}", exc_info=True)
         return False
 
 
