@@ -50,6 +50,29 @@ print(f"\n✅ NVIDIA_API_KEY is configured")
 print(f"   Key (truncated): {nvidia_key[:20]}...{nvidia_key[-15:]}")
 print(f"   Length: {len(nvidia_key)} characters")
 
+# Check for multiple API keys (recommended to avoid rate limits)
+print("\n📋 Checking for multiple API keys...")
+additional_keys = 0
+for i in range(2, 10):
+    key_name = f"NVIDIA_API_KEY_{i}"
+    key_value = os.getenv(key_name)
+    if key_value and key_value.startswith('nvapi-'):
+        additional_keys += 1
+        print(f"   ✅ Found {key_name}")
+
+if additional_keys == 0:
+    print(f"   ⚠️  Only 1 API key configured")
+    print(f"   JARVIS runs 9 parallel LLM calls (MEDDPICC scoring)")
+    print(f"   Recommendation: Add 3-6 keys to .env to avoid rate limits")
+    print(f"\n   How to add more keys:")
+    print(f"   1. Edit .env file")
+    print(f"   2. Add: NVIDIA_API_KEY_2=nvapi-YOUR-SECOND-KEY")
+    print(f"   3. Add: NVIDIA_API_KEY_3=nvapi-YOUR-THIRD-KEY")
+    print(f"   4. Save and restart Claude Desktop")
+else:
+    print(f"\n✅ Multiple API keys configured ({1 + additional_keys} total)")
+    print(f"   JARVIS will distribute requests across keys automatically")
+
 # Try to initialize LLM Manager
 try:
     sys.path.insert(0, str(Path.cwd()))
@@ -70,5 +93,8 @@ except Exception as e:
 print("\n" + "=" * 70)
 print("✅ ALL CHECKS PASSED - READY TO USE")
 print("=" * 70)
-print("\nNext: Restart Claude Desktop (⌘Q, then reopen)")
-print("      JARVIS will be available in 🔨 Tools")
+print("\nNext: Restart Claude Desktop")
+print("      • macOS: Press Cmd+Q to quit, then reopen")
+print("      • Windows: Right-click Claude in taskbar → Quit → Reopen")
+print("      • Linux: Close and reopen Claude Desktop")
+print("\n      JARVIS tools will be available when you ask for skills")

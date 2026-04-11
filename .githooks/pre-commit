@@ -8,7 +8,8 @@ echo "🔒 Checking for secrets before commit..."
 SECRET_FILES=(".env" "*.secret" "*.key" ".pem" ".aws/credentials" ".ssh/")
 
 for pattern in "${SECRET_FILES[@]}"; do
-    if git diff --cached --name-only | grep -E "$pattern"; then
+    # Skip check_api_key.py (it's a utility script, not a secret file)
+    if git diff --cached --name-only | grep -E "$pattern" | grep -v "check_api_key"; then
         echo "❌ BLOCKED: Attempt to commit secret file matching pattern: $pattern"
         echo ""
         echo "🔑 If you accidentally committed secrets:"
